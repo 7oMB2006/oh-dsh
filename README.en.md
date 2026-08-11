@@ -64,7 +64,8 @@ on its own.
 | Pinned Summary | Half-height summary card that follows the active Session and reserves space in the conversation |
 | Embedded Side Panel | Review, Browser, Files, Side chat, and Trajectory share one right-hand tool area |
 | Focus mode | The Side Panel can cover Chat completely and returns with Esc |
-| Transactional plugin marketplace | Browse `dsh-external`; preview install, update, enable, disable, or remove; then apply, discard, or undo |
+| Transactional plugin marketplace | Browse `dsh-external`; preview install, update, enable, disable, or remove; then apply, discard, or recover |
+| Conversational plugin management | Agent and human UI share one risk, preview, apply, and recovery transaction owner |
 | Bilingual plugin UI | The Settings Chinese / English choice updates every bundled Oh-DSH plugin live |
 | macOS integration | Hidden title bar, draggable window regions, native menus, file pickers, and external links |
 
@@ -192,18 +193,30 @@ discard (no live change) or apply (retain previous)
 Undo restores the complete previous Profile when needed
 ```
 
-- **All / Installed / Not installed** filters retain the complete catalog.
+- **All / Installed / Not installed / Updates / Disabled** filters retain the
+  complete catalog.
 - Installed and enabled are separate states. An installed plugin can be
   preview-enabled or preview-disabled without uninstalling it.
 - Refresh compares the installed commit with remote HEAD and prepares updates
   through the same isolated preview flow.
-- Details show community provenance, exact commits, and runtime boundaries.
-  A Repository plugin becomes trusted host code after apply, and the UI says
-  so explicitly.
+- First apply records source identity, mechanism, package name, exact commit,
+  and manifest hash. The TOFU lock survives uninstall. A changed identity
+  requires renewed approval; changed content at the same commit is rejected.
+- Risk is classified as low, elevated, high, or blocked. Repository plugins
+  become trusted host code after apply. Desktop core plugins and the market
+  itself are protected from self-replacement.
 - Install scripts are blocked by default. Reviewed scripts can run only after
   explicit confirmation and only inside the write-restricted preview tree.
+- Lifecycle state separates `candidate`, `current`, and `previous`. Failed
+  applies recover automatically, and a successful apply retains the complete
+  previous Profile for manual recovery.
 - Opening native Settings automatically dismisses the market so it never
   obscures configuration.
+
+The Agent can use `desktop_plugin_search`, `desktop_plugin_prepare`, and
+`desktop_plugin_preview` from conversation to enter the same workflow.
+`desktop_plugin_apply` and `desktop_plugin_recover` always cross the DSH human
+approval seam. They do not add a second Loader or bypass isolated preview.
 
 Private organization repositories authenticate through GitHub CLI:
 
@@ -249,6 +262,9 @@ window without restarting the runtime.
 - The marketplace builds candidates from exact Git commits. macOS Seatbelt
   restricts preview writes, and the live desktop Profile is untouched until
   the user applies the candidate.
+- The Agent management channel binds to a random loopback port. Its ephemeral
+  credential is removed from the Host environment after mount and is never
+  passed to preview runtimes.
 
 ## Build the macOS installer
 
