@@ -1,0 +1,125 @@
+.oh-dsh-side-panel {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100% !important;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.oh-dsh-side-header > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.oh-dsh-side-header > div strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oh-dsh-side-menu {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.oh-dsh-side-tool-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2328);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.oh-dsh-side-tool-row:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 5%));
+}
+
+.oh-dsh-side-tool-row:disabled { opacity: 0.4; cursor: default; }
+.oh-dsh-side-tool-row svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.oh-dsh-side-tool-row > span { font-size: 14px; }
+.oh-dsh-side-tool-row kbd { padding: 2px 7px; border: 0; border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%)); color: var(--dsw-alias-label-tertiary, #8c959f); font: 11px system-ui; }
+
+.oh-dsh-browser-view,
+.oh-dsh-files-view {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.oh-dsh-browser-bar,
+.oh-dsh-files-path {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 40px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+
+.oh-dsh-browser-bar button,
+.oh-dsh-files-path button,
+.oh-dsh-file-preview button {
+  min-width: 27px;
+  height: 27px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 5%));
+  color: inherit;
+  cursor: pointer;
+}
+
+.oh-dsh-browser-bar button:disabled,
+.oh-dsh-files-path button:disabled { opacity: 0.35; cursor: default; }
+
+.oh-dsh-browser-bar input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 10%));
+  border-radius: 7px;
+  outline: none;
+  background: var(--dsw-alias-bg-base, #fff);
+  color: inherit;
+}
+
+.oh-dsh-browser-host { flex: 1; min-height: 0; }
+.oh-dsh-browser-webview { display: flex; width: 100%; height: 100%; }
+.oh-dsh-browser-error,
+.oh-dsh-side-error { margin: 8px 12px; padding: 7px 9px; border-radius: 7px; background: color-mix(in srgb, #cf222e 10%, transparent); color: #cf222e; font-size: 11px; }
+
+.oh-dsh-files-path span { flex: 1; min-width: 0; overflow: hidden; color: var(--dsw-alias-label-secondary, #57606a); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.oh-dsh-file-list { flex: 1; min-height: 0; overflow: auto; padding: 6px 9px 20px; }
+.oh-dsh-file-list > button { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 6px; width: 100%; min-height: 32px; padding: 0 7px; border: 0; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: left; }
+.oh-dsh-file-list > button:hover { background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 5%)); }
+.oh-dsh-file-list > button span:nth-child(2) { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.oh-dsh-file-list small { color: var(--dsw-alias-label-tertiary, #8c959f); font-size: 10px; }
+.oh-dsh-file-preview { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+.oh-dsh-file-preview > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.oh-dsh-file-preview strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.oh-dsh-file-preview pre { margin: 0; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.oh-dsh-side-empty,
+.oh-dsh-side-muted { padding: 18px; color: var(--dsw-alias-label-tertiary, #8c959f); font-size: 11px; }
