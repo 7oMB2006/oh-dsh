@@ -14,6 +14,7 @@
   <p>
     <a href="#quick-start">Quick Start</a> ·
     <a href="#capabilities">Capabilities</a> ·
+    <a href="#plugin-marketplace">Plugin Marketplace</a> ·
     <a href="#architecture">Architecture</a> ·
     <a href="#plugin-system">Plugin System</a> ·
     <a href="#development-and-validation">Development</a>
@@ -63,7 +64,8 @@ on its own.
 | Pinned Summary | Half-height summary card that follows the active Session and reserves space in the conversation |
 | Embedded Side Panel | Review, Browser, Files, Side chat, and Trajectory share one right-hand tool area |
 | Focus mode | The Side Panel can cover Chat completely and returns with Esc |
-| Plugin installation | Install a DSH plugin from a folder and retain user plugin order across runtime restarts |
+| Transactional plugin marketplace | Browse `dsh-external`; preview install, update, enable, disable, or remove; then apply, discard, or undo |
+| Bilingual plugin UI | The Settings Chinese / English choice updates every bundled Oh-DSH plugin live |
 | macOS integration | Hidden title bar, draggable window regions, native menus, file pickers, and external links |
 
 Review lives only inside the Side Panel and does not take a separate toolbar
@@ -141,6 +143,7 @@ flowchart TB
   Panels["@oh-dsh/panel-controls<br/>terminal · sidebar"]
   Summary["@oh-dsh/pinned-summary<br/>session summary"]
   Tools["@oh-dsh/workspace-tools<br/>review · browser · files"]
+  Market["@oh-dsh/plugin-marketplace<br/>discover · preview · recover"]
 
   App --> Runtime
   Runtime --> UI
@@ -148,6 +151,7 @@ flowchart TB
   UI --> Panels
   UI --> Summary
   UI --> Tools
+  UI --> Market
 ```
 
 ### Bundled plugins
@@ -158,10 +162,57 @@ flowchart TB
 | `@oh-dsh/panel-controls` | Multi-tab Terminal, bottom panel, sidebar, font, and height preferences |
 | `@oh-dsh/pinned-summary` | Active Session summary and conversation gutter management |
 | `@oh-dsh/workspace-tools` | Workspace/Git API, embedded Review, and Side Panel tools |
+| `@oh-dsh/plugin-marketplace` | `dsh-external` catalog, isolated candidate Profiles, update checks, and recovery |
 | `@oh-dsh/desktop` | Root bundle that registers every desktop plugin in a stable order |
 
 `cordis.patch.yml` reuses `dsh-base` and `dsh-web-app`, binds the runtime to a
 temporary loopback port, and loads the desktop plugins in dependency order.
+
+## Plugin Marketplace
+
+The **Plugins** entry in the left sidebar reads the
+[`dsh-external/hub`](https://github.com/dsh-external/hub) catalog and reuses
+the official DSH Profile bundle and repository plugin mechanisms. The market
+is itself an `@oh-dsh/plugin-marketplace` plugin; it does not replace the DSH
+Loader.
+
+The implementation distills the proven management ideas from
+`plugin-registry`, `dsh-hub`, and related marketplace infrastructure into one
+transaction:
+
+```text
+verify source and resolve an exact commit
+        ↓
+copy the current Profile into an isolated candidate
+        ↓
+launch DSH in a write-restricted preview window
+        ↓
+discard (no live change) or apply (retain previous)
+        ↓
+Undo restores the complete previous Profile when needed
+```
+
+- **All / Installed / Not installed** filters retain the complete catalog.
+- Installed and enabled are separate states. An installed plugin can be
+  preview-enabled or preview-disabled without uninstalling it.
+- Refresh compares the installed commit with remote HEAD and prepares updates
+  through the same isolated preview flow.
+- Details show community provenance, exact commits, and runtime boundaries.
+  A Repository plugin becomes trusted host code after apply, and the UI says
+  so explicitly.
+- Install scripts are blocked by default. Reviewed scripts can run only after
+  explicit confirmation and only inside the write-restricted preview tree.
+- Opening native Settings automatically dismisses the market so it never
+  obscures configuration.
+
+Private organization repositories authenticate through GitHub CLI:
+
+```sh
+gh auth login
+```
+
+Credentials are supplied through `gh auth git-credential`; they are not
+stored in application settings or passed in command-line arguments.
 
 ## Plugin system
 
@@ -177,6 +228,11 @@ bundle order live in the writable `profiles/desktop/package.json`. Bundled
 desktop plugins keep their fixed order, while user plugins retain their own
 installation order.
 
+Every bundled client plugin injects the official DSH `locale` service and
+registers `zh` / `en` dictionaries. Changing the language in Settings updates
+Terminal, Pinned Summary, Workspace tools, and the marketplace in the current
+window without restarting the runtime.
+
 ## Security boundaries
 
 - The DSH Web runtime listens only on a random loopback port.
@@ -190,6 +246,9 @@ installation order.
   links back into the source tree.
 - pnpm's release-age policy stays enabled, with an explicit exclusion only
   for `@deepseek-ai/*`.
+- The marketplace builds candidates from exact Git commits. macOS Seatbelt
+  restricts preview writes, and the live desktop Profile is untouched until
+  the user applies the candidate.
 
 ## Build the macOS installer
 
@@ -239,6 +298,8 @@ four corners retain a real alpha channel.
 │   ├── desktop-shell/       # Electron bridge and PTY host
 │   ├── panel-controls/      # Terminal and panel controls
 │   ├── pinned-summary/      # Session summary
+│   ├── plugin-marketplace/  # Catalog, isolated preview, updates, recovery
+│   ├── shared/              # Locale contracts shared by bundled plugins
 │   └── workspace-tools/     # Review, Git, Browser, and Files
 ├── scripts/                 # Build, staging, smoke, and macOS packaging
 ├── src/                     # Electron main process, preload, and root bundle

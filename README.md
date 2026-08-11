@@ -14,6 +14,7 @@
   <p>
     <a href="#快速开始">快速开始</a> ·
     <a href="#核心能力">核心能力</a> ·
+    <a href="#插件市场">插件市场</a> ·
     <a href="#架构">架构</a> ·
     <a href="#插件机制">插件机制</a> ·
     <a href="#开发与验证">开发与验证</a>
@@ -59,7 +60,8 @@ Electron 和所需原生模块一起装进 macOS 应用，安装后即可启动�
 | Pinned Summary | 跟随当前 Session 的半高摘要卡片，并为正文自然预留空间 |
 | 内嵌 Side Panel | Review、Browser、Files、Side chat、Trajectory 共用右侧工具列 |
 | 专注模式 | Side Panel 可展开覆盖 Chat，按 Esc 恢复 |
-| 插件安装 | 从文件夹安装 DSH plugin，runtime 重启后保留用户插件顺序 |
+| 事务化插件市场 | 浏览 `dsh-external`，隔离预览安装、更新、启停和卸载，可应用、放弃或撤销 |
+| 双语插件 UI | 设置中的中文 / English 会实时更新全部内置 Oh-DSH plugins |
 | macOS 集成 | 隐藏式标题栏、窗口拖动、原生菜单、文件选择器和外链处理 |
 
 Review 只存在于 Side Panel 内，不占用独立顶部图标。打开 Side Panel 会自动
@@ -134,6 +136,7 @@ flowchart TB
   Panels["@oh-dsh/panel-controls<br/>terminal · sidebar"]
   Summary["@oh-dsh/pinned-summary<br/>session summary"]
   Tools["@oh-dsh/workspace-tools<br/>review · browser · files"]
+  Market["@oh-dsh/plugin-marketplace<br/>discover · preview · recover"]
 
   App --> Runtime
   Runtime --> UI
@@ -141,6 +144,7 @@ flowchart TB
   UI --> Panels
   UI --> Summary
   UI --> Tools
+  UI --> Market
 ```
 
 ### 内置 plugins
@@ -151,10 +155,49 @@ flowchart TB
 | `@oh-dsh/panel-controls` | 多标签 Terminal、底部面板、侧栏、字体与高度偏好 |
 | `@oh-dsh/pinned-summary` | 当前 Session 摘要和正文 gutter 管理 |
 | `@oh-dsh/workspace-tools` | Workspace/Git API、内嵌 Review 和 Side Panel 工具 |
+| `@oh-dsh/plugin-marketplace` | `dsh-external` 目录、隔离候选 Profile、更新检查和回滚 |
 | `@oh-dsh/desktop` | 根 bundle，按固定顺序注册所有桌面 plugins |
 
 `cordis.patch.yml` 复用 `dsh-base` 与 `dsh-web-app`，绑定临时 loopback
 端口，并按依赖顺序装载桌面 plugins。
+
+## 插件市场
+
+左侧 **插件** 入口读取
+[`dsh-external/hub`](https://github.com/dsh-external/hub) 目录，并沿用 DSH
+官方的 Profile bundle 与 repository plugin 两种加载机制。市场自身也是一个
+`@oh-dsh/plugin-marketplace` plugin，不会替换 DSH Loader。
+
+市场把 `plugin-registry`、`dsh-hub` 等管理项目中经过验证的设计收敛为一条
+明确的事务链：
+
+```text
+检查来源与精确 commit
+        ↓
+复制当前 Profile 到隔离候选目录
+        ↓
+在写入受限的预览窗口中启动 DSH
+        ↓
+放弃（当前桌面零变化）或应用（保留 previous）
+        ↓
+必要时 Undo 恢复完整旧 Profile
+```
+
+- **全部 / 已安装 / 未安装** 分组保持目录完整，不会只显示局部结果。
+- 安装与启用是两种状态；已安装插件可以单独预览启用或停用。
+- 刷新时比较已安装 commit 与远端 HEAD，并为更新生成新的隔离预览。
+- 每个详情页展示社区来源、精确 commit 和运行边界。Repository plugin
+  应用后属于受信任主机代码，界面会明确提示这一点。
+- 安装脚本默认阻止；只有用户审阅并确认后，才可在写入受限的预览目录中运行。
+- 打开原生设置页时市场自动关闭，避免遮挡设置内容。
+
+私有组织仓库通过 GitHub CLI 认证：
+
+```sh
+gh auth login
+```
+
+凭证由 `gh auth git-credential` 临时提供，不写入应用配置或命令行参数。
 
 ## 插件机制
 
@@ -168,6 +211,10 @@ dsh plugin --profile desktop add <plugin-directory>
 `profiles/desktop/package.json` 中；内置 plugins 会保持固定顺序，用户
 plugins 保留自己的安装顺序。
 
+所有内置客户端插件都注入 DSH 官方 `locale` 服务并注册 `zh` / `en`
+词典。设置页切换语言后，Terminal、Pinned Summary、Workspace tools 和
+插件市场会在当前窗口内立即更新，不需要重启 runtime。
+
 ## 安全边界
 
 - DSH Web runtime 只监听随机 loopback 端口。
@@ -176,6 +223,8 @@ plugins 保留自己的安装顺序。
 - 文件列表、文件预览和 PTY 消息都有明确的数量或大小上限。
 - `scripts/stage-dsh.mjs` 校验 Node.js SHA-256，并拒绝指回源码目录的链接。
 - pnpm 的 release-age 策略保持启用，只对 `@deepseek-ai/*` 做显式排除。
+- 市场从精确 Git commit 构建候选 Profile；预览写入受 macOS Seatbelt
+  限制，应用前不会触碰当前桌面 Profile。
 
 ## 生成 macOS 安装包
 
@@ -224,6 +273,8 @@ pnpm run smoke:app
 │   ├── desktop-shell/       # Electron bridge 与 PTY host
 │   ├── panel-controls/      # Terminal 和面板控制
 │   ├── pinned-summary/      # Session 摘要
+│   ├── plugin-marketplace/  # 目录、隔离预览、更新与恢复
+│   ├── shared/              # 内置 plugins 共用的 locale 契约
 │   └── workspace-tools/     # Review、Git、Browser 与 Files
 ├── scripts/                 # 构建、stage、smoke 和 macOS 打包
 ├── src/                     # Electron 主进程、preload 与根 bundle
