@@ -6,6 +6,22 @@ import { test } from 'node:test'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+test('embedded tools keep the application root inside the window row', () => {
+  const css = readFileSync(
+    join(root, 'plugins/workspace-tools/src/client/workspace-tools.css'),
+    'utf8',
+  )
+
+  assert.match(
+    css,
+    /#oh-dsh-embedded-layout\s*\{[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
+  )
+  assert.match(
+    css,
+    /#oh-dsh-embedded-layout > #root\s*\{[^}]*min-height: 0;[^}]*overflow: hidden;/s,
+  )
+})
+
 test('review, pinned summary, and embedded side tools keep distinct layouts', () => {
   const summary = readFileSync(join(root, 'plugins/pinned-summary/src/client.ts'), 'utf8')
   const workspace = readFileSync(join(root, 'plugins/workspace-tools/src/client/plugin.tsx'), 'utf8')
