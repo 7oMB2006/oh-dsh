@@ -200,13 +200,15 @@ release/
 ```sh
 pnpm run typecheck
 pnpm test
+pnpm run check:screenshot
 pnpm run build
 pnpm run smoke:runtime
 pnpm run smoke:app
 ```
 
 测试覆盖 profile 初始化、runtime 启动、PTY 协议、终端状态、Workspace/Git
-边界、文件访问约束和右侧面板布局契约。
+边界、文件访问约束和右侧面板布局契约。截图检查还会确认 UI 图片的四个
+圆角保留真实的 alpha 透明通道。
 
 ### 项目结构
 
