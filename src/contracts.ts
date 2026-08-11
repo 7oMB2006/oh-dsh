@@ -1,3 +1,5 @@
+import type { PluginMarketplaceBridge } from '../plugins/plugin-marketplace/src/protocol.ts'
+
 /** Commands sent from Electron's native chrome to the DSH client plugin. */
 export type DesktopCommand =
   | { type: 'focus-composer' }
@@ -21,6 +23,7 @@ export interface DesktopInfo {
   appDataPath: string
   dshHome: string
   platform: NodeJS.Platform
+  preview: { pluginId: string; transactionId: string } | null
   profile: string
   version: string
 }
@@ -41,4 +44,5 @@ export interface DesktopBridge {
   getRuntimeSnapshot(): Promise<DesktopRuntimeSnapshot>
   onCommand(listener: (command: DesktopCommand) => void): () => void
   openExternal(url: string): Promise<void>
+  pluginMarketplace: PluginMarketplaceBridge
 }

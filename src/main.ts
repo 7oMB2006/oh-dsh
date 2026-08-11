@@ -14,11 +14,20 @@ import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } 
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PluginMarketplaceManager } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
+import {
+  findGitHubCli,
+  previewSandboxPolicy,
+  ProductionMarketplacePlatform,
+  withGitHubCredentials,
+} from '../plugins/plugin-marketplace/src/host/platform.ts'
+import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/protocol.ts'
 import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 
 const PRODUCT_NAME = 'Oh-DSH-Desktop'
+const DEFAULT_UI_ZOOM_FACTOR = 1.12
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const splashPath = join(currentDir, 'splash.html')
 const preloadPath = join(currentDir, 'preload.cjs')
@@ -27,6 +36,12 @@ let mainWindow: BrowserWindow | undefined
 let runtime: DshRuntimeSupervisor | undefined
 let runtimeUrl: URL | undefined
 let runtimeOrigin: string | undefined
+let previewRuntime: DshRuntimeSupervisor | undefined
+let previewWindow: BrowserWindow | undefined
+let previewUrl: URL | undefined
+let previewOrigin: string | undefined
+let previewIdentity: { pluginId: string; transactionId: string } | undefined
+let marketplace: PluginMarketplaceManager | undefined
 let logStream: WriteStream | undefined
 let quitting = false
 let transitioning = false
@@ -54,12 +69,13 @@ function runtimePaths(): { cliEntry: string; nodeBinary: string; runtimeRoot: st
   }
 }
 
-function desktopInfo(): DesktopInfo {
+function desktopInfo(preview: DesktopInfo['preview'] = null): DesktopInfo {
   const appDataPath = app.getPath('userData')
   return {
     appDataPath,
     dshHome: join(appDataPath, 'dsh'),
     platform: process.platform,
+    preview,
     profile: DESKTOP_PROFILE,
     version: app.getVersion(),
   }
@@ -75,8 +91,11 @@ function desktopRuntimeSnapshot(): DesktopRuntimeSnapshot {
   }
 }
 
-function runtimeEnvironment(paths: ReturnType<typeof runtimePaths>): NodeJS.ProcessEnv {
-  const info = desktopInfo()
+function runtimeEnvironment(
+  paths: ReturnType<typeof runtimePaths>,
+  overrides: { appDataPath?: string; dshHome?: string; preview?: { pluginId: string; transactionId: string } } = {},
+): NodeJS.ProcessEnv {
+  const info = desktopInfo(overrides.preview ?? null)
   const inheritedPath = process.env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin'
   const path = [
     dirname(paths.nodeBinary),
@@ -85,16 +104,22 @@ function runtimeEnvironment(paths: ReturnType<typeof runtimePaths>): NodeJS.Proc
     '/usr/local/bin',
     inheritedPath,
   ].join(':')
-  return {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     DSH_DESKTOP: '1',
-    DSH_DESKTOP_APP_DATA: info.appDataPath,
+    DSH_DESKTOP_APP_DATA: overrides.appDataPath ?? info.appDataPath,
     DSH_DESKTOP_PROFILE: info.profile,
     DSH_DESKTOP_VERSION: info.version,
-    DSH_HOME: info.dshHome,
+    DSH_HOME: overrides.dshHome ?? info.dshHome,
     NODE_USE_ENV_PROXY: '1',
     PATH: path,
   }
+  if (overrides.preview !== undefined) {
+    environment.DSH_DESKTOP_PREVIEW = '1'
+    environment.DSH_DESKTOP_PREVIEW_PLUGIN = overrides.preview.pluginId
+    environment.DSH_DESKTOP_PREVIEW_TRANSACTION = overrides.preview.transactionId
+  }
+  return withGitHubCredentials(environment, findGitHubCli(environment))
 }
 
 function runtimeOptions(): DshRuntimeOptions {
@@ -118,11 +143,48 @@ function runtimeOptions(): DshRuntimeOptions {
   }
 }
 
-function isAllowedRuntimeNavigation(target: string): boolean {
+function previewRuntimeOptions(input: {
+  dshHome: string
+  pluginId: string
+  sandboxRoot: string
+  transactionId: string
+}): DshRuntimeOptions {
+  const paths = runtimePaths()
+  const workspaceRoot = join(input.sandboxRoot, 'workspace')
+  const temporary = join(input.sandboxRoot, '.tmp')
+  mkdirSync(workspaceRoot, { recursive: true, mode: 0o700 })
+  mkdirSync(temporary, { recursive: true, mode: 0o700 })
+  if (!existsSync(paths.nodeBinary)) throw new Error(`packaged Node runtime is missing: ${paths.nodeBinary}`)
+  if (!existsSync(paths.cliEntry)) throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
+  const preview = { pluginId: input.pluginId, transactionId: input.transactionId }
+  const sandbox = '/usr/bin/sandbox-exec'
+  const launcher = process.platform === 'darwin' && existsSync(sandbox)
+    ? { args: ['-p', previewSandboxPolicy(input.sandboxRoot)], command: sandbox }
+    : undefined
+  return {
+    args: ['--profile', DESKTOP_PROFILE],
+    cliEntry: paths.cliEntry,
+    cwd: workspaceRoot,
+    env: {
+      ...runtimeEnvironment(paths, {
+        appDataPath: input.sandboxRoot,
+        dshHome: input.dshHome,
+        preview,
+      }),
+      TMPDIR: temporary,
+    },
+    ...(launcher === undefined ? {} : { launcher }),
+    nodeBinary: paths.nodeBinary,
+    onLog: (stream, line) => { appendLog(stream, `[preview:${input.pluginId}] ${line}`) },
+    readyTimeoutMs: 90_000,
+  }
+}
+
+function isAllowedRuntimeNavigation(target: string, allowedOrigin: string | undefined): boolean {
   if (target.startsWith('file:')) return true
-  if (runtimeOrigin === undefined) return false
+  if (allowedOrigin === undefined) return false
   try {
-    return new URL(target).origin === runtimeOrigin
+    return new URL(target).origin === allowedOrigin
   } catch {
     return false
   }
@@ -133,20 +195,20 @@ function isAllowedBrowserNavigation(target: string): boolean {
   try {
     const url = new URL(target)
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
-    return runtimeOrigin === undefined || url.origin !== runtimeOrigin
+    return url.origin !== runtimeOrigin && url.origin !== previewOrigin
   } catch {
     return false
   }
 }
 
-function createWindow(): BrowserWindow {
+function createWindow(options: { preview?: boolean; title?: string } = {}): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1280,
-    height: 840,
+    width: options.preview === true ? 1160 : 1280,
+    height: options.preview === true ? 760 : 840,
     minWidth: 900,
     minHeight: 620,
     show: false,
-    title: PRODUCT_NAME,
+    title: options.title ?? PRODUCT_NAME,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#202020' : '#f7f7f5',
@@ -159,9 +221,21 @@ function createWindow(): BrowserWindow {
       webviewTag: true,
     },
   })
+  window.webContents.setZoomFactor(DEFAULT_UI_ZOOM_FACTOR)
   window.once('ready-to-show', () => { window.show() })
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
+    if (previewWindow === window) {
+      previewWindow = undefined
+      previewUrl = undefined
+      previewOrigin = undefined
+      previewIdentity = undefined
+      const supervisor = previewRuntime
+      previewRuntime = undefined
+      void supervisor?.stop().catch((error: unknown) => {
+        appendLog('desktop', `failed to stop closed preview runtime: ${error instanceof Error ? error.message : String(error)}`)
+      })
+    }
   })
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) void shell.openExternal(url)
@@ -191,7 +265,8 @@ function createWindow(): BrowserWindow {
     })
   })
   window.webContents.on('will-navigate', (event, url) => {
-    if (isAllowedRuntimeNavigation(url)) return
+    const allowedOrigin = options.preview === true ? previewOrigin : runtimeOrigin
+    if (isAllowedRuntimeNavigation(url, allowedOrigin)) return
     event.preventDefault()
     if (url.startsWith('https:') || url.startsWith('http:')) void shell.openExternal(url)
   })
@@ -253,6 +328,74 @@ async function startRuntime(): Promise<void> {
   if (mainWindow === undefined || mainWindow.isDestroyed()) mainWindow = createWindow()
   await mainWindow.loadURL(url.href)
   flushQueuedPaths()
+}
+
+async function stopPreviewSurface(): Promise<void> {
+  const window = previewWindow
+  const supervisor = previewRuntime
+  previewWindow = undefined
+  previewRuntime = undefined
+  previewUrl = undefined
+  previewOrigin = undefined
+  previewIdentity = undefined
+  if (window !== undefined && !window.isDestroyed()) window.destroy()
+  await supervisor?.stop()
+}
+
+async function startPreviewSurface(input: {
+  dshHome: string
+  pluginId: string
+  sandboxRoot: string
+  transactionId: string
+}): Promise<void> {
+  await stopPreviewSurface()
+  const identity = { pluginId: input.pluginId, transactionId: input.transactionId }
+  const supervisor = new DshRuntimeSupervisor(previewRuntimeOptions(input))
+  previewRuntime = supervisor
+  previewIdentity = identity
+  supervisor.on('exit', (exit: RuntimeExit) => {
+    if (previewRuntime !== supervisor) return
+    appendLog('desktop', `preview runtime exited: code=${String(exit.code)} signal=${String(exit.signal)}`)
+    const window = previewWindow
+    previewRuntime = undefined
+    previewWindow = undefined
+    previewUrl = undefined
+    previewOrigin = undefined
+    previewIdentity = undefined
+    if (window !== undefined && !window.isDestroyed()) window.destroy()
+  })
+  try {
+    const url = await supervisor.start()
+    if (previewRuntime !== supervisor) throw new Error('plugin preview was stopped before it became ready')
+    previewUrl = url
+    previewOrigin = url.origin
+    const window = createWindow({
+      preview: true,
+      title: `Preview ${input.pluginId} — ${PRODUCT_NAME}`,
+    })
+    previewWindow = window
+    await window.loadURL(url.href)
+  } catch (error) {
+    await stopPreviewSurface().catch(() => {})
+    throw error
+  }
+}
+
+async function stopLiveForMarketplace(): Promise<void> {
+  transitioning = true
+  await showSplash({ message: '正在应用插件 Profile…' })
+  await runtime?.stop()
+  runtime = undefined
+  runtimeUrl = undefined
+  runtimeOrigin = undefined
+}
+
+async function startLiveForMarketplace(): Promise<void> {
+  try {
+    await startRuntime()
+  } finally {
+    transitioning = false
+  }
 }
 
 async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'): Promise<void> {
@@ -325,6 +468,33 @@ async function installLocalPlugin(): Promise<void> {
   } finally {
     transitioning = false
   }
+}
+
+function createPluginMarketplace(): PluginMarketplaceManager {
+  const info = desktopInfo()
+  ensureDesktopProfile(info.dshHome)
+  const paths = runtimePaths()
+  const workingDirectory = join(info.appDataPath, 'plugin-marketplace')
+  mkdirSync(workingDirectory, { recursive: true, mode: 0o700 })
+  const environment = runtimeEnvironment(paths)
+  return new PluginMarketplaceManager({
+    appDataPath: info.appDataPath,
+    dshHome: info.dshHome,
+    platform: new ProductionMarketplacePlatform({
+      cliEntry: paths.cliEntry,
+      cwd: workingDirectory,
+      env: environment,
+      nodeBinary: paths.nodeBinary,
+      onLog: line => { appendLog('desktop', `[marketplace] ${line}`) },
+    }),
+    profile: DESKTOP_PROFILE,
+    runtime: {
+      startLive: startLiveForMarketplace,
+      startPreview: startPreviewSurface,
+      stopLive: stopLiveForMarketplace,
+      stopPreview: stopPreviewSurface,
+    },
+  })
 }
 
 function labels() {
@@ -469,8 +639,19 @@ function buildMenu(): void {
 
 function installIpc(): void {
   ipcMain.handle('desktop:choose-workspace', async () => await selectWorkspacePaths())
-  ipcMain.handle('desktop:get-info', () => desktopInfo())
+  ipcMain.handle('desktop:get-info', event => {
+    const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null
+    return desktopInfo(preview)
+  })
   ipcMain.handle('desktop:get-runtime-snapshot', () => desktopRuntimeSnapshot())
+  ipcMain.handle('desktop:plugin-marketplace-snapshot', () => {
+    if (marketplace === undefined) throw new Error('plugin marketplace is not initialized')
+    return marketplace.getSnapshot()
+  })
+  ipcMain.handle('desktop:plugin-marketplace-dispatch', async (_event, raw: unknown) => {
+    if (marketplace === undefined) throw new Error('plugin marketplace is not initialized')
+    return await marketplace.dispatch(parseMarketplaceCommand(raw))
+  })
   ipcMain.handle('desktop:open-external', async (_event, raw: unknown) => {
     if (typeof raw !== 'string') throw new Error('external URL must be a string')
     const url = new URL(raw)
@@ -516,6 +697,7 @@ async function bootstrap(): Promise<void> {
   mkdirSync(logsDir, { recursive: true })
   logStream = createWriteStream(join(logsDir, 'desktop.log'), { flags: 'a', mode: 0o600 })
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
+  marketplace = createPluginMarketplace()
   installIpc()
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
   session.defaultSession.setPermissionCheckHandler(() => false)
@@ -545,8 +727,15 @@ async function bootstrap(): Promise<void> {
     if (quitting) return
     event.preventDefault()
     quitting = true
-    void runtime?.stop().catch((error: unknown) => {
-      appendLog('desktop', error instanceof Error ? error.message : String(error))
+    void Promise.allSettled([
+      runtime?.stop() ?? Promise.resolve(),
+      stopPreviewSurface(),
+    ]).then(results => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          appendLog('desktop', result.reason instanceof Error ? result.reason.message : String(result.reason))
+        }
+      }
     }).finally(() => {
       logStream?.end()
       app.quit()

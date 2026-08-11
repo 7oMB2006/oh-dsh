@@ -10,6 +10,10 @@ export interface DshRuntimeOptions {
   cliEntry: string
   cwd: string
   env: NodeJS.ProcessEnv
+  launcher?: {
+    args: string[]
+    command: string
+  }
   nodeBinary: string
   readyTimeoutMs?: number
   onLog?: (stream: 'stderr' | 'stdout', line: string) => void
@@ -69,7 +73,11 @@ export class DshRuntimeSupervisor extends EventEmitter {
   async start(): Promise<URL> {
     if (this.child !== undefined) throw new Error('DSH runtime is already running')
     this.ready = false
-    const child = spawn(this.options.nodeBinary, [this.options.cliEntry, ...this.options.args], {
+    const command = this.options.launcher?.command ?? this.options.nodeBinary
+    const args = this.options.launcher === undefined
+      ? [this.options.cliEntry, ...this.options.args]
+      : [...this.options.launcher.args, this.options.nodeBinary, this.options.cliEntry, ...this.options.args]
+    const child = spawn(command, args, {
       cwd: this.options.cwd,
       env: this.options.env,
       stdio: ['ignore', 'pipe', 'pipe'],

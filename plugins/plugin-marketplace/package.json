@@ -1,0 +1,31 @@
+{
+  "name": "@oh-dsh/plugin-marketplace",
+  "version": "0.1.0",
+  "description": "Transactional dsh-external plugin marketplace for Oh-DSH-Desktop",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "dshClient": {
+    "inject": [
+      "@deepseek-ai/dsh-client-runtime"
+    ],
+    "platform": "web",
+    "immediately": true
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map"
+  ],
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

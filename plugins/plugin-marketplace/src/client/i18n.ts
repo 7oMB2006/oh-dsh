@@ -1,0 +1,214 @@
+import type { LocaleMessages } from '../../../shared/i18n.ts'
+
+export type MarketplaceMessage =
+  | 'plugins'
+  | 'subtitle'
+  | 'installed'
+  | 'enabled'
+  | 'disabled'
+  | 'update-available'
+  | 'not-installed'
+  | 'all'
+  | 'all-categories'
+  | 'mechanism.repository'
+  | 'mechanism.bundle'
+  | 'mechanism.unsupported'
+  | 'details'
+  | 'category'
+  | 'mechanism'
+  | 'updated'
+  | 'unknown'
+  | 'repository'
+  | 'trust'
+  | 'trust.community'
+  | 'runtime-boundary'
+  | 'risk.profile-bundle'
+  | 'risk.trusted-host'
+  | 'risk.guided'
+  | 'current-commit'
+  | 'latest-commit'
+  | 'prepared-plan'
+  | 'action.install'
+  | 'action.update'
+  | 'action.enable'
+  | 'action.disable'
+  | 'action.uninstall'
+  | 'commit'
+  | 'package'
+  | 'allow-scripts'
+  | 'open-repository'
+  | 'preview.install'
+  | 'preview.update'
+  | 'preview.enable'
+  | 'preview.disable'
+  | 'preview.uninstall'
+  | 'preview.launch'
+  | 'view-source'
+  | 'undo-last-apply'
+  | 'working'
+  | 'refresh'
+  | 'close'
+  | 'preview.running'
+  | 'discard'
+  | 'apply-to-desktop'
+  | 'reset-and-reload'
+  | 'search.label'
+  | 'search.placeholder'
+  | 'search.clear'
+  | 'installation-status'
+  | 'plugin-category'
+  | 'plugin-count'
+  | 'loading-catalog'
+  | 'github-auth-required'
+  | 'no-match'
+  | 'auth.install-gh'
+  | 'auth.ready'
+  | 'auth.not-refreshed'
+  | 'notice.loaded'
+  | 'notice.preview-ready'
+  | 'notice.discarded'
+  | 'notice.applied'
+  | 'notice.restored'
+
+export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
+  en: {
+    plugins: 'Plugins',
+    subtitle: 'dsh-external · isolated preview before every change',
+    installed: 'Installed',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    'update-available': 'Update available',
+    'not-installed': 'Not installed',
+    all: 'All',
+    'all-categories': 'All categories',
+    'mechanism.repository': 'Repository',
+    'mechanism.bundle': 'Bundle',
+    'mechanism.unsupported': 'Browse only',
+    details: '{plugin} details',
+    category: 'Category',
+    mechanism: 'Mechanism',
+    updated: 'Updated',
+    unknown: 'Unknown',
+    repository: 'Repository',
+    trust: 'Source trust',
+    'trust.community': 'Community · dsh-external',
+    'runtime-boundary': 'Runtime boundary',
+    'risk.profile-bundle': 'Official Profile bundle mechanism',
+    'risk.trusted-host': 'Trusted host code after apply',
+    'risk.guided': 'Guided install only',
+    'current-commit': 'Installed commit',
+    'latest-commit': 'Latest commit',
+    'prepared-plan': 'Prepared {action} plan',
+    'action.install': 'install',
+    'action.update': 'update',
+    'action.enable': 'enable',
+    'action.disable': 'disable',
+    'action.uninstall': 'uninstall',
+    commit: 'commit {commit}',
+    package: 'package {package}',
+    'allow-scripts': 'Allow these scripts only inside the write-restricted preview.',
+    'open-repository': 'Open repository',
+    'preview.install': 'Preview install',
+    'preview.update': 'Preview update',
+    'preview.enable': 'Preview enable',
+    'preview.disable': 'Preview disable',
+    'preview.uninstall': 'Preview uninstall',
+    'preview.launch': 'Launch isolated preview',
+    'view-source': 'View source',
+    'undo-last-apply': 'Undo last apply',
+    working: 'Working…',
+    refresh: 'Refresh',
+    close: 'Close Plugins',
+    'preview.running': '{plugin} is running in an isolated preview window.',
+    discard: 'Discard',
+    'apply-to-desktop': 'Apply to desktop',
+    'reset-and-reload': 'Reset and reload',
+    'search.label': 'Search plugins',
+    'search.placeholder': 'Search plugins, skills, and tags…',
+    'search.clear': 'Clear plugin search',
+    'installation-status': 'Installation status',
+    'plugin-category': 'Plugin category',
+    'plugin-count': '{count} plugins',
+    'loading-catalog': 'Loading the organization catalog…',
+    'github-auth-required': 'GitHub authentication required',
+    'no-match': 'No plugins match this view.',
+    'auth.install-gh': 'Install GitHub CLI and run `gh auth login` to browse private organization plugins.',
+    'auth.ready': 'Authenticated with GitHub CLI.',
+    'auth.not-refreshed': 'Plugin catalog has not been refreshed yet.',
+    'notice.loaded': 'Loaded {count} organization plugins.',
+    'notice.preview-ready': 'Isolated {action} preview is ready for {plugin}.',
+    'notice.discarded': 'Discarded the {plugin} preview without changing the desktop profile.',
+    'notice.applied': 'Applied {plugin}; the previous profile remains available for Undo.',
+    'notice.restored': 'Restored the profile from before {plugin} was applied.',
+  },
+  zh: {
+    plugins: '插件',
+    subtitle: 'dsh-external · 每次变更前均进行隔离预览',
+    installed: '已安装',
+    enabled: '已启用',
+    disabled: '已停用',
+    'update-available': '有可用更新',
+    'not-installed': '未安装',
+    all: '全部',
+    'all-categories': '全部分类',
+    'mechanism.repository': '仓库插件',
+    'mechanism.bundle': '插件包',
+    'mechanism.unsupported': '仅浏览',
+    details: '{plugin} 详情',
+    category: '分类',
+    mechanism: '安装机制',
+    updated: '更新时间',
+    unknown: '未知',
+    repository: '仓库',
+    trust: '来源信任',
+    'trust.community': '社区来源 · dsh-external',
+    'runtime-boundary': '运行边界',
+    'risk.profile-bundle': '官方 Profile 插件包机制',
+    'risk.trusted-host': '应用后作为受信任主机代码运行',
+    'risk.guided': '仅提供安装引导',
+    'current-commit': '已安装提交',
+    'latest-commit': '最新提交',
+    'prepared-plan': '已准备{action}方案',
+    'action.install': '安装',
+    'action.update': '更新',
+    'action.enable': '启用',
+    'action.disable': '停用',
+    'action.uninstall': '卸载',
+    commit: '提交 {commit}',
+    package: '软件包 {package}',
+    'allow-scripts': '仅允许在写入受限的预览环境中运行这些脚本。',
+    'open-repository': '打开仓库',
+    'preview.install': '预览安装',
+    'preview.update': '预览更新',
+    'preview.enable': '预览启用',
+    'preview.disable': '预览停用',
+    'preview.uninstall': '预览卸载',
+    'preview.launch': '启动隔离预览',
+    'view-source': '查看源码',
+    'undo-last-apply': '撤销上次应用',
+    working: '处理中…',
+    refresh: '刷新',
+    close: '关闭插件市场',
+    'preview.running': '{plugin} 正在隔离预览窗口中运行。',
+    discard: '放弃',
+    'apply-to-desktop': '应用到桌面端',
+    'reset-and-reload': '重置并重新加载',
+    'search.label': '搜索插件',
+    'search.placeholder': '搜索插件、技能和标签…',
+    'search.clear': '清空插件搜索',
+    'installation-status': '安装状态',
+    'plugin-category': '插件分类',
+    'plugin-count': '{count} 个插件',
+    'loading-catalog': '正在加载组织插件目录…',
+    'github-auth-required': '需要 GitHub 身份验证',
+    'no-match': '当前视图中没有匹配的插件。',
+    'auth.install-gh': '请安装 GitHub CLI 并运行 `gh auth login`，以浏览组织的私有插件。',
+    'auth.ready': '已通过 GitHub CLI 完成身份验证。',
+    'auth.not-refreshed': '插件目录尚未刷新。',
+    'notice.loaded': '已加载 {count} 个组织插件。',
+    'notice.preview-ready': '{plugin} 的隔离{action}预览已就绪。',
+    'notice.discarded': '已放弃 {plugin} 的预览，桌面端配置未发生更改。',
+    'notice.applied': '已应用 {plugin}；之前的配置仍可撤销恢复。',
+    'notice.restored': '已恢复应用 {plugin} 之前的配置。',
+  },
+}

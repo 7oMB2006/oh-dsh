@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
+import type { MarketplaceCommand, MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
 
 const bridge: DesktopBridge = Object.freeze({
   chooseWorkspace: async (): Promise<string[]> => {
@@ -17,6 +18,14 @@ const bridge: DesktopBridge = Object.freeze({
   openExternal: async (url: string): Promise<void> => {
     await ipcRenderer.invoke('desktop:open-external', url)
   },
+  pluginMarketplace: Object.freeze({
+    dispatch: async (command: MarketplaceCommand): Promise<MarketplaceSnapshot> => {
+      return await ipcRenderer.invoke('desktop:plugin-marketplace-dispatch', command) as MarketplaceSnapshot
+    },
+    getSnapshot: async (): Promise<MarketplaceSnapshot> => {
+      return await ipcRenderer.invoke('desktop:plugin-marketplace-snapshot') as MarketplaceSnapshot
+    },
+  }),
 })
 
 contextBridge.exposeInMainWorld('dshDesktop', bridge)

@@ -12,6 +12,7 @@ const pluginPackages = [
   { directory: 'desktop-shell', id: '@oh-dsh/desktop-shell' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
+  { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
   { directory: 'workspace-tools', id: '@oh-dsh/workspace-tools' },
 ]
 

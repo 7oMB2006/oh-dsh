@@ -98,6 +98,7 @@ try {
   const pluginIds = [
     '@oh-dsh/panel-controls',
     '@oh-dsh/pinned-summary',
+    '@oh-dsh/plugin-marketplace',
     '@oh-dsh/workspace-tools',
     '@oh-dsh/desktop-shell',
   ]

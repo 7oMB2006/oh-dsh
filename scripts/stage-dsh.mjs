@@ -354,7 +354,7 @@ function installDesktopPackages() {
         [join(root, 'dist', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
-    ...['desktop-shell', 'panel-controls', 'pinned-summary', 'workspace-tools'].map(directory => ({
+    ...['desktop-shell', 'panel-controls', 'pinned-summary', 'plugin-marketplace', 'workspace-tools'].map(directory => ({
       manifest: join(root, 'plugins', directory, 'package.json'),
       files: [
         [join(root, 'dist', 'plugins', directory, 'index.js'), 'dist/index.js'],
@@ -415,6 +415,8 @@ for (const required of [
   'plugins/panel-controls/client.js',
   'plugins/pinned-summary/index.js',
   'plugins/pinned-summary/client.js',
+  'plugins/plugin-marketplace/index.js',
+  'plugins/plugin-marketplace/client.js',
   'plugins/workspace-tools/index.js',
   'plugins/workspace-tools/client.js',
 ]) {

@@ -24,5 +24,8 @@
     - id: oh-workspace-tools
       name: '@oh-dsh/workspace-tools'
 
+    - id: oh-plugin-marketplace
+      name: '@oh-dsh/plugin-marketplace'
+
     - id: oh-desktop-shell
       name: '@oh-dsh/desktop-shell'
