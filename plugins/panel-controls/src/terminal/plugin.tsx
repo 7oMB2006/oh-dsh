@@ -3,7 +3,6 @@ import { createRoot, type Root } from 'react-dom/client'
 import xtermCss from '@xterm/xterm/css/xterm.css'
 import terminalCss from './terminal.css'
 import { TerminalPanel, openOrToggleTerminal } from './TerminalPanel.tsx'
-import { TerminalTrigger } from './TerminalTrigger.tsx'
 import { createMountScheduler, mutationNeedsMount } from './mount-utils.ts'
 import { createDockStore, type DockStore } from './panel-store.ts'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
@@ -72,11 +71,6 @@ function findConversationColumn(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-phase]')?.parentElement ?? null
 }
 
-function findTriggerSeat(column: HTMLElement): HTMLElement | null {
-  const titleRow = column.querySelector<HTMLElement>('header > div')
-  return titleRow ?? column.querySelector<HTMLElement>('header [role="tablist"]')
-}
-
 class DesktopPanelService implements DesktopPanels {
   private readonly listeners = new Set<() => void>()
   private readonly layout: LayoutService
@@ -84,7 +78,6 @@ class DesktopPanelService implements DesktopPanels {
   private readonly surfaces = new Map<string, SessionSurface>()
   private active: SessionSurface | undefined
   private readonly dock: ReactMount = { element: null, root: null }
-  private readonly trigger: ReactMount = { element: null, root: null }
   private style: HTMLStyleElement | undefined
   private observer: MutationObserver | undefined
   private stopSessionSubscription: (() => void) | undefined
@@ -127,9 +120,7 @@ class DesktopPanelService implements DesktopPanels {
     this.observer?.disconnect()
     this.scheduler?.cancel()
     this.dock.root?.unmount()
-    this.trigger.root?.unmount()
     this.dock.element?.remove()
-    this.trigger.element?.remove()
     this.style?.remove()
     this.surfaces.clear()
     this.active = undefined
@@ -180,7 +171,6 @@ class DesktopPanelService implements DesktopPanels {
     }
     this.active = next
     this.renderDock()
-    this.renderTrigger()
     this.scheduler?.schedule()
     this.notify()
   }
@@ -193,7 +183,6 @@ class DesktopPanelService implements DesktopPanels {
     const column = findConversationColumn()
     if (column === null) return
     this.mountDock(column)
-    this.mountTrigger(column)
   }
 
   private mountDock(column: HTMLElement): void {
@@ -208,20 +197,6 @@ class DesktopPanelService implements DesktopPanels {
       column.append(this.dock.element)
     }
     this.renderDock()
-  }
-
-  private mountTrigger(column: HTMLElement): void {
-    const seat = findTriggerSeat(column)
-    if (seat === null) return
-    if (this.trigger.element === null) {
-      const element = document.createElement('div')
-      element.id = 'oh-dsh-terminal-trigger-root'
-      element.style.marginLeft = 'auto'
-      this.trigger.element = element
-      this.trigger.root = createRoot(element)
-    }
-    if (this.trigger.element.parentElement !== seat) seat.append(this.trigger.element)
-    this.renderTrigger()
   }
 
   private renderDock(): void {
@@ -246,14 +221,6 @@ class DesktopPanelService implements DesktopPanels {
         ))}
       </Fragment>,
     )
-  }
-
-  private renderTrigger(): void {
-    if (this.trigger.root !== null && this.active !== undefined) {
-      this.trigger.root.render(
-        <TerminalTrigger locale={this.locale} t={this.t} store={this.active.store} />,
-      )
-    }
   }
 }
 

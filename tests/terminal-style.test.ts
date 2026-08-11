@@ -12,3 +12,22 @@ test('terminal viewport cannot expose xterm default black behind the themed scre
   assert.match(css, /\.oh-dsh-terminal-view \{[\s\S]*padding: 9px 12px;/)
   assert.doesNotMatch(css, /\.oh-dsh-terminal-view \.xterm \{[^}]*padding:/)
 })
+
+test('terminal is controlled only by the shared desktop toolbar', () => {
+  const plugin = readFileSync(
+    join(root, 'plugins/panel-controls/src/terminal/plugin.tsx'),
+    'utf8',
+  )
+  const mounts = readFileSync(
+    join(root, 'plugins/panel-controls/src/terminal/mount-utils.ts'),
+    'utf8',
+  )
+  const css = readFileSync(
+    join(root, 'plugins/panel-controls/src/terminal/terminal.css'),
+    'utf8',
+  )
+
+  assert.doesNotMatch(plugin, /TerminalTrigger|terminal-trigger-root/)
+  assert.doesNotMatch(mounts, /terminal-trigger-root/)
+  assert.doesNotMatch(css, /oh-dsh-terminal-trigger/)
+})

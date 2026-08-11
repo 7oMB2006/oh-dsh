@@ -1,4 +1,4 @@
-const OWNED_ROOTS = '#oh-dsh-terminal-root, #oh-dsh-terminal-trigger-root'
+const OWNED_ROOTS = '#oh-dsh-terminal-root'
 
 function insideOwnedRoot(node: Node): boolean {
   let current: Node | null = node
