@@ -3,7 +3,10 @@ import type {
   MarketplaceMechanism,
   MarketplacePlugin,
 } from './protocol.ts'
-import { MARKETPLACE_ORGANIZATION } from './protocol.ts'
+import {
+  isProtectedMarketplacePlugin,
+  MARKETPLACE_ORGANIZATION,
+} from './protocol.ts'
 
 export interface MarketplaceCatalog {
   generatedAt: string | null
@@ -76,11 +79,12 @@ export function parseMarketplaceCatalog(
       installed: installedIds.has(id),
       latestCommit: null,
       mechanism: installMechanism,
+      protected: isProtectedMarketplacePlugin(id),
       pushedAt: cleanString(row.pushedAt),
       runtimeRisk: runtimeRisk(installMechanism),
       tags,
       title: id,
-      trust: 'community',
+      trust: 'organization',
       updateAvailable: false,
       url: `https://github.com/${MARKETPLACE_ORGANIZATION}/${id}`,
     })

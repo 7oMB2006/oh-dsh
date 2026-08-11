@@ -34,6 +34,14 @@ function catalogDocument(): unknown {
         pushedAt: '2026-08-10T12:00:00Z',
       },
       {
+        name: 'safe-demo',
+        category: 'plugin',
+        description: 'Safe bundle demo',
+        bundle: true,
+        repository: false,
+        tags: ['safe'],
+      },
+      {
         name: 'repository-demo',
         category: 'skill',
         note: 'Repository demo',
@@ -48,6 +56,7 @@ function catalogDocument(): unknown {
       },
       { name: 'legacy-demo', category: 'plugin', bundle: false, repository: false },
       { name: 'hidden-demo', category: 'plugin', bundle: true, hide: true },
+      { name: 'oh-dsh-desktop', category: 'infra', bundle: true },
       { name: '../escape', category: 'plugin', bundle: true },
     ],
   }
@@ -56,6 +65,8 @@ function catalogDocument(): unknown {
 class FakePlatform implements MarketplacePlatform {
   readonly commands: DshCommandInput[] = []
   latestCommit = COMMIT
+  bundleName = '@example/bundle-demo'
+  bundleDescription = 'Bundle demo manifest'
 
   async authStatus(): Promise<MarketplaceAuthResult> {
     return { detail: 'test auth', status: 'ready' }
@@ -72,9 +83,22 @@ class FakePlatform implements MarketplacePlatform {
   async readRepositoryFile(pluginId: string, path: string): Promise<string | null> {
     if (pluginId === 'bundle-demo' && path === 'package.json') {
       return JSON.stringify({
-        name: '@example/bundle-demo',
+        name: this.bundleName,
+        description: this.bundleDescription,
         dsh: { bundle: { patch: './cordis.patch.yml' } },
         scripts: { prepare: 'node build.mjs', test: 'node test.mjs' },
+      })
+    }
+    if (pluginId === 'safe-demo' && path === 'package.json') {
+      return JSON.stringify({
+        name: '@example/safe-demo',
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
+      })
+    }
+    if (pluginId === 'oh-dsh-desktop' && path === 'package.json') {
+      return JSON.stringify({
+        name: '@oh-dsh/desktop',
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
       })
     }
     if (pluginId === 'repository-demo' && path === '.dsh-plugin/package.json') {
@@ -92,14 +116,19 @@ class FakePlatform implements MarketplacePlatform {
     const profile = join(input.dshHome, 'profiles', 'desktop', 'package.json')
     const manifest = JSON.parse(readFileSync(profile, 'utf8'))
     if (input.args.includes('add')) {
-      manifest.dependencies['@example/bundle-demo'] = `link:${input.args.at(-1) as string}`
-      if (!manifest.dsh.profile.bundles.includes('@example/bundle-demo')) {
-        manifest.dsh.profile.bundles.push('@example/bundle-demo')
+      const checkout = input.args.at(-1) as string
+      const dependency = checkout.includes('safe-demo')
+        ? '@example/safe-demo'
+        : this.bundleName
+      manifest.dependencies[dependency] = `link:${checkout}`
+      if (!manifest.dsh.profile.bundles.includes(dependency)) {
+        manifest.dsh.profile.bundles.push(dependency)
       }
     } else if (input.args.includes('remove')) {
-      delete manifest.dependencies['@example/bundle-demo']
+      const dependency = input.args.at(-1) as string
+      delete manifest.dependencies[dependency]
       manifest.dsh.profile.bundles = manifest.dsh.profile.bundles
-        .filter((entry: string) => entry !== '@example/bundle-demo')
+        .filter((entry: string) => entry !== dependency)
     }
     writeFileSync(profile, JSON.stringify(manifest, undefined, 2) + '\n')
   }
@@ -164,7 +193,9 @@ test('catalog parser keeps safe entries and labels unsupported managers', () => 
   assert.deepEqual(catalog.plugins.map(plugin => [plugin.id, plugin.mechanism]), [
     ['bundle-demo', 'bundle'],
     ['hybrid-demo', 'bundle'],
+    ['oh-dsh-desktop', 'bundle'],
     ['repository-demo', 'repository'],
+    ['safe-demo', 'bundle'],
     ['legacy-demo', 'unsupported'],
   ])
   assert.equal(
@@ -255,12 +286,12 @@ test('bundle preview remains isolated until apply and supports undo', async () =
   const setup = fixture()
   try {
     let snapshot = await setup.manager.dispatch({ type: 'refresh' })
-    assert.equal(snapshot.catalog.length, 4)
+    assert.equal(snapshot.catalog.length, 6)
     snapshot = await setup.manager.dispatch({ type: 'inspect', action: 'install', pluginId: 'bundle-demo' })
     assert.deepEqual(snapshot.plan?.buildScripts, { prepare: 'node build.mjs' })
 
     snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
-    assert.match(snapshot.error ?? '', /explicitly allow/)
+    assert.match(snapshot.error ?? '', /allow-build-scripts/)
     assert.equal(snapshot.preview, null)
 
     snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
@@ -298,6 +329,181 @@ test('bundle preview remains isolated until apply and supports undo', async () =
   }
 })
 
+test('safe actions prepare an isolated candidate in one transaction', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'safe-demo',
+    })
+    assert.equal(snapshot.error, null)
+    assert.equal(snapshot.plan?.riskLevel, 'low')
+    assert.deepEqual(snapshot.plan?.requirements, [])
+    assert.equal(snapshot.plan?.sourceReview, 'first-use')
+    assert.match(snapshot.plan?.manifestHash ?? '', /^[0-9a-f]{64}$/)
+    assert.equal(snapshot.preview?.pluginId, 'safe-demo')
+    assert.equal(snapshot.lifecycle.candidate?.pluginId, 'safe-demo')
+    assert.equal(snapshot.lifecycle.current.profile, 'desktop')
+    assert.equal(snapshot.lifecycle.previous, null)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('risky plans require explicit acknowledgements before preview', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    let snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.equal(snapshot.preview, null)
+    assert.equal(snapshot.plan?.riskLevel, 'elevated')
+    assert.deepEqual(snapshot.plan?.riskReasons, ['install-scripts'])
+    assert.deepEqual(snapshot.plan?.requirements, ['allow-build-scripts'])
+
+    snapshot = await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: [],
+    })
+    assert.match(snapshot.error ?? '', /allow-build-scripts/)
+    assert.equal(snapshot.preview, null)
+
+    snapshot = await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts'],
+    })
+    assert.equal(snapshot.error, null)
+    assert.equal(snapshot.preview?.pluginId, 'bundle-demo')
+
+    await setup.manager.dispatch({ type: 'discard' })
+    snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'repository-demo',
+    })
+    assert.equal(snapshot.plan?.riskLevel, 'high')
+    assert.ok(snapshot.plan?.riskReasons.includes('trusted-host-code'))
+    assert.ok(snapshot.plan?.requirements.includes('accept-high-risk'))
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('TOFU locks survive uninstall and gate source identity changes', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'safe-demo',
+    })
+    let snapshot = await setup.manager.dispatch({ type: 'apply' })
+    assert.equal(snapshot.sourceLocks.length, 1)
+    assert.equal(snapshot.sourceLocks[0]?.pluginId, 'safe-demo')
+    assert.equal(snapshot.lifecycle.previous?.pluginId, 'safe-demo')
+
+    snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'uninstall',
+      pluginId: 'safe-demo',
+    })
+    assert.equal(snapshot.preview?.action, 'uninstall')
+    snapshot = await setup.manager.dispatch({ type: 'apply' })
+    assert.deepEqual(snapshot.installed, [])
+    assert.equal(snapshot.sourceLocks.length, 1)
+
+    await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts'],
+    })
+    await setup.manager.dispatch({ type: 'apply' })
+    await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'uninstall',
+      pluginId: 'bundle-demo',
+    })
+    await setup.manager.dispatch({ type: 'apply' })
+
+    setup.platform.bundleName = '@example/renamed-bundle'
+    setup.platform.latestCommit = UPDATED_COMMIT
+    snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.equal(snapshot.plan?.sourceReview, 'changed')
+    assert.equal(snapshot.plan?.riskLevel, 'high')
+    assert.ok(snapshot.plan?.requirements.includes('accept-source-change'))
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('TOFU detects changed content at an already pinned commit', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts'],
+    })
+    await setup.manager.dispatch({ type: 'apply' })
+    await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'uninstall',
+      pluginId: 'bundle-demo',
+    })
+    await setup.manager.dispatch({ type: 'apply' })
+
+    setup.platform.bundleDescription = 'Tampered manifest at the same commit'
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.match(snapshot.error ?? '', /changed content at pinned commit/)
+    assert.equal(snapshot.preview, null)
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('the marketplace refuses to modify protected desktop plugins', async () => {
+  const setup = fixture()
+  try {
+    await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'oh-dsh-desktop',
+    })
+    assert.match(snapshot.error ?? '', /protected by the desktop/)
+    assert.equal(snapshot.preview, null)
+    assert.equal(
+      snapshot.catalog.find(plugin => plugin.id === 'oh-dsh-desktop')?.protected,
+      true,
+    )
+  } finally {
+    setup.cleanup()
+  }
+})
+
 test('installed bundles keep enabled state and update through isolated previews', async () => {
   const setup = fixture()
   try {
@@ -320,7 +526,7 @@ test('installed bundles keep enabled state and update through isolated previews'
       action: 'disable',
       pluginId: 'bundle-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
+    await setup.manager.dispatch({ type: 'preview', confirmations: [] })
     snapshot = await setup.manager.dispatch({ type: 'apply' })
     plugin = snapshot.catalog.find(entry => entry.id === 'bundle-demo')
     assert.equal(plugin?.installed, true)
@@ -375,7 +581,10 @@ test('repository preview can be discarded without changing the live patch', asyn
       pluginId: 'repository-demo',
     })
     assert.equal(snapshot.plan?.mechanism, 'repository')
-    snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    snapshot = await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts', 'accept-high-risk'],
+    })
     assert.equal(snapshot.preview?.pluginId, 'repository-demo')
     assert.equal(readFileSync(join(setup.profileDir, 'cordis.patch.yml'), 'utf8'), '[]\n')
     const previewHome = setup.runtime.previewStarts[0]?.dshHome
@@ -401,7 +610,10 @@ test('repository plugins can be disabled without losing their install receipt', 
       action: 'install',
       pluginId: 'repository-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['allow-build-scripts', 'accept-high-risk'],
+    })
     let snapshot = await setup.manager.dispatch({ type: 'apply' })
     let plugin = snapshot.catalog.find(entry => entry.id === 'repository-demo')
     assert.equal(plugin?.installed, true)
@@ -427,7 +639,10 @@ test('repository plugins can be disabled without losing their install receipt', 
       action: 'enable',
       pluginId: 'repository-demo',
     })
-    await setup.manager.dispatch({ type: 'preview', allowBuildScripts: false })
+    await setup.manager.dispatch({
+      type: 'preview',
+      confirmations: ['accept-high-risk'],
+    })
     snapshot = await setup.manager.dispatch({ type: 'apply' })
     plugin = snapshot.catalog.find(entry => entry.id === 'repository-demo')
     assert.equal(plugin?.enabled, true)

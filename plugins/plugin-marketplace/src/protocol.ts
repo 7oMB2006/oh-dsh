@@ -5,7 +5,32 @@ export type MarketplaceAuthStatus = 'ready' | 'missing-cli' | 'signed-out' | 'er
 export type MarketplaceMechanism = 'bundle' | 'repository' | 'unsupported'
 export type MarketplaceAction = 'install' | 'update' | 'enable' | 'disable' | 'uninstall'
 export type MarketplaceRuntimeRisk = 'profile-bundle' | 'trusted-host' | 'guided'
-export type MarketplaceTrust = 'community'
+export type MarketplaceTrust = 'organization' | 'community' | 'untrusted'
+export type MarketplaceRiskLevel = 'low' | 'elevated' | 'high' | 'blocked'
+export type MarketplaceRiskReason =
+  | 'install-scripts'
+  | 'trusted-host-code'
+  | 'source-change'
+  | 'protected-plugin'
+export type MarketplaceSourceReview = 'first-use' | 'matched' | 'changed'
+export type MarketplaceConfirmation =
+  | 'allow-build-scripts'
+  | 'accept-high-risk'
+  | 'accept-source-change'
+
+const PROTECTED_PLUGIN_IDS = new Set([
+  'desktop-shell',
+  'oh-dsh-desktop',
+  'panel-controls',
+  'pinned-summary',
+  'plugin-marketplace',
+  'workspace-tools',
+])
+
+/** Marketplace code cannot replace the desktop or its transaction owner. */
+export function isProtectedMarketplacePlugin(pluginId: string): boolean {
+  return PROTECTED_PLUGIN_IDS.has(pluginId)
+}
 
 export interface MarketplacePlugin {
   category: string
@@ -16,6 +41,7 @@ export interface MarketplacePlugin {
   installed: boolean
   latestCommit: string | null
   mechanism: MarketplaceMechanism
+  protected: boolean
   pushedAt: string | null
   runtimeRisk: MarketplaceRuntimeRisk
   tags: string[]
@@ -34,6 +60,17 @@ export interface MarketplaceInstalledPlugin {
   source: string
 }
 
+export interface MarketplaceSourceLock {
+  canonicalSource: string
+  firstSeenCommit: string
+  manifestHash: string
+  mechanism: Exclude<MarketplaceMechanism, 'unsupported'>
+  packageName: string
+  pluginId: string
+  recordedAt: string
+  resolvedCommit: string
+}
+
 export interface MarketplacePlan {
   action: MarketplaceAction
   buildScripts: Record<string, string>
@@ -41,8 +78,13 @@ export interface MarketplacePlan {
   mechanism: Exclude<MarketplaceMechanism, 'unsupported'>
   packageName: string | null
   pluginId: string
+  manifestHash: string
+  requirements: MarketplaceConfirmation[]
   resolvedCommit: string
+  riskLevel: MarketplaceRiskLevel
+  riskReasons: MarketplaceRiskReason[]
   source: string
+  sourceReview: MarketplaceSourceReview
 }
 
 export interface MarketplacePreview {
@@ -51,6 +93,21 @@ export interface MarketplacePreview {
   resolvedCommit: string
   startedAt: string
   transactionId: string
+}
+
+export interface MarketplaceRecoveryPoint {
+  appliedAt: string
+  pluginId: string
+  transactionId: string
+}
+
+export interface MarketplaceLifecycle {
+  candidate: MarketplacePreview | null
+  current: {
+    profile: string
+    state: 'live'
+  }
+  previous: MarketplaceRecoveryPoint | null
 }
 
 export interface MarketplaceSnapshot {
@@ -64,15 +121,23 @@ export interface MarketplaceSnapshot {
   error: string | null
   installed: MarketplaceInstalledPlugin[]
   lastAction: string | null
+  lifecycle: MarketplaceLifecycle
   plan: MarketplacePlan | null
   preview: MarketplacePreview | null
+  sourceLocks: MarketplaceSourceLock[]
   undoAvailable: boolean
 }
 
 export type MarketplaceCommand =
   | { type: 'refresh' }
   | { type: 'inspect'; action: MarketplaceAction; pluginId: string }
-  | { type: 'preview'; allowBuildScripts: boolean }
+  | { type: 'prepare'; action: MarketplaceAction; pluginId: string }
+  | {
+    type: 'preview'
+    confirmations?: MarketplaceConfirmation[]
+    /** @deprecated Accepted while older renderers reconnect during an upgrade. */
+    allowBuildScripts?: boolean
+  }
   | { type: 'discard' }
   | { type: 'apply' }
   | { type: 'undo' }
@@ -95,19 +160,39 @@ export function parseMarketplaceCommand(value: unknown): MarketplaceCommand {
     || value.type === 'apply' || value.type === 'undo') {
     return { type: value.type }
   }
-  if (value.type === 'inspect') {
+  if (value.type === 'inspect' || value.type === 'prepare') {
     if (!['install', 'update', 'enable', 'disable', 'uninstall'].includes(String(value.action))
       || typeof value.pluginId !== 'string') {
       throw new Error('invalid marketplace inspect command')
     }
     return {
-      type: 'inspect',
+      type: value.type,
       action: value.action as MarketplaceAction,
       pluginId: value.pluginId,
     }
   }
-  if (value.type === 'preview' && typeof value.allowBuildScripts === 'boolean') {
-    return { type: 'preview', allowBuildScripts: value.allowBuildScripts }
+  if (value.type === 'preview') {
+    const valid = new Set<MarketplaceConfirmation>([
+      'allow-build-scripts',
+      'accept-high-risk',
+      'accept-source-change',
+    ])
+    if (value.confirmations !== undefined
+      && (!Array.isArray(value.confirmations)
+        || value.confirmations.some(entry => typeof entry !== 'string'
+          || !valid.has(entry as MarketplaceConfirmation)))) {
+      throw new Error('invalid marketplace preview confirmations')
+    }
+    if (value.allowBuildScripts !== undefined
+      && typeof value.allowBuildScripts !== 'boolean') {
+      throw new Error('invalid marketplace preview compatibility flag')
+    }
+    const confirmations = Array.isArray(value.confirmations)
+      ? value.confirmations as MarketplaceConfirmation[]
+      : value.allowBuildScripts === true
+        ? ['allow-build-scripts'] satisfies MarketplaceConfirmation[]
+        : [] satisfies MarketplaceConfirmation[]
+    return { type: 'preview', confirmations }
   }
   throw new Error(`unsupported marketplace command: ${value.type}`)
 }
