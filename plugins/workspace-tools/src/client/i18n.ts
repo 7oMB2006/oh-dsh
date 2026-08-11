@@ -1,0 +1,184 @@
+import type { LocaleMessages } from '../../../shared/i18n.ts'
+
+export type WorkspaceMessage =
+  | 'panels.label'
+  | 'side.expand'
+  | 'side.restore'
+  | 'summary.toggle'
+  | 'summary.title'
+  | 'terminal.toggle'
+  | 'terminal.title'
+  | 'side.toggle'
+  | 'side.title'
+  | 'review'
+  | 'terminal'
+  | 'browser'
+  | 'files'
+  | 'side-chat'
+  | 'trajectory'
+  | 'browser.enter-url'
+  | 'browser.http-only'
+  | 'browser.page-failed'
+  | 'browser.back'
+  | 'browser.reload'
+  | 'browser.url'
+  | 'browser.go'
+  | 'files.select-workspace'
+  | 'files.request-failed'
+  | 'files.loading'
+  | 'files.empty-directory'
+  | 'files.showing-first'
+  | 'files.open'
+  | 'files.binary'
+  | 'files.preview-truncated'
+  | 'side.back'
+  | 'side.close'
+  | 'workspace.request-failed'
+  | 'workspace.title'
+  | 'workspace.refresh'
+  | 'workspace.add'
+  | 'workspace.close-review'
+  | 'workspace.select'
+  | 'workspace.changes'
+  | 'workspace.staged'
+  | 'workspace.more-changes'
+  | 'workspace.clean'
+  | 'workspace.not-git'
+  | 'workspace.execution-environment'
+  | 'workspace.local'
+  | 'workspace.current-branch'
+  | 'workspace.new-branch'
+  | 'workspace.new-branch-name'
+  | 'workspace.create'
+  | 'workspace.commit-or-push'
+  | 'workspace.commit-message'
+  | 'workspace.commit-all'
+  | 'workspace.push'
+  | 'workspace.behind'
+  | 'workspace.background-processes'
+  | 'workspace.no-background-processes'
+  | 'workspace.loading-diff'
+  | 'workspace.no-text-diff'
+
+export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
+  en: {
+    'panels.label': 'Desktop panels',
+    'side.expand': 'Expand side panel',
+    'side.restore': 'Restore side panel',
+    'summary.toggle': 'Toggle pinned summary',
+    'summary.title': 'Pinned summary',
+    'terminal.toggle': 'Toggle terminal panel',
+    'terminal.title': 'Terminal',
+    'side.toggle': 'Toggle side panel',
+    'side.title': 'Side panel',
+    review: 'Review',
+    terminal: 'Terminal',
+    browser: 'Browser',
+    files: 'Files',
+    'side-chat': 'Side chat',
+    trajectory: 'Trajectory',
+    'browser.enter-url': 'Enter a URL',
+    'browser.http-only': 'Only HTTP and HTTPS URLs are supported',
+    'browser.page-failed': 'Page failed to load',
+    'browser.back': 'Browser back',
+    'browser.reload': 'Reload browser',
+    'browser.url': 'Browser URL',
+    'browser.go': 'Go',
+    'files.select-workspace': 'Select a workspace to browse files.',
+    'files.request-failed': 'File request failed ({status})',
+    'files.loading': 'Loading…',
+    'files.empty-directory': 'Empty directory',
+    'files.showing-first': 'Showing the first 300 entries',
+    'files.open': 'Open',
+    'files.binary': 'Binary file · {size}',
+    'files.preview-truncated': 'preview truncated',
+    'side.back': 'Back to side panel',
+    'side.close': 'Close side panel',
+    'workspace.request-failed': 'Workspace request failed ({status})',
+    'workspace.title': 'Workspace',
+    'workspace.refresh': 'Refresh workspace',
+    'workspace.add': 'Add workspace',
+    'workspace.close-review': 'Close review',
+    'workspace.select': 'Select a DSH workspace to inspect changes.',
+    'workspace.changes': 'Changes',
+    'workspace.staged': 'staged',
+    'workspace.more-changes': '{count} more changes',
+    'workspace.clean': 'Working tree clean',
+    'workspace.not-git': 'This directory is not a Git repository.',
+    'workspace.execution-environment': 'Execution environment',
+    'workspace.local': 'Local',
+    'workspace.current-branch': 'Current branch',
+    'workspace.new-branch': 'New branch',
+    'workspace.new-branch-name': 'New branch name',
+    'workspace.create': 'Create',
+    'workspace.commit-or-push': 'Commit or push',
+    'workspace.commit-message': 'Commit message',
+    'workspace.commit-all': 'Commit all',
+    'workspace.push': 'Push',
+    'workspace.behind': 'Behind upstream by {count}',
+    'workspace.background-processes': 'Background processes',
+    'workspace.no-background-processes': 'No background processes',
+    'workspace.loading-diff': 'Loading diff…',
+    'workspace.no-text-diff': 'No textual diff is available.',
+  },
+  zh: {
+    'panels.label': '桌面面板',
+    'side.expand': '展开侧边栏',
+    'side.restore': '恢复侧边栏',
+    'summary.toggle': '切换固定摘要',
+    'summary.title': '固定摘要',
+    'terminal.toggle': '切换终端面板',
+    'terminal.title': '终端',
+    'side.toggle': '切换侧边栏',
+    'side.title': '侧边栏',
+    review: '审查',
+    terminal: '终端',
+    browser: '浏览器',
+    files: '文件',
+    'side-chat': '侧边对话',
+    trajectory: '轨迹',
+    'browser.enter-url': '输入 URL',
+    'browser.http-only': '仅支持 HTTP 和 HTTPS URL',
+    'browser.page-failed': '页面加载失败',
+    'browser.back': '浏览器后退',
+    'browser.reload': '重新加载浏览器',
+    'browser.url': '浏览器 URL',
+    'browser.go': '前往',
+    'files.select-workspace': '选择工作区以浏览文件。',
+    'files.request-failed': '文件请求失败（{status}）',
+    'files.loading': '加载中…',
+    'files.empty-directory': '空目录',
+    'files.showing-first': '仅显示前 300 项',
+    'files.open': '打开',
+    'files.binary': '二进制文件 · {size}',
+    'files.preview-truncated': '预览已截断',
+    'side.back': '返回侧边栏',
+    'side.close': '关闭侧边栏',
+    'workspace.request-failed': '工作区请求失败（{status}）',
+    'workspace.title': '工作区',
+    'workspace.refresh': '刷新工作区',
+    'workspace.add': '添加工作区',
+    'workspace.close-review': '关闭审查',
+    'workspace.select': '选择 DSH 工作区以检查变更。',
+    'workspace.changes': '变更',
+    'workspace.staged': '已暂存',
+    'workspace.more-changes': '还有 {count} 项变更',
+    'workspace.clean': '工作树已清理',
+    'workspace.not-git': '此目录不是 Git 仓库。',
+    'workspace.execution-environment': '执行环境',
+    'workspace.local': '本地',
+    'workspace.current-branch': '当前分支',
+    'workspace.new-branch': '新分支',
+    'workspace.new-branch-name': '新分支名称',
+    'workspace.create': '创建',
+    'workspace.commit-or-push': '提交或推送',
+    'workspace.commit-message': '提交信息',
+    'workspace.commit-all': '提交全部',
+    'workspace.push': '推送',
+    'workspace.behind': '落后上游 {count} 个提交',
+    'workspace.background-processes': '后台进程',
+    'workspace.no-background-processes': '没有后台进程',
+    'workspace.loading-diff': '正在加载差异…',
+    'workspace.no-text-diff': '没有可用的文本差异。',
+  },
+}

@@ -16,8 +16,14 @@ import {
   tabLabelFromCwd,
   type DockStore,
 } from './panel-store.ts'
+import { DEFAULT_TAB_LABEL } from './panel-store.ts'
+import type { LocaleService, Translate } from '../../../shared/i18n.ts'
+import { useTranslate } from '../../../shared/use-i18n.ts'
+import type { TerminalMessage } from './i18n.ts'
 
 export interface TerminalPanelProps {
+  locale: LocaleService
+  t: Translate<TerminalMessage>
   store: DockStore
   scopeKey: string
   cwd: string | null
@@ -35,7 +41,8 @@ export function openOrToggleTerminal(store: DockStore): void {
 }
 
 /** Bottom dock adapted from dsh-web-panel and owned by Oh-DSH-Desktop. */
-export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelProps): JSX.Element {
+export function TerminalPanel({ locale, t: translate, store, scopeKey, cwd, active }: TerminalPanelProps): JSX.Element {
+  const t = useTranslate(locale, translate)
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const [resizing, setResizing] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -91,13 +98,13 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
       className="oh-dsh-terminal-dock"
       data-oh-dsh-terminal-dock=""
       data-collapsed={state.collapsed || undefined}
-      aria-label="Terminal"
+      aria-label={t('terminal')}
     >
       {!state.collapsed && (
         <div
           className="oh-dsh-terminal-resize"
           role="separator"
-          aria-label="Resize terminal"
+          aria-label={t('terminal.resize')}
           aria-orientation="horizontal"
           aria-valuemin={MIN_PANEL_SIZE}
           aria-valuemax={MAX_PANEL_SIZE}
@@ -108,7 +115,7 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
         />
       )}
       <div className="oh-dsh-terminal-bar">
-        <div className="oh-dsh-terminal-tabs" role="tablist" aria-label="Terminal tabs">
+        <div className="oh-dsh-terminal-tabs" role="tablist" aria-label={t('terminal.tabs')}>
           {state.tabs.map(tab => (
             <span
               key={tab.id}
@@ -119,12 +126,15 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
             >
               <span className={`oh-dsh-terminal-status is-${tab.status}`} aria-hidden="true" />
               <span className="oh-dsh-terminal-tab-label">
-                {tab.label}{tab.status === 'exited' ? ' · exited' : tab.status === 'error' ? ' · error' : ''}
+                {tab.label === DEFAULT_TAB_LABEL ? t('terminal.shell') : tab.label}
+                {tab.status === 'exited'
+                  ? ` · ${t('terminal.status.exited')}`
+                  : tab.status === 'error' ? ` · ${t('terminal.status.error')}` : ''}
               </span>
               <button
                 type="button"
                 className="oh-dsh-terminal-tab-close"
-                aria-label={`Close ${tab.label}`}
+                aria-label={t('terminal.close-tab', { tab: tab.label })}
                 onClick={(event) => {
                   event.stopPropagation()
                   store.dispatch({ type: 'remove-tab', id: tab.id })
@@ -136,37 +146,37 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
             type="button"
             className="oh-dsh-terminal-add"
             onClick={addTab}
-            title="New shell"
-            aria-label="New shell"
+            title={t('terminal.new-shell')}
+            aria-label={t('terminal.new-shell')}
           >+</button>
-          {state.tabs.length === 0 && <span className="oh-dsh-terminal-hint">Terminal</span>}
+          {state.tabs.length === 0 && <span className="oh-dsh-terminal-hint">{t('terminal')}</span>}
         </div>
         <div className="oh-dsh-terminal-actions">
           <button
             type="button"
             className="oh-dsh-terminal-action"
             onClick={() => { setSettingsOpen(open => !open) }}
-            title="Terminal font"
-            aria-label="Terminal font settings"
+            title={t('terminal.font')}
+            aria-label={t('terminal.font-settings')}
             aria-expanded={settingsOpen}
           >Aa</button>
           <button
             type="button"
             className="oh-dsh-terminal-action"
             onClick={() => { store.dispatch({ type: 'toggle-collapsed' }) }}
-            title={state.collapsed ? 'Expand terminal' : 'Collapse terminal'}
-            aria-label={state.collapsed ? 'Expand terminal' : 'Collapse terminal'}
+            title={state.collapsed ? t('terminal.expand') : t('terminal.collapse')}
+            aria-label={state.collapsed ? t('terminal.expand') : t('terminal.collapse')}
           >{state.collapsed ? '⌃' : '⌄'}</button>
         </div>
       </div>
       {settingsOpen && (
-        <div className="oh-dsh-terminal-settings" role="dialog" aria-label="Terminal font settings">
+        <div className="oh-dsh-terminal-settings" role="dialog" aria-label={t('terminal.font-settings')}>
           <div className="oh-dsh-terminal-settings-header">
-            <strong>Terminal font</strong>
-            <button type="button" onClick={() => { setSettingsOpen(false) }} aria-label="Close settings">×</button>
+            <strong>{t('terminal.font')}</strong>
+            <button type="button" onClick={() => { setSettingsOpen(false) }} aria-label={t('terminal.close-settings')}>×</button>
           </div>
           <label>
-            <span>Font family</span>
+            <span>{t('terminal.font-family')}</span>
             <input
               type="text"
               list={fontPresetListId}
@@ -187,7 +197,7 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
             </datalist>
           </label>
           <label>
-            <span>Font size</span>
+            <span>{t('terminal.font-size')}</span>
             <input
               type="number"
               min={MIN_TERMINAL_FONT_SIZE}
@@ -198,7 +208,7 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
           </label>
           <div className="oh-dsh-terminal-settings-footer">
             <span>{MIN_TERMINAL_FONT_SIZE}–{MAX_TERMINAL_FONT_SIZE}px</span>
-            <button type="button" onClick={() => { store.dispatch({ type: 'reset-font' }) }}>Reset</button>
+            <button type="button" onClick={() => { store.dispatch({ type: 'reset-font' }) }}>{t('terminal.reset')}</button>
           </div>
         </div>
       )}
@@ -230,13 +240,14 @@ export function TerminalPanel({ store, scopeKey, cwd, active }: TerminalPanelPro
                   ...(exitCode === undefined ? {} : { exitCode }),
                 })
               }}
+              t={t}
             />
           </div>
         ))}
         {state.tabs.length === 0 && (
           <div className="oh-dsh-terminal-empty">
-            <span>No shell is running</span>
-            <button type="button" onClick={addTab}>New shell</button>
+            <span>{t('terminal.empty')}</span>
+            <button type="button" onClick={addTab}>{t('terminal.new-shell')}</button>
           </div>
         )}
       </div>

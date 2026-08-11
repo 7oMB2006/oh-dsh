@@ -1,6 +1,41 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { apply } from '../plugins/desktop-shell/src/index.ts'
+
+test('desktop client replaces the hero title and keeps the Preview badge', () => {
+  const client = readFileSync(new URL('../plugins/desktop-shell/src/client.ts', import.meta.url), 'utf8')
+  assert.match(client, /element\.textContent = 'Oh-DSH-Desktop'/)
+  assert.match(client, /\['Into the Unknown', '探索未知之境'\]/)
+  assert.doesNotMatch(client, /data-oh-dsh-hero-preview/)
+})
+
+test('every bundled Oh-DSH client follows the native locale service', () => {
+  const clients = [
+    '../plugins/desktop-shell/src/client.ts',
+    '../plugins/panel-controls/src/terminal/plugin.tsx',
+    '../plugins/pinned-summary/src/client.ts',
+    '../plugins/plugin-marketplace/src/client/plugin.tsx',
+    '../plugins/workspace-tools/src/client/plugin.tsx',
+  ]
+  for (const path of clients) {
+    const source = readFileSync(new URL(path, import.meta.url), 'utf8')
+    assert.match(source, /export const inject = \[[^\]]*'locale'/)
+    assert.match(source, /locale\.register\('oh-dsh\./)
+  }
+
+  const dictionaries = [
+    '../plugins/panel-controls/src/terminal/i18n.ts',
+    '../plugins/pinned-summary/src/i18n.ts',
+    '../plugins/plugin-marketplace/src/client/i18n.ts',
+    '../plugins/workspace-tools/src/client/i18n.ts',
+  ]
+  for (const path of dictionaries) {
+    const source = readFileSync(new URL(path, import.meta.url), 'utf8')
+    assert.match(source, /en: \{/)
+    assert.match(source, /zh: \{/)
+  }
+})
 
 test('desktop-shell Host plugin publishes capability, prompt, and bash environment', () => {
   const previous = {

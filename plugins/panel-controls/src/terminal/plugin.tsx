@@ -6,6 +6,8 @@ import { TerminalPanel, openOrToggleTerminal } from './TerminalPanel.tsx'
 import { TerminalTrigger } from './TerminalTrigger.tsx'
 import { createMountScheduler, mutationNeedsMount } from './mount-utils.ts'
 import { createDockStore, type DockStore } from './panel-store.ts'
+import type { LocaleService, Translate } from '../../../shared/i18n.ts'
+import { TERMINAL_MESSAGES, type TerminalMessage } from './i18n.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -55,7 +57,7 @@ export interface DesktopPanels {
   toggleSidebar(): void
 }
 
-export const inject = ['layout', 'sessions']
+export const inject = ['layout', 'locale', 'sessions']
 
 function currentSession(sessions: SessionsService): { scopeKey: string; cwd: string | null } {
   const snapshot = sessions.list.getSnapshot()
@@ -91,6 +93,8 @@ class DesktopPanelService implements DesktopPanels {
 
   constructor(
     layout: LayoutService,
+    private readonly locale: LocaleService,
+    private readonly t: Translate<TerminalMessage>,
     sessions: SessionsService,
   ) {
     this.layout = layout
@@ -231,6 +235,8 @@ class DesktopPanelService implements DesktopPanels {
             style={{ display: surface === active ? 'contents' : 'none' }}
           >
             <TerminalPanel
+              locale={this.locale}
+              t={this.t}
               store={surface.store}
               scopeKey={surface.scopeKey}
               cwd={surface.cwd}
@@ -244,14 +250,24 @@ class DesktopPanelService implements DesktopPanels {
 
   private renderTrigger(): void {
     if (this.trigger.root !== null && this.active !== undefined) {
-      this.trigger.root.render(<TerminalTrigger store={this.active.store} />)
+      this.trigger.root.render(
+        <TerminalTrigger locale={this.locale} t={this.t} store={this.active.store} />,
+      )
     }
   }
 }
 
 export function apply(ctx: ClientContext): void {
+  const locale = ctx.get('locale') as LocaleService
+  const t: Translate<TerminalMessage> = locale.bind('oh-dsh.terminal')
+  ctx.effect(
+    () => locale.register('oh-dsh.terminal', TERMINAL_MESSAGES),
+    'oh-dsh-desktop: terminal dictionaries',
+  )
   const service = new DesktopPanelService(
     ctx.get('layout') as LayoutService,
+    locale,
+    t,
     ctx.get('sessions') as SessionsService,
   )
   ctx.effect(() => {

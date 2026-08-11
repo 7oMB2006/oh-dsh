@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import type { TerminalTabStatus } from './panel-store.ts'
 import { TerminalSocket } from './terminal-socket.ts'
 import { resolveTerminalTheme } from './terminal-theme.ts'
+import type { Translate } from '../../../shared/i18n.ts'
+import type { TerminalMessage } from './i18n.ts'
 
 export interface TerminalViewProps {
   tabId: string
@@ -12,6 +14,7 @@ export interface TerminalViewProps {
   fontSize: number
   onReady(cwd: string): void
   onStatus(status: TerminalTabStatus, exitCode?: number | null): void
+  t: Translate<TerminalMessage>
 }
 
 /** One persistent xterm/PTY pair. It is destroyed only when its tab is closed. */
@@ -58,7 +61,9 @@ export function TerminalView(props: TerminalViewProps): JSX.Element {
       if (exited) return
       exited = true
       onStatusRef.current('exited', code)
-      terminal.write(`\r\n\x1b[90m[process exited with code ${code ?? 'unknown'}]\x1b[0m\r\n`)
+      terminal.write(`\r\n\x1b[90m[${props.t('terminal.process-exited', {
+        code: code ?? props.t('terminal.unknown'),
+      })}]\x1b[0m\r\n`)
     }
     const requestedCwd = props.cwd?.trim()
     socket.connect(terminal.cols, terminal.rows, {
@@ -70,7 +75,7 @@ export function TerminalView(props: TerminalViewProps): JSX.Element {
       onExit: markExited,
       onError: message => {
         if (!exited) onStatusRef.current('error')
-        terminal.write(`\r\n\x1b[31m[terminal error: ${message}]\x1b[0m\r\n`)
+        terminal.write(`\r\n\x1b[31m[${props.t('terminal.error', { message })}]\x1b[0m\r\n`)
       },
     }, requestedCwd ? { cwd: requestedCwd } : undefined)
 

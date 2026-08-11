@@ -19,6 +19,9 @@ import { WORKSPACE_API_PATH } from '../protocol.ts'
 import { SideToolsPanel, type DesktopToolView } from './SideToolsPanel.tsx'
 import sideToolsCss from './side-tools.css'
 import workspaceCss from './workspace-tools.css'
+import type { LocaleService, Translate } from '../../../shared/i18n.ts'
+import { useTranslate } from '../../../shared/use-i18n.ts'
+import { WORKSPACE_MESSAGES, type WorkspaceMessage } from './i18n.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -104,7 +107,7 @@ declare global {
   }
 }
 
-export const inject = ['desktopPanels', 'pinnedSummary', 'sessions', 'workspaces']
+export const inject = ['desktopPanels', 'locale', 'pinnedSummary', 'sessions', 'workspaces']
 
 const OPEN_KEY = 'oh-dsh-desktop.workspace-tools.open'
 const WIDTH_KEY = 'oh-dsh-desktop.workspace-tools.width'
@@ -144,9 +147,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-async function responseJson<T>(response: Response): Promise<T> {
+async function responseJson<T>(
+  response: Response,
+  t: Translate<WorkspaceMessage>,
+): Promise<T> {
   const payload = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(payload.error ?? `Workspace request failed (${String(response.status)})`)
+  if (!response.ok) {
+    throw new Error(payload.error ?? t('workspace.request-failed', {
+      status: response.status,
+    }))
+  }
   return payload
 }
 
@@ -231,6 +241,8 @@ class WorkspaceToolsService implements WorkspaceTools {
 
   constructor(
     private readonly panels: DesktopPanels,
+    private readonly locale: LocaleService,
+    private readonly t: Translate<WorkspaceMessage>,
     private readonly pinnedSummary: PinnedSummary,
     private readonly sessions: SessionsService,
     private readonly workspaces: WorkspacesService,
@@ -287,8 +299,12 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 
   openTrajectory(): void {
+    const translated = this.t('trajectory').toLowerCase()
     const tab = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
-      .find(element => element.textContent?.trim().toLowerCase() === 'trajectory')
+      .find(element => {
+        const label = element.textContent?.trim().toLowerCase()
+        return label === translated || label === 'trajectory' || label === '轨迹'
+      })
     if (tab === undefined) return
     tab.click()
     this.setOpen(false)
@@ -330,6 +346,8 @@ class WorkspaceToolsService implements WorkspaceTools {
     this.root = createRoot(this.element)
     this.root.render(
       <WorkspaceToolsSurface
+        locale={this.locale}
+        t={this.t}
         service={this}
         panels={this.panels}
         pinnedSummary={this.pinnedSummary}
@@ -416,48 +434,50 @@ function DesktopPanelToolbar({
   service,
   panels,
   pinnedSummary,
+  t,
 }: {
   service: WorkspaceToolsService
   panels: DesktopPanels
   pinnedSummary: PinnedSummary
+  t: Translate<WorkspaceMessage>
 }): JSX.Element {
   const workspaceState = useSyncExternalStore(service.subscribe, service.getSnapshot)
   const terminalOpen = useSyncExternalStore(panels.subscribe, () => panels.isBottomPanelOpen())
   const summaryOpen = useSyncExternalStore(pinnedSummary.subscribe, () => pinnedSummary.isOpen())
   const sideOpen = workspaceState.open
   return (
-    <nav className="oh-dsh-panel-toolbar" aria-label="Desktop panels">
+    <nav className="oh-dsh-panel-toolbar" aria-label={t('panels.label')}>
       {sideOpen
         ? (
           <button
             type="button"
-            aria-label="Expand side panel"
+            aria-label={t('side.expand')}
             aria-pressed={workspaceState.maximized}
-            title={workspaceState.maximized ? 'Restore side panel' : 'Expand side panel'}
+            title={workspaceState.maximized ? t('side.restore') : t('side.expand')}
             onClick={() => { service.togglePanelMaximized() }}
           ><PanelIcon kind="expand" /></button>
         )
         : (
           <button
             type="button"
-            aria-label="Toggle pinned summary"
+            aria-label={t('summary.toggle')}
             aria-pressed={summaryOpen}
-            title="Pinned summary"
+            title={t('summary.title')}
             onClick={() => { service.setOpen(false); pinnedSummary.toggle() }}
           ><PanelIcon kind="summary" /></button>
         )}
       <button
         type="button"
-        aria-label="Toggle terminal panel"
+        aria-label={t('terminal.toggle')}
         aria-pressed={terminalOpen}
-        title="Terminal (⌘J)"
+        title={`${t('terminal.title')} (⌘J)`}
         onClick={() => { panels.toggleBottomPanel() }}
       ><PanelIcon kind="terminal" /></button>
       <button
         type="button"
-        aria-label="Toggle side panel"
+        aria-label={t('side.toggle')}
         aria-pressed={sideOpen}
-        title="Side panel (⌥⌘B)"
+        title={`${t('side.title')} (⌥⌘B)`}
         onClick={() => { service.toggleSidePanel() }}
       ><PanelIcon kind="side" /></button>
     </nav>
@@ -484,10 +504,12 @@ function WorkspacePanel({
   service,
   sessions,
   workspaces,
+  t,
 }: {
   service: WorkspaceToolsService
   sessions: SessionsService
   workspaces: WorkspacesService
+  t: Translate<WorkspaceMessage>
 }): JSX.Element {
   const panelState = useSyncExternalStore(service.subscribe, service.getSnapshot)
   const sessionList = useSyncExternalStore(sessions.list.subscribe, sessions.list.getSnapshot)
@@ -514,7 +536,7 @@ function WorkspacePanel({
       return
     }
     try {
-      setSnapshot(await responseJson<WorkspaceSnapshot>(await fetch(workspaceUrl(cwd))))
+      setSnapshot(await responseJson<WorkspaceSnapshot>(await fetch(workspaceUrl(cwd)), t))
       setError('')
     } catch (nextError) {
       setError(errorMessage(nextError))
@@ -547,7 +569,7 @@ function WorkspacePanel({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(mutation),
       })
-      const result = await responseJson<WorkspaceMutationResponse>(response)
+      const result = await responseJson<WorkspaceMutationResponse>(response, t)
       setSnapshot(result.snapshot)
       setError('')
       if (mutation.action === 'commit') setCommitMessage('')
@@ -566,10 +588,13 @@ function WorkspacePanel({
       return
     }
     setSelectedPath(path)
-    setDiff('Loading diff…')
+    setDiff(t('workspace.loading-diff'))
     try {
-      const response = await responseJson<WorkspaceDiffResponse>(await fetch(workspaceUrl(cwd, path)))
-      setDiff(response.diff || 'No textual diff is available.')
+      const response = await responseJson<WorkspaceDiffResponse>(
+        await fetch(workspaceUrl(cwd, path)),
+        t,
+      )
+      setDiff(response.diff || t('workspace.no-text-diff'))
     } catch (nextError) {
       setDiff(errorMessage(nextError))
     }
@@ -584,28 +609,28 @@ function WorkspacePanel({
   }
 
   return (
-    <div className="oh-dsh-review-view" aria-label="Workspace and changes">
+    <div className="oh-dsh-review-view" aria-label={t('workspace.changes')}>
       <header className="oh-dsh-workspace-header">
         <div>
-          <button type="button" aria-label="Back to side panel" onClick={() => { service.openMenu() }}>‹</button>
-          <strong>{snapshot?.name ?? (cwd?.split(/[\\/]/).filter(Boolean).pop() || 'Workspace')}</strong>
+          <button type="button" aria-label={t('side.back')} onClick={() => { service.openMenu() }}>‹</button>
+          <strong>{snapshot?.name ?? (cwd?.split(/[\\/]/).filter(Boolean).pop() || t('workspace.title'))}</strong>
         </div>
         <div>
-          <button type="button" onClick={() => { void refresh() }} aria-label="Refresh workspace" title="Refresh">↻</button>
-          <button type="button" onClick={() => { void chooseWorkspace() }} aria-label="Add workspace" title="Add workspace">+</button>
-          <button type="button" onClick={() => { service.setOpen(false) }} aria-label="Close review" title="Close">×</button>
+          <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}>↻</button>
+          <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+          <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}>×</button>
         </div>
       </header>
 
       {cwd === undefined
-        ? <div className="oh-dsh-workspace-empty">Select a DSH workspace to inspect changes.</div>
+        ? <div className="oh-dsh-workspace-empty">{t('workspace.select')}</div>
         : (
           <div className="oh-dsh-workspace-content">
             {error !== '' && <div className="oh-dsh-workspace-error" role="alert">{error}</div>}
             <section>
               <div className="oh-dsh-workspace-section-title">
                 <span className="oh-dsh-workspace-section-icon">▣</span>
-                <strong>Changes</strong>
+                <strong>{t('workspace.changes')}</strong>
                 <span className="oh-dsh-workspace-count">{snapshot?.changes.length ?? 0}</span>
               </div>
               <div className="oh-dsh-change-list">
@@ -619,21 +644,23 @@ function WorkspacePanel({
                     >
                       <span className={`oh-dsh-change-status is-${change.status}`}>{statusLabel(change.status)}</span>
                       <span title={change.path}>{change.path}</span>
-                      {change.staged && <small>staged</small>}
+                      {change.staged && <small>{t('workspace.staged')}</small>}
                     </button>
                     {selectedPath === change.path && <pre className="oh-dsh-change-diff">{diff}</pre>}
                   </div>
                 ))}
                 {(snapshot?.changes.length ?? 0) > visibleChanges.length && (
                   <div className="oh-dsh-workspace-muted">
-                    {String((snapshot?.changes.length ?? 0) - visibleChanges.length)} more changes
+                    {t('workspace.more-changes', {
+                      count: (snapshot?.changes.length ?? 0) - visibleChanges.length,
+                    })}
                   </div>
                 )}
                 {snapshot?.kind === 'repository' && snapshot.changes.length === 0 && (
-                  <div className="oh-dsh-workspace-muted">Working tree clean</div>
+                  <div className="oh-dsh-workspace-muted">{t('workspace.clean')}</div>
                 )}
                 {snapshot?.kind === 'directory' && (
-                  <div className="oh-dsh-workspace-muted">This directory is not a Git repository.</div>
+                  <div className="oh-dsh-workspace-muted">{t('workspace.not-git')}</div>
                 )}
               </div>
             </section>
@@ -641,8 +668,8 @@ function WorkspacePanel({
             <section className="oh-dsh-workspace-facts">
               <label className="oh-dsh-workspace-fact">
                 <span className="oh-dsh-workspace-fact-icon">▱</span>
-                <select aria-label="Execution environment" value="local" onChange={() => {}}>
-                  <option value="local">Local</option>
+                <select aria-label={t('workspace.execution-environment')} value="local" onChange={() => {}}>
+                  <option value="local">{t('workspace.local')}</option>
                 </select>
                 <span className="oh-dsh-workspace-chevron">⌄</span>
               </label>
@@ -651,7 +678,7 @@ function WorkspacePanel({
                 <select
                   value={snapshot?.branch ?? ''}
                   disabled={snapshot?.kind !== 'repository' || busy}
-                  aria-label="Current branch"
+                  aria-label={t('workspace.current-branch')}
                   onChange={event => { void mutate({ action: 'checkout', branch: event.currentTarget.value }) }}
                 >
                   {(snapshot?.branches ?? []).map(branch => <option key={branch} value={branch}>{branch}</option>)}
@@ -662,15 +689,15 @@ function WorkspacePanel({
                 <div className="oh-dsh-new-branch">
                   <input
                     value={newBranch}
-                    placeholder="New branch"
-                    aria-label="New branch name"
+                    placeholder={t('workspace.new-branch')}
+                    aria-label={t('workspace.new-branch-name')}
                     onChange={event => { setNewBranch(event.currentTarget.value) }}
                   />
                   <button
                     type="button"
                     disabled={busy || newBranch.trim() === ''}
                     onClick={() => { void mutate({ action: 'create-branch', branch: newBranch }).then(() => { setNewBranch('') }) }}
-                  >Create</button>
+                  >{t('workspace.create')}</button>
                 </div>
               )}
               <button
@@ -680,15 +707,15 @@ function WorkspacePanel({
                 aria-expanded={commitOpen}
               >
                 <span className="oh-dsh-workspace-fact-icon">—◯—</span>
-                <span>Commit or push</span>
+                <span>{t('workspace.commit-or-push')}</span>
                 <span className="oh-dsh-workspace-chevron">{commitOpen ? '⌃' : '⌄'}</span>
               </button>
               {commitOpen && snapshot?.kind === 'repository' && (
                 <div className="oh-dsh-commit-box">
                   <textarea
                     value={commitMessage}
-                    placeholder="Commit message"
-                    aria-label="Commit message"
+                    placeholder={t('workspace.commit-message')}
+                    aria-label={t('workspace.commit-message')}
                     onChange={event => { setCommitMessage(event.currentTarget.value) }}
                   />
                   <div>
@@ -696,14 +723,16 @@ function WorkspacePanel({
                       type="button"
                       disabled={busy || snapshot.changes.length === 0 || commitMessage.trim() === ''}
                       onClick={() => { void mutate({ action: 'commit', message: commitMessage }) }}
-                    >Commit all</button>
+                    >{t('workspace.commit-all')}</button>
                     <button
                       type="button"
                       disabled={busy || !snapshot.hasRemote}
                       onClick={() => { void mutate({ action: 'push' }) }}
-                    >Push{snapshot.ahead > 0 ? ` (${String(snapshot.ahead)})` : ''}</button>
+                    >{t('workspace.push')}{snapshot.ahead > 0 ? ` (${String(snapshot.ahead)})` : ''}</button>
                   </div>
-                  {snapshot.behind > 0 && <small>Behind upstream by {snapshot.behind}</small>}
+                  {snapshot.behind > 0 && (
+                    <small>{t('workspace.behind', { count: snapshot.behind })}</small>
+                  )}
                 </div>
               )}
             </section>
@@ -711,18 +740,20 @@ function WorkspacePanel({
             <section className="oh-dsh-workspace-directory">
               <span>{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
               <small title={cwd}>{cwd}</small>
-              <button type="button" onClick={() => { void chooseWorkspace() }} aria-label="Add workspace">+</button>
+              <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
             </section>
 
             <section className="oh-dsh-processes">
-              <h3>Background processes</h3>
+              <h3>{t('workspace.background-processes')}</h3>
               {processes.map(process => (
                 <div key={process.callId} className="oh-dsh-process-row">
                   <span>›_</span>
                   <code title={processTitle(process)}>{processTitle(process)}</code>
                 </div>
               ))}
-              {processes.length === 0 && <div className="oh-dsh-workspace-muted">No background processes</div>}
+              {processes.length === 0 && (
+                <div className="oh-dsh-workspace-muted">{t('workspace.no-background-processes')}</div>
+              )}
             </section>
           </div>
         )}
@@ -731,25 +762,41 @@ function WorkspacePanel({
 }
 
 function WorkspaceToolsSurface(props: {
+  locale: LocaleService
+  t: Translate<WorkspaceMessage>
   service: WorkspaceToolsService
   panels: DesktopPanels
   pinnedSummary: PinnedSummary
   sessions: SessionsService
   workspaces: WorkspacesService
 }): JSX.Element {
+  const t = useTranslate(props.locale, props.t)
   const panelState = useSyncExternalStore(props.service.subscribe, props.service.getSnapshot)
   const sessionList = useSyncExternalStore(props.sessions.list.subscribe, props.sessions.list.getSnapshot)
   const cwd = sessionList.current === undefined ? undefined : sessionList.byId[sessionList.current]?.cwd
   return (
     <>
-      <DesktopPanelToolbar service={props.service} panels={props.panels} pinnedSummary={props.pinnedSummary} />
+      <DesktopPanelToolbar
+        service={props.service}
+        panels={props.panels}
+        pinnedSummary={props.pinnedSummary}
+        t={t}
+      />
       <SideToolsPanel
         cwd={cwd}
         open={panelState.open}
-        review={<WorkspacePanel service={props.service} sessions={props.sessions} workspaces={props.workspaces} />}
+        review={(
+          <WorkspacePanel
+            service={props.service}
+            sessions={props.sessions}
+            workspaces={props.workspaces}
+            t={t}
+          />
+        )}
         view={panelState.view}
         width={panelState.width}
         maximized={panelState.maximized}
+        t={t}
         onClose={() => { props.service.setOpen(false) }}
         onResize={width => { props.service.setWidth(width) }}
         onReview={() => { props.service.openReview() }}
@@ -770,8 +817,16 @@ function WorkspaceToolsSurface(props: {
 }
 
 export function apply(ctx: ClientContext): void {
+  const locale = ctx.get('locale') as LocaleService
+  const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.workspace-tools')
+  ctx.effect(
+    () => locale.register('oh-dsh.workspace-tools', WORKSPACE_MESSAGES),
+    'oh-dsh-desktop: workspace tools dictionaries',
+  )
   const service = new WorkspaceToolsService(
     ctx.get('desktopPanels') as DesktopPanels,
+    locale,
+    t,
     ctx.get('pinnedSummary') as PinnedSummary,
     ctx.get('sessions') as SessionsService,
     ctx.get('workspaces') as WorkspacesService,

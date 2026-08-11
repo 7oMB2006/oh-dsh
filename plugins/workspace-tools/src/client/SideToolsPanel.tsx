@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { WorkspaceFilesResponse, WorkspaceFileKind } from '../protocol.ts'
 import { FILES_API_PATH } from '../protocol.ts'
+import type { Translate } from '../../../shared/i18n.ts'
+import type { WorkspaceMessage } from './i18n.ts'
 
 export type DesktopToolView = 'review' | 'menu' | 'browser' | 'files'
 
@@ -28,6 +30,7 @@ interface SideToolsPanelProps {
   review: ReactNode
   view: DesktopToolView
   width: number
+  t: Translate<WorkspaceMessage>
 }
 
 function ToolIcon({ kind }: { kind: 'review' | 'terminal' | 'browser' | 'files' | 'chat' | 'trajectory' }): JSX.Element {
@@ -67,26 +70,26 @@ function SideMenu(props: SideToolsPanelProps): JSX.Element {
   }
   return (
     <div className="oh-dsh-side-menu">
-      <ToolRow icon="review" label="Review" shortcut="⌃⇧G" onClick={props.onReview} />
-      <ToolRow icon="terminal" label="Terminal" onClick={props.onTerminal} />
-      <ToolRow icon="browser" label="Browser" shortcut="⌘T" onClick={() => { props.onView('browser') }} />
-      <ToolRow icon="files" label="Files" shortcut="⌘P" disabled={props.cwd === undefined} onClick={props.onFiles} />
-      <ToolRow icon="chat" label="Side chat" shortcut="⌥⌘S" onClick={() => { void sideChat() }} />
-      <ToolRow icon="trajectory" label="Trajectory" disabled={props.cwd === undefined} onClick={props.onTrajectory} />
+      <ToolRow icon="review" label={props.t('review')} shortcut="⌃⇧G" onClick={props.onReview} />
+      <ToolRow icon="terminal" label={props.t('terminal')} onClick={props.onTerminal} />
+      <ToolRow icon="browser" label={props.t('browser')} shortcut="⌘T" onClick={() => { props.onView('browser') }} />
+      <ToolRow icon="files" label={props.t('files')} shortcut="⌘P" disabled={props.cwd === undefined} onClick={props.onFiles} />
+      <ToolRow icon="chat" label={props.t('side-chat')} shortcut="⌥⌘S" onClick={() => { void sideChat() }} />
+      <ToolRow icon="trajectory" label={props.t('trajectory')} disabled={props.cwd === undefined} onClick={props.onTrajectory} />
       {error !== '' && <div className="oh-dsh-side-error" role="alert">{error}</div>}
     </div>
   )
 }
 
-function normalizeBrowserUrl(raw: string): string {
+function normalizeBrowserUrl(raw: string, t: Translate<WorkspaceMessage>): string {
   const value = raw.trim()
-  if (value === '') throw new Error('Enter a URL')
+  if (value === '') throw new Error(t('browser.enter-url'))
   const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`)
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Only HTTP and HTTPS URLs are supported')
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error(t('browser.http-only'))
   return url.href
 }
 
-function BrowserView(): JSX.Element {
+function BrowserView({ t }: { t: Translate<WorkspaceMessage> }): JSX.Element {
   const container = useRef<HTMLDivElement | null>(null)
   const webview = useRef<ElectronWebviewElement | null>(null)
   const [address, setAddress] = useState('')
@@ -107,7 +110,9 @@ function BrowserView(): JSX.Element {
       setError('')
     }
     const failed = (event: Event): void => {
-      const description = 'errorDescription' in event ? String(event.errorDescription) : 'Page failed to load'
+      const description = 'errorDescription' in event
+        ? String(event.errorDescription)
+        : t('browser.page-failed')
       setError(description)
     }
     element.addEventListener('did-navigate', update)
@@ -123,7 +128,7 @@ function BrowserView(): JSX.Element {
 
   const navigate = async (): Promise<void> => {
     try {
-      const url = normalizeBrowserUrl(address)
+      const url = normalizeBrowserUrl(address, t)
       setAddress(url)
       setError('')
       await webview.current?.loadURL(url)
@@ -135,10 +140,10 @@ function BrowserView(): JSX.Element {
   return (
     <div className="oh-dsh-browser-view">
       <form className="oh-dsh-browser-bar" onSubmit={event => { event.preventDefault(); void navigate() }}>
-        <button type="button" disabled={!canGoBack} aria-label="Browser back" onClick={() => { webview.current?.goBack() }}>‹</button>
-        <button type="button" aria-label="Reload browser" onClick={() => { webview.current?.reload() }}>↻</button>
-        <input value={address} placeholder="Enter a URL" aria-label="Browser URL" onChange={event => { setAddress(event.currentTarget.value) }} />
-        <button type="submit">Go</button>
+        <button type="button" disabled={!canGoBack} aria-label={t('browser.back')} onClick={() => { webview.current?.goBack() }}>‹</button>
+        <button type="button" aria-label={t('browser.reload')} onClick={() => { webview.current?.reload() }}>↻</button>
+        <input value={address} placeholder={t('browser.enter-url')} aria-label={t('browser.url')} onChange={event => { setAddress(event.currentTarget.value) }} />
+        <button type="submit">{t('browser.go')}</button>
       </form>
       {error !== '' && <div className="oh-dsh-browser-error" role="alert">{error}</div>}
       <div ref={container} className="oh-dsh-browser-host" />
@@ -164,7 +169,15 @@ function fileGlyph(kind: WorkspaceFileKind): string {
   return kind === 'directory' ? '▱' : kind === 'symlink' ? '↗' : '▤'
 }
 
-function FilesView({ cwd, onOpenPath }: { cwd: string | undefined; onOpenPath(path: string): Promise<void> }): JSX.Element {
+function FilesView({
+  cwd,
+  onOpenPath,
+  t,
+}: {
+  cwd: string | undefined
+  onOpenPath(path: string): Promise<void>
+  t: Translate<WorkspaceMessage>
+}): JSX.Element {
   const [path, setPath] = useState(cwd)
   const [snapshot, setSnapshot] = useState<WorkspaceFilesResponse | null>(null)
   const [error, setError] = useState('')
@@ -178,7 +191,11 @@ function FilesView({ cwd, onOpenPath }: { cwd: string | undefined; onOpenPath(pa
     setLoading(true)
     void fetch(fileUrl(cwd, path), { signal: controller.signal }).then(async response => {
       const payload = await response.json() as WorkspaceFilesResponse & { error?: string }
-      if (!response.ok) throw new Error(payload.error ?? `File request failed (${String(response.status)})`)
+      if (!response.ok) {
+        throw new Error(payload.error ?? t('files.request-failed', {
+          status: response.status,
+        }))
+      }
       setSnapshot(payload)
       setError('')
     }).catch((next: unknown) => {
@@ -187,7 +204,7 @@ function FilesView({ cwd, onOpenPath }: { cwd: string | undefined; onOpenPath(pa
     return () => { controller.abort() }
   }, [cwd, path, refreshKey])
 
-  if (cwd === undefined) return <div className="oh-dsh-side-empty">Select a workspace to browse files.</div>
+  if (cwd === undefined) return <div className="oh-dsh-side-empty">{t('files.select-workspace')}</div>
   return (
     <div className="oh-dsh-files-view">
       <div className="oh-dsh-files-path" title={snapshot?.path ?? cwd}>
@@ -195,7 +212,7 @@ function FilesView({ cwd, onOpenPath }: { cwd: string | undefined; onOpenPath(pa
         <span>{(snapshot?.path ?? cwd).slice(cwd.length) || '/'}</span>
         <button type="button" onClick={() => { setRefreshKey(value => value + 1) }}>↻</button>
       </div>
-      {loading && <div className="oh-dsh-side-muted">Loading…</div>}
+      {loading && <div className="oh-dsh-side-muted">{t('files.loading')}</div>}
       {error !== '' && <div className="oh-dsh-side-error" role="alert">{error}</div>}
       {snapshot?.kind === 'directory' && (
         <div className="oh-dsh-file-list">
@@ -206,19 +223,19 @@ function FilesView({ cwd, onOpenPath }: { cwd: string | undefined; onOpenPath(pa
               <small>{formatSize(entry.size)}</small>
             </button>
           ))}
-          {snapshot.entries.length === 0 && <div className="oh-dsh-side-muted">Empty directory</div>}
-          {snapshot.truncated && <div className="oh-dsh-side-muted">Showing the first 300 entries</div>}
+          {snapshot.entries.length === 0 && <div className="oh-dsh-side-muted">{t('files.empty-directory')}</div>}
+          {snapshot.truncated && <div className="oh-dsh-side-muted">{t('files.showing-first')}</div>}
         </div>
       )}
       {snapshot?.kind === 'file' && (
         <div className="oh-dsh-file-preview">
           <div>
             <strong>{snapshot.path.split(/[\\/]/).pop()}</strong>
-            <button type="button" onClick={() => { void onOpenPath(snapshot.path) }}>Open</button>
+            <button type="button" onClick={() => { void onOpenPath(snapshot.path) }}>{t('files.open')}</button>
           </div>
           {snapshot.binary
-            ? <div className="oh-dsh-side-muted">Binary file · {formatSize(snapshot.size)}</div>
-            : <pre>{snapshot.content}{snapshot.truncated ? '\n\n… preview truncated' : ''}</pre>}
+            ? <div className="oh-dsh-side-muted">{t('files.binary', { size: formatSize(snapshot.size) })}</div>
+            : <pre>{snapshot.content}{snapshot.truncated ? `\n\n… ${t('files.preview-truncated')}` : ''}</pre>}
         </div>
       )}
     </div>
@@ -241,7 +258,11 @@ export function SideToolsPanel(props: SideToolsPanelProps): JSX.Element {
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
   }
-  const title = props.view === 'browser' ? 'Browser' : props.view === 'files' ? 'Files' : props.view === 'review' ? 'Review' : 'Side panel'
+  const title = props.view === 'browser'
+    ? props.t('browser')
+    : props.view === 'files'
+      ? props.t('files')
+      : props.view === 'review' ? props.t('review') : props.t('side.title')
   return (
     <aside
       className="oh-dsh-workspace-panel oh-dsh-side-panel"
@@ -255,16 +276,16 @@ export function SideToolsPanel(props: SideToolsPanelProps): JSX.Element {
       {props.view !== 'menu' && props.view !== 'review' && (
         <header className="oh-dsh-workspace-header oh-dsh-side-header">
           <div>
-            <button type="button" aria-label="Back to side panel" onClick={() => { props.onView('menu') }}>‹</button>
+            <button type="button" aria-label={props.t('side.back')} onClick={() => { props.onView('menu') }}>‹</button>
             <strong>{title}</strong>
           </div>
-          <button type="button" aria-label="Close side panel" onClick={props.onClose}>×</button>
+          <button type="button" aria-label={props.t('side.close')} onClick={props.onClose}>×</button>
         </header>
       )}
       {props.view === 'menu' && <SideMenu {...props} />}
       {props.view === 'review' && props.review}
-      {props.view === 'browser' && <BrowserView />}
-      {props.view === 'files' && <FilesView cwd={props.cwd} onOpenPath={props.onOpenPath} />}
+      {props.view === 'browser' && <BrowserView t={props.t} />}
+      {props.view === 'files' && <FilesView cwd={props.cwd} onOpenPath={props.onOpenPath} t={props.t} />}
     </aside>
   )
 }

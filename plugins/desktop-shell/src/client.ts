@@ -4,6 +4,11 @@ import type { DesktopBridge, DesktopCommand } from '../../../src/contracts.ts'
 import type { DesktopPanels } from '../../panel-controls/src/client.ts'
 import type { PinnedSummary } from '../../pinned-summary/src/client.ts'
 import type { WorkspaceTools } from '../../workspace-tools/src/client.ts'
+import type {
+  LocaleMessages,
+  LocaleService,
+  Translate,
+} from '../../shared/i18n.ts'
 
 interface WorkspaceView {
   workspaceId: string
@@ -50,10 +55,44 @@ html[data-oh-dsh-desktop='true'] body::before {
   -webkit-app-region: drag;
   user-select: none;
 }
+
+html[data-oh-dsh-preview='true'] body::after {
+  content: attr(data-oh-dsh-preview-label);
+  position: fixed;
+  z-index: 2147483647;
+  top: 7px;
+  left: 50%;
+  max-width: 52vw;
+  padding: 4px 11px;
+  overflow: hidden;
+  border: 1px solid #a9c2f5;
+  border-radius: 999px;
+  background: #edf3ff;
+  color: #28549f;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 `
 
 /** Wait for the DSH services used by native menu commands. */
-export const inject = ['workspaces', 'desktopPanels', 'pinnedSummary', 'workspaceTools']
+export const inject = ['locale', 'workspaces', 'desktopPanels', 'pinnedSummary', 'workspaceTools']
+
+type DesktopShellMessage = 'preview.label'
+
+const DESKTOP_SHELL_MESSAGES: LocaleMessages<DesktopShellMessage> = {
+  en: {
+    'preview.label': 'Isolated plugin preview · {plugin}',
+  },
+  zh: {
+    'preview.label': '隔离插件预览 · {plugin}',
+  },
+}
 
 function installDesktopChrome(): () => void {
   const originalTitle = document.title
@@ -67,6 +106,30 @@ function installDesktopChrome(): () => void {
     style.remove()
     delete document.documentElement.dataset.ohDshDesktop
     document.title = originalTitle
+  }
+}
+
+function installHeroBranding(): () => void {
+  const headlineCopy = new Set(['Into the Unknown', '探索未知之境'])
+  const originalHeadlines = new Map<HTMLElement, string>()
+  const synchronize = (): void => {
+    for (const element of document.querySelectorAll<HTMLElement>('span')) {
+      const text = element.textContent?.trim() ?? ''
+      if (!headlineCopy.has(text)) continue
+      if (!originalHeadlines.has(element)) originalHeadlines.set(element, text)
+      element.textContent = 'Oh-DSH-Desktop'
+      element.dataset.ohDshHeroHeadline = 'true'
+    }
+  }
+  const observer = new MutationObserver(synchronize)
+  observer.observe(document.body, { childList: true, characterData: true, subtree: true })
+  synchronize()
+  return () => {
+    observer.disconnect()
+    for (const [element, original] of originalHeadlines) {
+      if (element.isConnected && element.textContent === 'Oh-DSH-Desktop') element.textContent = original
+      delete element.dataset.ohDshHeroHeadline
+    }
   }
 }
 
@@ -155,18 +218,47 @@ export function apply(ctx: ClientContext): void {
     throw new Error('oh-dsh-desktop: preload bridge is unavailable outside Oh-DSH-Desktop')
   }
   const workspaces = ctx.get('workspaces') as WorkspacesService
+  const locale = ctx.get('locale') as LocaleService
+  const t: Translate<DesktopShellMessage> = locale.bind('oh-dsh.desktop-shell')
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
   const workspaceTools = ctx.get('workspaceTools') as WorkspaceTools
+  ctx.effect(
+    () => locale.register('oh-dsh.desktop-shell', DESKTOP_SHELL_MESSAGES),
+    'oh-dsh-desktop: shell dictionaries',
+  )
   ctx.reflect.provide('desktopShell', bridge, undefined)
   ctx.effect(() => {
+    let disposed = false
+    let previewPluginId: string | null = null
+    const renderPreviewLabel = (): void => {
+      if (previewPluginId === null) return
+      document.body.dataset.ohDshPreviewLabel = t('preview.label', {
+        plugin: previewPluginId,
+      })
+    }
     const removeDesktopChrome = installDesktopChrome()
+    const removeHeroBranding = installHeroBranding()
+    const unsubscribeLocale = locale.subscribe(renderPreviewLabel)
+    void bridge.getInfo().then(info => {
+      if (disposed || info.preview === null) return
+      previewPluginId = info.preview.pluginId
+      document.documentElement.dataset.ohDshPreview = 'true'
+      renderPreviewLabel()
+    }).catch((error: unknown) => {
+      console.error('oh-dsh-desktop: failed to read preview identity', error)
+    })
     const unsubscribe = bridge.onCommand((command) => {
       dispatch(command, workspaces, panels, pinnedSummary, workspaceTools)
     })
     return () => {
+      disposed = true
       unsubscribe()
+      unsubscribeLocale()
+      removeHeroBranding()
       removeDesktopChrome()
+      delete document.documentElement.dataset.ohDshPreview
+      delete document.body.dataset.ohDshPreviewLabel
     }
   }, 'oh-dsh-desktop: native command bridge')
 }

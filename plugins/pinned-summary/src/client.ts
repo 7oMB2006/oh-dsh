@@ -1,5 +1,12 @@
 /** Layout-reserving pinned summary derived from the active DSH session. */
 
+import type { LocaleService, Translate } from '../../shared/i18n.ts'
+import { localeTag } from '../../shared/i18n.ts'
+import {
+  PINNED_SUMMARY_MESSAGES,
+  type PinnedSummaryMessage,
+} from './i18n.ts'
+
 interface ObservableSnapshot<T> {
   getSnapshot(): T
   subscribe(listener: () => void): () => void
@@ -46,7 +53,7 @@ export interface PinnedSummary {
   toggle(): void
 }
 
-export const inject = ['sessions']
+export const inject = ['locale', 'sessions']
 
 const OPEN_KEY = 'oh-dsh-desktop.pinned-summary.open'
 
@@ -199,12 +206,12 @@ function conversationNodes(snapshot: unknown): unknown[] {
   return snapshot.nodes
 }
 
-function latestSummary(nodes: readonly unknown[]): { label: string; text: string } | undefined {
+function latestSummary(nodes: readonly unknown[]): { kind: 'context' | 'assistant'; text: string } | undefined {
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index]
     if (!isRecord(node)) continue
     if (node.kind === 'compaction' && typeof node.summary === 'string' && node.summary.trim() !== '') {
-      return { label: 'DSH context summary', text: node.summary.trim() }
+      return { kind: 'context', text: node.summary.trim() }
     }
   }
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
@@ -213,7 +220,7 @@ function latestSummary(nodes: readonly unknown[]): { label: string; text: string
     const text = node.blocks.flatMap((block) => {
       return isRecord(block) && block.kind === 'text' && typeof block.text === 'string' ? [block.text] : []
     }).join('\n').trim()
-    if (text !== '') return { label: 'Latest assistant response', text: text.slice(0, 5000) }
+    if (text !== '') return { kind: 'assistant', text: text.slice(0, 5000) }
   }
   return undefined
 }
@@ -226,22 +233,33 @@ function required<T extends Element>(root: ParentNode, selector: string): T {
 
 class PinnedSummaryService implements PinnedSummary {
   readonly #sessions: SessionsService
+  readonly #locale: LocaleService
+  readonly #t: Translate<PinnedSummaryMessage>
   readonly #listeners = new Set<() => void>()
   #open = readOpen()
   #panel: HTMLElement | undefined
   #style: HTMLStyleElement | undefined
   #title: HTMLElement | undefined
+  #headerTitle: HTMLElement | undefined
+  #close: HTMLButtonElement | undefined
   #meta: HTMLElement | undefined
   #source: HTMLElement | undefined
   #text: HTMLElement | undefined
   #currentId: string | undefined
   #unsubscribeList: (() => void) | undefined
   #unsubscribeSession: (() => void) | undefined
+  #unsubscribeLocale: (() => void) | undefined
   readonly #narrowViewport = window.matchMedia('(max-width: 900px)')
   readonly #handleViewportChange = (): void => { this.applyState() }
 
-  constructor(sessions: SessionsService) {
+  constructor(
+    sessions: SessionsService,
+    locale: LocaleService,
+    t: Translate<PinnedSummaryMessage>,
+  ) {
     this.#sessions = sessions
+    this.#locale = locale
+    this.#t = t
   }
 
   mount(): void {
@@ -252,29 +270,35 @@ class PinnedSummaryService implements PinnedSummary {
 
     const panel = document.createElement('aside')
     panel.dataset.ohDshPinnedSummary = 'true'
-    panel.setAttribute('aria-label', 'Pinned Summary')
+    panel.setAttribute('aria-label', this.#t('summary.label'))
     panel.innerHTML = `
       <header data-oh-dsh-summary-header>
-        <span>Pinned Summary</span>
-        <button data-oh-dsh-summary-close type="button" aria-label="Close Pinned Summary" title="Close Pinned Summary">×</button>
+        <span></span>
+        <button data-oh-dsh-summary-close type="button">×</button>
       </header>
       <div data-oh-dsh-summary-body>
-        <h2 data-oh-dsh-summary-title>No active session</h2>
-        <div data-oh-dsh-summary-meta>Select a session to see its summary.</div>
-        <span data-oh-dsh-summary-source>Session</span>
-        <p data-oh-dsh-summary-text>The active DSH session summary will appear here.</p>
+        <h2 data-oh-dsh-summary-title></h2>
+        <div data-oh-dsh-summary-meta></div>
+        <span data-oh-dsh-summary-source></span>
+        <p data-oh-dsh-summary-text></p>
       </div>
     `
     document.body.append(panel)
     this.#panel = panel
     this.#title = required(panel, '[data-oh-dsh-summary-title]')
+    this.#headerTitle = required(panel, '[data-oh-dsh-summary-header] span')
+    this.#close = required(panel, '[data-oh-dsh-summary-close]')
     this.#meta = required(panel, '[data-oh-dsh-summary-meta]')
     this.#source = required(panel, '[data-oh-dsh-summary-source]')
     this.#text = required(panel, '[data-oh-dsh-summary-text]')
-    required<HTMLButtonElement>(panel, '[data-oh-dsh-summary-close]')
-      .addEventListener('click', () => { this.setOpen(false) })
+    this.#close.addEventListener('click', () => { this.setOpen(false) })
     this.#narrowViewport.addEventListener('change', this.#handleViewportChange)
     this.#unsubscribeList = this.#sessions.list.subscribe(() => { this.bindAndRender() })
+    this.#unsubscribeLocale = this.#locale.subscribe(() => {
+      this.renderChrome()
+      this.render()
+    })
+    this.renderChrome()
     this.applyState()
     this.bindAndRender()
   }
@@ -282,6 +306,7 @@ class PinnedSummaryService implements PinnedSummary {
   dispose(): void {
     this.#unsubscribeList?.()
     this.#unsubscribeSession?.()
+    this.#unsubscribeLocale?.()
     this.#narrowViewport.removeEventListener('change', this.#handleViewportChange)
     this.#panel?.remove()
     this.#style?.remove()
@@ -351,38 +376,68 @@ class PinnedSummaryService implements PinnedSummary {
     this.render()
   }
 
+  private renderChrome(): void {
+    this.#panel?.setAttribute('aria-label', this.#t('summary.label'))
+    if (this.#headerTitle !== undefined) this.#headerTitle.textContent = this.#t('summary.title')
+    if (this.#close !== undefined) {
+      const label = this.#t('summary.close')
+      this.#close.setAttribute('aria-label', label)
+      this.#close.title = label
+    }
+  }
+
   private render(): void {
     if (this.#title === undefined || this.#meta === undefined || this.#source === undefined || this.#text === undefined) return
     const list = this.#sessions.list.getSnapshot()
     const id = list.current
     const summary = id === undefined ? undefined : list.byId[id]
     if (id === undefined || summary === undefined) {
-      this.#title.textContent = 'No active session'
-      this.#meta.textContent = 'Select a session to see its summary.'
-      this.#source.textContent = 'Session'
-      this.#text.textContent = 'The active DSH session summary will appear here.'
+      this.#title.textContent = this.#t('summary.no-active')
+      this.#meta.textContent = this.#t('summary.select-session')
+      this.#source.textContent = this.#t('summary.session')
+      this.#text.textContent = this.#t('summary.empty-placeholder')
       return
     }
     const binding = this.#sessions.binding(id)
     const derived = latestSummary(conversationNodes(binding?.session.getSnapshot()))
-    const status = summary.running ? 'Running' : summary.pendingInteraction !== undefined ? 'Waiting for input' : 'Ready'
+    const status = summary.running
+      ? this.#t('summary.status.running')
+      : summary.pendingInteraction !== undefined
+        ? this.#t('summary.status.waiting')
+        : this.#t('summary.status.ready')
     this.#title.textContent = summary.displayTitle
     this.#meta.textContent = [
       status,
       summary.cwd,
-      `Updated ${new Date(summary.updatedAt).toLocaleString()}`,
+      this.#t('summary.updated', {
+        time: new Date(summary.updatedAt).toLocaleString(localeTag(this.#locale)),
+      }),
     ].filter((part): part is string => typeof part === 'string' && part !== '').join(' · ')
-    this.#source.textContent = derived?.label ?? 'Session overview'
+    this.#source.textContent = derived === undefined
+      ? this.#t('summary.source.overview')
+      : derived.kind === 'context'
+        ? this.#t('summary.source.context')
+        : this.#t('summary.source.assistant')
     this.#text.textContent = derived?.text
       ?? (summary.blank
-        ? 'This session has not started yet.'
-        : 'No DSH compaction summary is available yet. The latest generated summary will be pinned here automatically.')
+        ? this.#t('summary.blank')
+        : this.#t('summary.unavailable'))
   }
 }
 
 /** Provide the pinned-summary service and its layout-reserving DOM surface. */
 export function apply(ctx: ClientContext): void {
-  const service = new PinnedSummaryService(ctx.get('sessions') as SessionsService)
+  const locale = ctx.get('locale') as LocaleService
+  const t: Translate<PinnedSummaryMessage> = locale.bind('oh-dsh.pinned-summary')
+  ctx.effect(
+    () => locale.register('oh-dsh.pinned-summary', PINNED_SUMMARY_MESSAGES),
+    'oh-dsh-desktop: pinned summary dictionaries',
+  )
+  const service = new PinnedSummaryService(
+    ctx.get('sessions') as SessionsService,
+    locale,
+    t,
+  )
   ctx.effect(() => {
     service.mount()
     const disposeService = ctx.reflect.provide('pinnedSummary', service, undefined)
