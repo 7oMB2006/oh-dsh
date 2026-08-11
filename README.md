@@ -1,3 +1,8 @@
+<p align="center">
+  <strong>简体中文</strong> ·
+  <a href="./README.en.md">English</a>
+</p>
+
 <div align="center">
   <img src="./assets/dsh-whale.png" width="168" alt="Oh-DSH-Desktop whale">
   <h1>Oh-DSH-Desktop</h1>
