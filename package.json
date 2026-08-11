@@ -1,0 +1,124 @@
+{
+  "name": "@oh-dsh/desktop",
+  "productName": "Oh-DSH-Desktop",
+  "version": "0.1.0",
+  "description": "An extensible DeepSeek Harness plugin collection and Electron desktop distribution",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "exports": {
+    ".": {
+      "default": "./dist/plugin.js"
+    },
+    "./cordis.patch.yml": "./dist/cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/plugin.js",
+    "dist/cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./dist/cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:dsh": "node scripts/build-dsh.mjs",
+    "stage:dsh": "node scripts/stage-dsh.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime.mjs",
+    "smoke:app": "node scripts/smoke-runtime.mjs \"release/mac-arm64/Oh-DSH-Desktop.app/Contents/Resources\"",
+    "start": "pnpm run build && pnpm run stage:dsh && electron .",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "dist:mac": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-mac.mjs",
+    "dist:mac:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-mac.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "electron": "42.3.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.12",
+    "pnpm": "11.20.0",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "build": {
+    "appId": "ai.deepseek.oh-dsh-desktop",
+    "productName": "Oh-DSH-Desktop",
+    "asar": true,
+    "afterPack": "scripts/after-pack.cjs",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/main.js",
+      "dist/preload.cjs",
+      "dist/splash.html",
+      "LICENSE",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".stage",
+        "to": ".",
+        "filter": [
+          "dsh-runtime/**/*",
+          "node-runtime/**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/Oh-DSH-Desktop.icns",
+      "identity": null,
+      "darkModeSupport": true,
+      "minimumSystemVersion": "12.0.0",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Oh-DSH-Desktop uses Apple Events only when a DeepSeek Harness tool needs to interact with a Mac app.",
+        "NSDesktopFolderUsageDescription": "Oh-DSH-Desktop needs access to workspaces you select on the Desktop.",
+        "NSDocumentsFolderUsageDescription": "Oh-DSH-Desktop needs access to workspaces you select in Documents.",
+        "NSDownloadsFolderUsageDescription": "Oh-DSH-Desktop needs access to workspaces you select in Downloads."
+      }
+    },
+    "dmg": {
+      "title": "Oh-DSH-Desktop ${version}",
+      "artifactName": "Oh-DSH-Desktop-${version}-${arch}.${ext}",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 185,
+          "type": "file"
+        },
+        {
+          "x": 400,
+          "y": 185,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "artifactName": "Oh-DSH-Desktop-${version}-${arch}.${ext}"
+  }
+}

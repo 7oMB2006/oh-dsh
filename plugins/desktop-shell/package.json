@@ -1,0 +1,36 @@
+{
+  "name": "@oh-dsh/desktop-shell",
+  "version": "0.1.0",
+  "description": "Native Electron bridge and desktop surface facts for Oh-DSH-Desktop",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "dshClient": {
+    "inject": [
+      "@deepseek-ai/dsh-client-runtime",
+      "@deepseek-ai/dsh-client-ui-layout",
+      "@oh-dsh/panel-controls",
+      "@oh-dsh/pinned-summary",
+      "@oh-dsh/workspace-tools"
+    ],
+    "platform": "web",
+    "immediately": true
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map"
+  ],
+  "dependencies": {
+    "node-pty": "1.1.0",
+    "ws": "8.21.2"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

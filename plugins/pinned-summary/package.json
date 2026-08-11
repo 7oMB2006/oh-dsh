@@ -1,0 +1,25 @@
+{
+  "name": "@oh-dsh/pinned-summary",
+  "version": "0.1.0",
+  "description": "Layout-reserving current-session summary panel for Oh-DSH-Desktop",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./package.json": "./package.json"
+  },
+  "dshClient": {
+    "inject": [
+      "@deepseek-ai/dsh-client-runtime"
+    ],
+    "platform": "web",
+    "immediately": true
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map"
+  ]
+}

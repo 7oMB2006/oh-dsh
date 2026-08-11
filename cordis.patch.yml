@@ -1,0 +1,28 @@
+# Oh-DSH-Desktop is a bundle layer over dsh-base + dsh-web-app. The Electron
+# distribution keeps DSH's browser UI and mounts each desktop behavior as an
+# independently registered Host/Client plugin.
+
+- id: webserver
+  config:
+    host: 127.0.0.1
+    port: 0
+
+- id: web-runtime
+  config:
+    mode: production
+    printUrl: true
+    surfaceContext: false
+    lanAddresses: []
+
+- insert:
+    - id: oh-panel-controls
+      name: '@oh-dsh/panel-controls'
+
+    - id: oh-pinned-summary
+      name: '@oh-dsh/pinned-summary'
+
+    - id: oh-workspace-tools
+      name: '@oh-dsh/workspace-tools'
+
+    - id: oh-desktop-shell
+      name: '@oh-dsh/desktop-shell'

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": [
+      "ES2024",
+      "DOM"
+    ],
+    "jsx": "react-jsx",
+    "types": [
+      "node"
+    ],
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "plugins/**/*",
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.mjs"
+  ]
+}
