@@ -12,7 +12,9 @@ import { localeTag } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import type {
   MarketplaceCommand,
+  MarketplaceConfirmation,
   MarketplacePlugin,
+  MarketplaceRiskReason,
   MarketplaceSnapshot,
 } from '../protocol.ts'
 import { MARKETPLACE_MESSAGES, type MarketplaceMessage } from './i18n.ts'
@@ -304,6 +306,22 @@ function runtimeRiskLabel(
   return t(`risk.${plugin.runtimeRisk}`)
 }
 
+function riskReasonLabel(
+  reason: MarketplaceRiskReason,
+  t: Translate<MarketplaceMessage>,
+): string {
+  return t(`risk-reason.${reason}`)
+}
+
+function confirmationLabel(
+  confirmation: MarketplaceConfirmation,
+  t: Translate<MarketplaceMessage>,
+): string {
+  if (confirmation === 'allow-build-scripts') return t('allow-scripts')
+  if (confirmation === 'accept-high-risk') return t('accept-high-risk')
+  return t('accept-source-change')
+}
+
 function PluginCard({
   plugin,
   selected,
@@ -352,6 +370,11 @@ function PluginCard({
             {t('update-available')}
           </span>
         )}
+        {plugin.protected && (
+          <span className="oh-marketplace-pill" data-protected="true">
+            {t('managed')}
+          </span>
+        )}
       </div>
     </button>
   )
@@ -376,10 +399,20 @@ function PluginDetail({
   close(): void
   run(command: MarketplaceCommand): Promise<void>
 }): JSX.Element {
-  const [allowScripts, setAllowScripts] = useState(false)
+  const [confirmations, setConfirmations] = useState<MarketplaceConfirmation[]>([])
   const plan = snapshot.plan?.pluginId === plugin.id ? snapshot.plan : null
   const hasScripts = plan !== null && Object.keys(plan.buildScripts).length > 0
-  useEffect(() => { setAllowScripts(false) }, [plugin.id, plan?.resolvedCommit])
+  const readyToPreview = plan !== null
+    && plan.requirements.every(requirement => confirmations.includes(requirement))
+  useEffect(() => { setConfirmations([]) }, [plugin.id, plan?.resolvedCommit])
+  const setConfirmed = (
+    confirmation: MarketplaceConfirmation,
+    confirmed: boolean,
+  ): void => {
+    setConfirmations(current => confirmed
+      ? [...new Set([...current, confirmation])]
+      : current.filter(entry => entry !== confirmation))
+  }
   return (
     <aside
       className="oh-marketplace-detail"
@@ -402,7 +435,7 @@ function PluginDetail({
               : new Date(plugin.pushedAt).toLocaleString(localeTag(locale))}
           </dd>
           <dt>{t('repository')}</dt><dd>{plugin.url.replace('https://github.com/', '')}</dd>
-          <dt>{t('trust')}</dt><dd>{t('trust.community')}</dd>
+          <dt>{t('trust')}</dt><dd>{t(`trust.${plugin.trust}`)}</dd>
           <dt>{t('runtime-boundary')}</dt><dd>{runtimeRiskLabel(plugin, t)}</dd>
           {plugin.currentCommit !== null && (
             <><dt>{t('current-commit')}</dt><dd>{shortCommit(plugin.currentCommit)}</dd></>
@@ -414,30 +447,47 @@ function PluginDetail({
 
         {plan !== null && (
           <section className="oh-marketplace-plan">
+            <div className="oh-marketplace-flow" aria-label={t('prepared-plan', { action: t(`action.${plan.action}`) })}>
+              <span data-active="true">1 · {t('flow.review')}</span>
+              <span data-active={String(snapshot.preview !== null)}>2 · {t('flow.preview')}</span>
+              <span>3 · {t('flow.apply')}</span>
+            </div>
             <h3>{t('prepared-plan', { action: t(`action.${plan.action}`) })}</h3>
+            <div className="oh-marketplace-plan-risk" data-risk={plan.riskLevel}>
+              <strong>{t('risk-level')}: {t(`risk-level.${plan.riskLevel}`)}</strong>
+              <span>{t('source-review')}: {t(`source-review.${plan.sourceReview}`)}</span>
+            </div>
+            {plan.riskReasons.length > 0 && (
+              <ul className="oh-marketplace-risk-reasons">
+                {plan.riskReasons.map(reason => (
+                  <li key={reason}>{riskReasonLabel(reason, t)}</li>
+                ))}
+              </ul>
+            )}
             <code>{plan.source}</code>
             <code>{t('commit', { commit: shortCommit(plan.resolvedCommit) })}</code>
             {plan.packageName !== null && (
               <code>{t('package', { package: plan.packageName })}</code>
             )}
             {hasScripts && (
-              <>
-                <code>{Object.entries(plan.buildScripts).map(([name, script]) => `${name}: ${script}`).join('\n')}</code>
-                <label className="oh-marketplace-confirm">
+              <code>{Object.entries(plan.buildScripts).map(([name, script]) => `${name}: ${script}`).join('\n')}</code>
+            )}
+            {plan.requirements.map(requirement => (
+              <label className="oh-marketplace-confirm" key={requirement}>
                   <input
-                    checked={allowScripts}
-                    onChange={event => { setAllowScripts(event.target.checked) }}
+                    checked={confirmations.includes(requirement)}
+                    onChange={event => { setConfirmed(requirement, event.target.checked) }}
                     type="checkbox"
                   />
-                  <span>{t('allow-scripts')}</span>
-                </label>
-              </>
-            )}
+                  <span>{confirmationLabel(requirement, t)}</span>
+              </label>
+            ))}
+            <p className="oh-marketplace-recovery-note">{t('recovery-note')}</p>
           </section>
         )}
 
         <div className="oh-marketplace-detail-actions">
-          {plugin.mechanism === 'unsupported' ? (
+          {plugin.mechanism === 'unsupported' || plugin.protected ? (
             <button className="oh-marketplace-button" onClick={() => { void bridge.openExternal(plugin.url) }} type="button">
               {t('open-repository')}
             </button>
@@ -449,7 +499,7 @@ function PluginDetail({
                   data-primary="true"
                   disabled={pending}
                   onClick={() => { void run({
-                    type: 'inspect',
+                    type: 'prepare',
                     action: 'install',
                     pluginId: plugin.id,
                   }) }}
@@ -464,7 +514,7 @@ function PluginDetail({
                   data-primary="true"
                   disabled={pending}
                   onClick={() => { void run({
-                    type: 'inspect',
+                    type: 'prepare',
                     action: 'update',
                     pluginId: plugin.id,
                   }) }}
@@ -478,7 +528,7 @@ function PluginDetail({
                   className="oh-marketplace-button"
                   disabled={pending}
                   onClick={() => { void run({
-                    type: 'inspect',
+                    type: 'prepare',
                     action: plugin.enabled ? 'disable' : 'enable',
                     pluginId: plugin.id,
                   }) }}
@@ -490,9 +540,10 @@ function PluginDetail({
               {plugin.installed && (
                 <button
                   className="oh-marketplace-button"
+                  data-danger="true"
                   disabled={pending}
                   onClick={() => { void run({
-                    type: 'inspect',
+                    type: 'prepare',
                     action: 'uninstall',
                     pluginId: plugin.id,
                   }) }}
@@ -506,8 +557,8 @@ function PluginDetail({
             <button
               className="oh-marketplace-button"
               data-primary="true"
-              disabled={pending || (hasScripts && !allowScripts)}
-              onClick={() => { void run({ type: 'preview', allowBuildScripts: allowScripts }) }}
+              disabled={pending || !readyToPreview}
+              onClick={() => { void run({ type: 'preview', confirmations }) }}
               type="button"
             >
               {t('preview.launch')}
@@ -566,7 +617,9 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
   const [pending, setPending] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'available'>('all')
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'installed' | 'available' | 'updates' | 'disabled'
+  >('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -602,13 +655,21 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
   const statusCounts = useMemo(() => {
     const catalog = snapshot?.catalog ?? []
     const installed = catalog.filter(plugin => plugin.installed).length
-    return { all: catalog.length, available: catalog.length - installed, installed }
+    return {
+      all: catalog.length,
+      available: catalog.length - installed,
+      disabled: catalog.filter(plugin => plugin.installed && !plugin.enabled).length,
+      installed,
+      updates: catalog.filter(plugin => plugin.updateAvailable).length,
+    }
   }, [snapshot?.catalog])
   const plugins = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return (snapshot?.catalog ?? []).filter(plugin => {
       if (statusFilter === 'installed' && !plugin.installed) return false
       if (statusFilter === 'available' && plugin.installed) return false
+      if (statusFilter === 'updates' && !plugin.updateAvailable) return false
+      if (statusFilter === 'disabled' && (!plugin.installed || plugin.enabled)) return false
       if (categoryFilter !== 'all' && plugin.category !== categoryFilter) return false
       return needle === '' || [plugin.title, plugin.description, plugin.category, ...plugin.tags]
         .some(value => value.toLowerCase().includes(needle))
@@ -660,7 +721,7 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
                 {t('discard')}
               </button>
               <button className="oh-marketplace-button" data-primary="true" disabled={pending} onClick={() => { void run({ type: 'apply' }) }} type="button">
-                {t('apply-to-desktop')}
+                {t('apply-action', { action: t(`action.${snapshot.preview.action}`) })}
               </button>
             </div>
           )}
@@ -703,6 +764,8 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
                   ['all', t('all')],
                   ['installed', t('installed')],
                   ['available', t('not-installed')],
+                  ['updates', t('updates')],
+                  ['disabled', t('disabled')],
                 ] as const).map(([value, label]) => (
                   <button
                     data-active={String(statusFilter === value)}

@@ -187,6 +187,7 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 .oh-marketplace-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 20px;
 }
@@ -194,7 +195,7 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 .oh-marketplace-search {
   display: flex;
   align-items: center;
-  flex: 1;
+  flex: 1 1 280px;
   max-width: 460px;
   height: 38px;
   padding: 0 13px;
@@ -260,7 +261,12 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
   border: 1px solid var(--dsw-alias-border-l1, #ddd);
   border-radius: 11px;
   background: var(--dsw-alias-interactive-bg-hover, #f3f4f5);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+
+.oh-marketplace-status-tabs::-webkit-scrollbar { display: none; }
 
 .oh-marketplace-status-tabs button {
   display: flex;
@@ -375,6 +381,7 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 .oh-marketplace-card-footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: auto;
 }
@@ -404,6 +411,11 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 .oh-marketplace-pill[data-unsupported='true'] {
   background: #fff4df;
   color: #966211;
+}
+
+.oh-marketplace-pill[data-protected='true'] {
+  background: #f1eaff;
+  color: #6741a5;
 }
 
 .oh-marketplace-detail {
@@ -468,6 +480,57 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
   font-size: 12px;
 }
 
+.oh-marketplace-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 13px;
+}
+
+.oh-marketplace-flow span {
+  padding: 6px 4px;
+  border-radius: 7px;
+  background: rgb(53 85 147 / 7%);
+  color: var(--dsw-alias-label-tertiary, #92959a);
+  font-size: 9px;
+  text-align: center;
+}
+
+.oh-marketplace-flow span[data-active='true'] {
+  background: #e7efff;
+  color: #315fae;
+  font-weight: 650;
+}
+
+.oh-marketplace-plan-risk {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #ecf7f0;
+  color: #17663a;
+  line-height: 1.45;
+}
+
+.oh-marketplace-plan-risk[data-risk='elevated'] {
+  background: #fff6e6;
+  color: #83570b;
+}
+
+.oh-marketplace-plan-risk[data-risk='high'],
+.oh-marketplace-plan-risk[data-risk='blocked'] {
+  background: #fff0ef;
+  color: #a33228;
+}
+
+.oh-marketplace-risk-reasons {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  color: var(--dsw-alias-label-secondary, #61656b);
+  line-height: 1.55;
+}
+
 .oh-marketplace-plan code {
   display: block;
   margin: 5px 0;
@@ -485,6 +548,21 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
   color: #7d5412;
   font-size: 10px;
   line-height: 1.45;
+}
+
+.oh-marketplace-confirm input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: #315fae;
+}
+
+.oh-marketplace-recovery-note {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgb(53 85 147 / 14%);
+  color: var(--dsw-alias-label-tertiary, #7d8086);
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .oh-marketplace-detail-actions {
@@ -536,6 +614,7 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 .oh-marketplace-preview-banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 14px;
   border: 1px solid #bcd0fa;
@@ -570,6 +649,11 @@ html[data-oh-dsh-marketplace-open='true'] #oh-dsh-workspace-tools-root {
 @media (prefers-color-scheme: dark) {
   .oh-marketplace-card-icon { background: #1d2c4c; color: #8eb4ff; }
   .oh-marketplace-plan { border-color: #33466d; background: #19233a; }
+  .oh-marketplace-flow span[data-active='true'] { background: #283d67; color: #b8ceff; }
+  .oh-marketplace-plan-risk { background: #193326; color: #94d5ae; }
+  .oh-marketplace-plan-risk[data-risk='elevated'] { background: #3b2e16; color: #e5c27f; }
+  .oh-marketplace-plan-risk[data-risk='high'],
+  .oh-marketplace-plan-risk[data-risk='blocked'] { background: #40211e; color: #f0aaa4; }
   .oh-marketplace-preview-banner { border-color: #395993; background: #182744; color: #a9c4ff; }
 }
 
