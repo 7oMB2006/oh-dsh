@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { apply } from '../plugins/desktop-shell/src/index.ts'
+import { mountMarketplaceAgentTools } from '../plugins/desktop-shell/src/marketplace/tools.ts'
 
 test('desktop client replaces the hero title and keeps the Preview badge', () => {
   const client = readFileSync(new URL('../plugins/desktop-shell/src/client.ts', import.meta.url), 'utf8')
@@ -64,6 +65,7 @@ test('desktop-shell Host plugin publishes capability, prompt, and bash environme
       debug: () => {},
       warn: () => {},
     },
+    on: () => {},
     inject: (names: string[], callback: (ctx: unknown) => void): void => {
       if (names[0] === 'systemPrompt') {
         callback({
@@ -84,6 +86,9 @@ test('desktop-shell Host plugin publishes capability, prompt, and bash environme
     },
     provide: (name: string, value: unknown): void => {
       if (name === 'desktop') capability = value
+    },
+    tools: {
+      register: () => {},
     },
   }
   try {
@@ -112,4 +117,55 @@ test('desktop-shell Host plugin publishes capability, prompt, and bash environme
     if (previous.version === undefined) delete process.env.DSH_DESKTOP_VERSION
     else process.env.DSH_DESKTOP_VERSION = previous.version
   }
+})
+
+test('desktop Agent tools share the guarded marketplace transaction owner', async () => {
+  const names: string[] = []
+  const definitions: unknown[] = []
+  type AgentPolicy = Parameters<Parameters<typeof mountMarketplaceAgentTools>[0]['on']>[1]
+  let policy: AgentPolicy | undefined
+  const environment: NodeJS.ProcessEnv = {
+    OH_DSH_MARKETPLACE_AGENT_TOKEN: 'secret-token',
+    OH_DSH_MARKETPLACE_AGENT_URL: 'http://127.0.0.1:43210/v1/marketplace',
+  }
+  mountMarketplaceAgentTools({
+    on: (_name, listener) => { policy = listener },
+    tools: {
+      register: definition => {
+        names.push(definition.name)
+        definitions.push(definition)
+      },
+    },
+  }, environment)
+  assert.deepEqual(names, [
+    'desktop_plugin_search',
+    'desktop_plugin_status',
+    'desktop_plugin_prepare',
+    'desktop_plugin_preview',
+    'desktop_plugin_discard',
+    'desktop_plugin_apply',
+    'desktop_plugin_recover',
+  ])
+  assert.equal(environment.OH_DSH_MARKETPLACE_AGENT_TOKEN, undefined)
+  assert.equal(environment.OH_DSH_MARKETPLACE_AGENT_URL, undefined)
+  const first = definitions[0] as {
+    output: { schema: { properties: Record<string, Record<string, unknown>>; required: string[] } }
+    parameters: { properties: Record<string, Record<string, unknown>>; type: string }
+  }
+  assert.equal(first.parameters.type, 'object')
+  assert.equal(first.parameters.properties.query?.required, undefined)
+  assert.deepEqual(first.output.schema.required, ['summary', 'data'])
+  assert.equal(first.output.schema.properties.summary?.required, undefined)
+  assert.ok(policy)
+  assert.deepEqual(
+    await policy({ name: 'desktop_plugin_apply' }, async () => ({ kind: 'allow' })),
+    {
+      kind: 'ask',
+      reason: 'Apply the tested plugin preview to Oh-DSH-Desktop?',
+    },
+  )
+  assert.deepEqual(
+    await policy({ name: 'desktop_plugin_search' }, async () => ({ kind: 'allow' })),
+    { kind: 'allow' },
+  )
 })

@@ -15,6 +15,7 @@ import {
   type MarketplacePreviewRuntimeInput,
   type MarketplaceRuntime,
 } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
+import { startMarketplaceAgentGateway } from '../plugins/plugin-marketplace/src/host/agent-gateway.ts'
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567'
 const UPDATED_COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
@@ -249,6 +250,50 @@ test('a client reconnect during apply does not leave a sticky busy error', async
     assert.equal(settled.busy, false)
     assert.equal(settled.error, null)
   } finally {
+    setup.cleanup()
+  }
+})
+
+test('Agent gateway authenticates and defers runtime-restarting applies', async () => {
+  const setup = fixture()
+  const gateway = await startMarketplaceAgentGateway(setup.manager, { deferMs: 5 })
+  try {
+    const unauthorized = await fetch(gateway.url, {
+      body: JSON.stringify({ type: 'snapshot' }),
+      method: 'POST',
+    })
+    assert.equal(unauthorized.status, 401)
+
+    await setup.manager.dispatch({ type: 'refresh' })
+    const prepare = await fetch(gateway.url, {
+      body: JSON.stringify({
+        type: 'dispatch',
+        command: { type: 'prepare', action: 'install', pluginId: 'safe-demo' },
+      }),
+      headers: { authorization: `Bearer ${gateway.token}` },
+      method: 'POST',
+    })
+    assert.equal(prepare.status, 200)
+    const prepared = await prepare.json() as { snapshot: { preview: { pluginId: string } | null } }
+    assert.equal(prepared.snapshot.preview?.pluginId, 'safe-demo')
+
+    const apply = await fetch(gateway.url, {
+      body: JSON.stringify({ type: 'dispatch', command: { type: 'apply' } }),
+      headers: { authorization: `Bearer ${gateway.token}` },
+      method: 'POST',
+    })
+    assert.equal(apply.status, 202)
+    const accepted = await apply.json() as { deferred: boolean }
+    assert.equal(accepted.deferred, true)
+    assert.equal(setup.manager.getSnapshot().preview?.pluginId, 'safe-demo')
+
+    for (let attempt = 0; attempt < 30 && setup.manager.getSnapshot().preview !== null; attempt += 1) {
+      await new Promise(resolve => { setTimeout(resolve, 5) })
+    }
+    assert.equal(setup.manager.getSnapshot().preview, null)
+    assert.equal(setup.manager.getSnapshot().installed[0]?.pluginId, 'safe-demo')
+  } finally {
+    await gateway.close()
     setup.cleanup()
   }
 })

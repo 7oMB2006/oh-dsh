@@ -16,6 +16,12 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PluginMarketplaceManager } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
 import {
+  MARKETPLACE_AGENT_TOKEN_ENV,
+  MARKETPLACE_AGENT_URL_ENV,
+  startMarketplaceAgentGateway,
+  type MarketplaceAgentGateway,
+} from '../plugins/plugin-marketplace/src/host/agent-gateway.ts'
+import {
   findGitHubCli,
   previewSandboxPolicy,
   ProductionMarketplacePlatform,
@@ -42,6 +48,7 @@ let previewUrl: URL | undefined
 let previewOrigin: string | undefined
 let previewIdentity: { pluginId: string; transactionId: string } | undefined
 let marketplace: PluginMarketplaceManager | undefined
+let marketplaceAgentGateway: MarketplaceAgentGateway | undefined
 let logStream: WriteStream | undefined
 let quitting = false
 let transitioning = false
@@ -118,6 +125,9 @@ function runtimeEnvironment(
     environment.DSH_DESKTOP_PREVIEW = '1'
     environment.DSH_DESKTOP_PREVIEW_PLUGIN = overrides.preview.pluginId
     environment.DSH_DESKTOP_PREVIEW_TRANSACTION = overrides.preview.transactionId
+  } else if (marketplaceAgentGateway !== undefined) {
+    environment[MARKETPLACE_AGENT_URL_ENV] = marketplaceAgentGateway.url
+    environment[MARKETPLACE_AGENT_TOKEN_ENV] = marketplaceAgentGateway.token
   }
   return withGitHubCredentials(environment, findGitHubCli(environment))
 }
@@ -698,6 +708,9 @@ async function bootstrap(): Promise<void> {
   logStream = createWriteStream(join(logsDir, 'desktop.log'), { flags: 'a', mode: 0o600 })
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
   marketplace = createPluginMarketplace()
+  marketplaceAgentGateway = await startMarketplaceAgentGateway(marketplace, {
+    onError: error => { appendLog('desktop', `[marketplace-agent] ${String(error)}`) },
+  })
   installIpc()
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
   session.defaultSession.setPermissionCheckHandler(() => false)
@@ -730,6 +743,7 @@ async function bootstrap(): Promise<void> {
     void Promise.allSettled([
       runtime?.stop() ?? Promise.resolve(),
       stopPreviewSurface(),
+      marketplaceAgentGateway?.close() ?? Promise.resolve(),
     ]).then(results => {
       for (const result of results) {
         if (result.status === 'rejected') {

@@ -1,6 +1,10 @@
 /** Host face for the native Oh-DSH-Desktop surface. */
 
 import { mountDesktopTerminal, type DesktopTerminalContext } from './terminal/server.ts'
+import {
+  mountMarketplaceAgentTools,
+  type MarketplaceToolContext,
+} from './marketplace/tools.ts'
 
 interface SystemPromptService {
   section(entry: {
@@ -23,7 +27,7 @@ interface HostServices {
   bashEnv: BashEnvService
 }
 
-interface HostContext extends DesktopTerminalContext {
+interface HostContext extends DesktopTerminalContext, MarketplaceToolContext {
   inject(names: string[], callback: (ctx: HostContext & HostServices) => void): void
   provide(name: string, value: unknown): void
   effect(effect: () => (() => void) | void, label?: string): void
@@ -33,7 +37,7 @@ interface HostContext extends DesktopTerminalContext {
 export const name = 'oh-dsh-desktop-shell'
 
 /** The desktop surface needs the loopback server before publishing facts. */
-export const inject = ['httpServer']
+export const inject = ['httpServer', 'tools']
 
 /** Immutable Host-side desktop capability published to other DSH plugins. */
 export interface DesktopHostCapability {
@@ -58,6 +62,7 @@ function desktopPrompt(capability: DesktopHostCapability): string {
   return `You are interacting with the user through Oh-DSH-Desktop ${capability.version} on ${capability.platform}. `
     + 'Oh-DSH-Desktop is an Electron distribution backed by DeepSeek Harness. '
     + 'Native window actions, workspaces, panels, files, tools, skills, subagents, and other agent capabilities are composed through DSH plugins. '
+    + 'Manage desktop plugins only with desktop_plugin_* tools: prepare every change, inspect risk, use the isolated preview, and apply only after approval. '
     + 'When the user says “this app” without naming another target, they mean Oh-DSH-Desktop. '
     + 'Identify this surface as Oh-DSH-Desktop backed by DeepSeek Harness.'
 }
@@ -67,6 +72,7 @@ export function apply(ctx: HostContext): void {
   const capability = environmentCapability()
   ctx.provide('desktop', capability)
   ctx.effect(() => mountDesktopTerminal(ctx), 'oh-dsh-desktop: terminal websocket')
+  mountMarketplaceAgentTools(ctx)
 
   ctx.inject(['systemPrompt'], (promptCtx) => {
     promptCtx.systemPrompt.section({
