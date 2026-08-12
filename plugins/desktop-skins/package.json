@@ -1,6 +1,6 @@
 {
   "name": "@oh-dsh/desktop-skins",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Built-in Oh-DSH-Desktop skin gallery and theme adapter",
   "private": true,
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@oh-dsh/better-sidebar-runtime",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Host-only Better Sidebar capability provider for Oh-DSH-Desktop",
   "private": true,
   "type": "module",

@@ -68,8 +68,8 @@ Loader、locale、settings 和 ThemeService 契约。
 从 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases)
 下载：
 
-- `Oh-DSH-Desktop-0.1.0-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.0-arm64.zip`
+- `Oh-DSH-Desktop-0.1.1-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.1-arm64.zip`
 
 打开 DMG，把 `Oh-DSH-Desktop.app` 拖入 `Applications`。当前测试包没有
 Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并选择
@@ -217,8 +217,8 @@ pnpm run dist:mac:quick
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.0-arm64.dmg
-├── Oh-DSH-Desktop-0.1.0-arm64.zip
+├── Oh-DSH-Desktop-0.1.1-arm64.dmg
+├── Oh-DSH-Desktop-0.1.1-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -231,17 +231,17 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.0-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.1-arm64.dmg
 ```
 
 验证通过后手动创建 Release，已有 Release 则使用 `gh release upload
 --clobber` 更新产物：
 
 ```sh
-gh release create v0.1.0 \
-  release/Oh-DSH-Desktop-0.1.0-arm64.dmg \
-  release/Oh-DSH-Desktop-0.1.0-arm64.zip \
-  --title "Oh-DSH-Desktop 0.1.0" \
+gh release create v0.1.1 \
+  release/Oh-DSH-Desktop-0.1.1-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.1-arm64.zip \
+  --title "Oh-DSH-Desktop 0.1.1" \
   --generate-notes
 ```
 
