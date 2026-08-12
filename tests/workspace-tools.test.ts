@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -10,7 +10,10 @@ import {
   readWorkspaceDiff,
   readWorkspaceSnapshot,
 } from '../plugins/desktop-sidebar/src/git-workspace.ts'
-import { readWorkspaceFiles } from '../plugins/desktop-sidebar/src/workspace-files.ts'
+import {
+  mapBetterSidebarFile,
+  mapBetterSidebarTree,
+} from '../plugins/desktop-sidebar/src/client/better-sidebar-api.ts'
 
 function git(cwd: string, args: string[]): void {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
@@ -56,28 +59,27 @@ test('porcelain status parser preserves staged and rename metadata', () => {
   ])
 })
 
-test('workspace files stay bounded to the selected workspace', async () => {
-  const parent = mkdtempSync(join(tmpdir(), 'oh-dsh-workspace-files-'))
-  const workspace = join(parent, 'workspace')
-  const outside = join(parent, 'outside.txt')
-  try {
-    mkdirSync(join(workspace, 'src'), { recursive: true })
-    writeFileSync(join(workspace, 'src', 'index.ts'), 'export const ready = true\n')
-    writeFileSync(outside, 'secret\n')
-    symlinkSync(outside, join(workspace, 'outside-link'))
-
-    const root = await readWorkspaceFiles(workspace, undefined)
-    assert.equal(root.kind, 'directory')
-    if (root.kind !== 'directory') return
-    assert.deepEqual(root.entries.map(entry => [entry.name, entry.kind]), [
-      ['src', 'directory'],
-      ['outside-link', 'symlink'],
-    ])
-    const preview = await readWorkspaceFiles(workspace, join(workspace, 'src', 'index.ts'))
-    assert.equal(preview.kind, 'file')
-    if (preview.kind === 'file') assert.match(preview.content ?? '', /ready = true/)
-    await assert.rejects(readWorkspaceFiles(workspace, join(workspace, 'outside-link')), /escapes the workspace/)
-  } finally {
-    rmSync(parent, { recursive: true, force: true })
-  }
+test('workspace files adapt Better Sidebar responses to the Oh-DSH UI', () => {
+  const root = mapBetterSidebarTree('/workspace', {
+    path: '/workspace/src',
+    entries: [
+      { name: 'nested', path: '/workspace/src/nested', isDir: true, hidden: false },
+      { name: 'index.ts', path: '/workspace/src/index.ts', isDir: false, hidden: false },
+    ],
+    truncated: false,
+  })
+  assert.equal(root.kind, 'directory')
+  if (root.kind !== 'directory') return
+  assert.equal(root.parent, '/workspace')
+  assert.deepEqual(root.entries.map(entry => [entry.name, entry.kind]), [
+    ['nested', 'directory'],
+    ['index.ts', 'file'],
+  ])
+  const preview = mapBetterSidebarFile('/workspace', '/workspace/src/index.ts', {
+    kind: 'text',
+    content: 'export const ready = true\n',
+    truncated: false,
+  })
+  assert.equal(preview.kind, 'file')
+  if (preview.kind === 'file') assert.match(preview.content ?? '', /ready = true/)
 })

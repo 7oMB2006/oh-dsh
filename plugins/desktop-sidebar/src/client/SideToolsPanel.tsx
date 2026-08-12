@@ -8,7 +8,12 @@ import {
 } from 'react'
 import type { Translate } from '../../../shared/i18n.ts'
 import type { WorkspaceFilesResponse, WorkspaceFileKind } from '../protocol.ts'
-import { FILES_API_PATH } from '../protocol.ts'
+import {
+  betterSidebarApi,
+  mapBetterSidebarFile,
+  mapBetterSidebarTree,
+  type BetterSidebarScope,
+} from './better-sidebar-api.ts'
 import type {
   DesktopSidebar,
   DesktopSidebarRenderProps,
@@ -254,13 +259,6 @@ export function BrowserView({
   )
 }
 
-function fileUrl(cwd: string, path: string): string {
-  const url = new URL(FILES_API_PATH, window.location.origin)
-  url.searchParams.set('cwd', cwd)
-  url.searchParams.set('path', path)
-  return url.href
-}
-
 function formatSize(size: number | null): string {
   if (size === null) return ''
   if (size < 1024) return `${String(size)} B`
@@ -273,16 +271,17 @@ function fileGlyph(kind: WorkspaceFileKind): string {
 }
 
 export function FilesView({
-  cwd,
   patch,
+  scope,
   sidebar,
   t,
   tab,
 }: DesktopSidebarRenderProps & {
-  cwd: string | undefined
+  scope: BetterSidebarScope | undefined
   sidebar: DesktopSidebar
   t: Translate<WorkspaceMessage>
 }): JSX.Element {
+  const cwd = scope?.cwd
   const [path, setPath] = useState(tab.resource ?? cwd)
   const [snapshot, setSnapshot] = useState<WorkspaceFilesResponse | null>(null)
   const [error, setError] = useState('')
@@ -295,20 +294,12 @@ export function FilesView({
     setSnapshot(null)
   }, [cwd, tab.id, tab.resource])
   useEffect(() => {
-    if (cwd === undefined || path === undefined) return
+    if (cwd === undefined || path === undefined || scope === undefined) return
     const controller = new AbortController()
     setLoading(true)
-    void fetch(fileUrl(cwd, path), { signal: controller.signal }).then(
-      async response => {
-        const payload = await response.json() as WorkspaceFilesResponse & {
-          error?: string
-        }
-        if (!response.ok) {
-          throw new Error(payload.error ?? t('files.request-failed', {
-            status: response.status,
-          }))
-        }
-        setSnapshot(payload)
+    void betterSidebarApi.fsTree(scope, path, controller.signal).then(
+      listing => {
+        setSnapshot(mapBetterSidebarTree(cwd, listing))
         setError('')
       },
     ).catch((next: unknown) => {
@@ -319,7 +310,7 @@ export function FilesView({
       if (!controller.signal.aborted) setLoading(false)
     })
     return () => { controller.abort() }
-  }, [cwd, path, refreshKey])
+  }, [cwd, path, refreshKey, scope?.sessionId])
 
   const browse = (next: string): void => {
     setPath(next)
@@ -383,33 +374,28 @@ export function FilesView({
 }
 
 export function FileView({
-  cwd,
   onOpenPath,
+  scope,
   sidebar,
   t,
   tab,
 }: DesktopSidebarRenderProps & {
-  cwd: string | undefined
+  scope: BetterSidebarScope | undefined
   onOpenPath(path: string): Promise<void>
   sidebar: DesktopSidebar
   t: Translate<WorkspaceMessage>
 }): JSX.Element {
+  const cwd = scope?.cwd
   const [snapshot, setSnapshot] = useState<WorkspaceFilesResponse | null>(null)
   const [error, setError] = useState('')
   const path = tab.resource
 
   useEffect(() => {
-    if (cwd === undefined || path === undefined) return
+    if (cwd === undefined || path === undefined || scope === undefined) return
     const controller = new AbortController()
-    void fetch(fileUrl(cwd, path), { signal: controller.signal }).then(
-      async response => {
-        const payload = await response.json() as WorkspaceFilesResponse & {
-          error?: string
-        }
-        if (!response.ok) throw new Error(payload.error ?? t('files.request-failed', {
-          status: response.status,
-        }))
-        setSnapshot(payload)
+    void betterSidebarApi.fsRead(scope, path, controller.signal).then(
+      result => {
+        setSnapshot(mapBetterSidebarFile(cwd, path, result))
         setError('')
       },
     ).catch((next: unknown) => {
@@ -418,7 +404,7 @@ export function FileView({
       }
     })
     return () => { controller.abort() }
-  }, [cwd, path])
+  }, [cwd, path, scope?.sessionId])
 
   if (cwd === undefined || path === undefined) {
     return <div className="oh-dsh-side-empty">{t('files.select-workspace')}</div>

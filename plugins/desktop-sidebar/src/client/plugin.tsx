@@ -916,6 +916,16 @@ function activeWorkspace(sessions: SessionsService): string | undefined {
     : snapshot.byId[snapshot.current]?.cwd
 }
 
+function activeSidebarScope(sessions: SessionsService): {
+  sessionId: string
+  cwd: string
+} | undefined {
+  const snapshot = sessions.list.getSnapshot()
+  if (snapshot.current === undefined) return undefined
+  const cwd = snapshot.byId[snapshot.current]?.cwd
+  return cwd === undefined ? undefined : { sessionId: snapshot.current, cwd }
+}
+
 function registerBuiltinSidebarTools(options: {
   panels: DesktopPanels
   service: WorkspaceToolsService
@@ -968,7 +978,7 @@ function registerBuiltinSidebarTools(options: {
       render: props => (
         <FilesView
           {...props}
-          cwd={activeWorkspace(sessions)}
+          scope={activeSidebarScope(sessions)}
           sidebar={sidebar}
           t={t}
         />
@@ -985,7 +995,7 @@ function registerBuiltinSidebarTools(options: {
       render: props => (
         <FileView
           {...props}
-          cwd={activeWorkspace(sessions)}
+          scope={activeSidebarScope(sessions)}
           onOpenPath={async path => { await workspaces.openPath(path) }}
           sidebar={sidebar}
           t={t}
