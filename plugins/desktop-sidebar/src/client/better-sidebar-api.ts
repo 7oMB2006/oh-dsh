@@ -46,6 +46,11 @@ export interface BetterSidebarGitLogEntry {
   refs: string
 }
 
+export interface BetterSidebarSettingsView {
+  revision?: number
+  value?: unknown
+}
+
 export type BetterSidebarFsRead = {
   kind: 'text'
   content: string
@@ -84,6 +89,24 @@ async function call<T>(
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(scopePayload(scope, extra)),
+    ...(signal === undefined ? {} : { signal }),
+  })
+  const envelope = await response.json() as BetterSidebarEnvelope<T>
+  if (!response.ok || envelope.ok !== true || envelope.value === undefined) {
+    throw new Error(envelope.error?.message ?? `HTTP ${String(response.status)}`)
+  }
+  return envelope.value
+}
+
+async function callGlobal<T>(
+  method: string,
+  extra: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetch(`/sidebar/api/${method}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(extra),
     ...(signal === undefined ? {} : { signal }),
   })
   const envelope = await response.json() as BetterSidebarEnvelope<T>
@@ -154,6 +177,20 @@ export const betterSidebarApi = {
     scope: BetterSidebarScope,
     signal?: AbortSignal,
   ): Promise<BetterSidebarGitStatus> => call('git.status', scope, {}, signal),
+  settingsGet: (
+    signal?: AbortSignal,
+  ): Promise<BetterSidebarSettingsView> => callGlobal(
+    'settings.get',
+    {},
+    signal,
+  ),
+  settingsUpdate: (
+    patch: Record<string, unknown>,
+    expectedRevision?: number,
+  ): Promise<BetterSidebarSettingsView> => callGlobal('settings.update', {
+    patch,
+    ...(expectedRevision === undefined ? {} : { expectedRevision }),
+  }),
 }
 
 function statusFromCode(code: string): WorkspaceChange['status'] {

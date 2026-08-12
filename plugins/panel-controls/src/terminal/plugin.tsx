@@ -51,6 +51,7 @@ interface ReactMount {
 
 export interface DesktopPanels {
   isBottomPanelOpen(): boolean
+  setAutoOpenTerminal(enabled: boolean): void
   subscribe(listener: () => void): () => void
   toggleBottomPanel(): void
   toggleSidebar(): void
@@ -83,6 +84,7 @@ class DesktopPanelService implements DesktopPanels {
   private stopSessionSubscription: (() => void) | undefined
   private stopActiveStoreSubscription: (() => void) | undefined
   private scheduler: ReturnType<typeof createMountScheduler> | undefined
+  private autoOpenTerminal = true
 
   constructor(
     layout: LayoutService,
@@ -135,9 +137,19 @@ class DesktopPanelService implements DesktopPanels {
     return () => { this.listeners.delete(listener) }
   }
 
+  setAutoOpenTerminal(enabled: boolean): void {
+    this.autoOpenTerminal = enabled
+  }
+
   toggleBottomPanel(): void {
     if (this.active === undefined) this.syncActiveSession()
-    if (this.active !== undefined) openOrToggleTerminal(this.active.store)
+    if (this.active === undefined) return
+    const state = this.active.store.getState()
+    if (state.tabs.length === 0 && !this.autoOpenTerminal) {
+      this.active.store.dispatch({ type: 'toggle-collapsed' })
+      return
+    }
+    openOrToggleTerminal(this.active.store)
   }
 
   toggleSidebar(): void {

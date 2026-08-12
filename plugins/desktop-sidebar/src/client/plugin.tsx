@@ -17,7 +17,11 @@ import type {
   WorkspaceSnapshot,
 } from '../protocol.ts'
 import { WORKSPACE_API_PATH } from '../protocol.ts'
-import { DEFAULT_SIDEBAR_PREFERENCES } from '../sidebar-preferences.ts'
+import {
+  DEFAULT_SIDEBAR_PREFERENCES,
+  SIDEBAR_MAX_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+} from '../sidebar-preferences.ts'
 import {
   BrowserView,
   FilesView,
@@ -51,6 +55,10 @@ import {
 } from './review-comments.ts'
 import { reviewCommitFromBetterSidebar } from './review-diff.ts'
 import type { GitReviewCommit } from './review-types.ts'
+import {
+  SidebarRuntimeSettingsService,
+  type SidebarRuntimePreferences,
+} from './runtime-settings.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -131,6 +139,7 @@ interface SidebarSettingsProps {
   setTabEnabled(id: string, enabled: boolean): void
   setViewerEnabled(id: string, enabled: boolean): void
   setWidth(width: number): void
+  runtime: SidebarRuntimeSettingsService
   sidebar: DesktopSidebar
   t: Translate<WorkspaceMessage>
   useStore<T>(selector: (state: SidebarSettingsState) => T): T
@@ -145,6 +154,7 @@ interface SlotsService {
       't' | 'useStore'
     >
     locale: string
+    label: () => string
     name: string
     order: number
     store: unknown
@@ -163,6 +173,8 @@ export interface WorkspaceTools {
   subscribe(listener: () => void): () => void
   isOpen(): boolean
   openBrowser(): void
+  openBrowserUrl(url: string): void
+  openFile(path: string): void
   openFiles(): void
   openMenu(): void
   openReview(): void
@@ -334,6 +346,21 @@ class WorkspaceToolsService implements WorkspaceTools {
   openReview(): void { this.openView('review') }
 
   openBrowser(): void { this.openView('browser') }
+
+  openBrowserUrl(url: string): void {
+    let title = url
+    try { title = new URL(url).hostname || url } catch {}
+    this.pinnedSummary.setOpen(false)
+    this.sidebar.openTab({ resource: url, title, type: 'browser' })
+    this.sidebar.setOpen(true)
+  }
+
+  openFile(path: string): void {
+    const title = path.split(/[\\/]/).filter(Boolean).pop() ?? path
+    this.pinnedSummary.setOpen(false)
+    this.sidebar.openTab({ resource: path, title, type: 'file' })
+    this.sidebar.setOpen(true)
+  }
 
   openFiles(): void {
     const list = this.sessions.list.getSnapshot()
@@ -1243,6 +1270,7 @@ function activeSidebarScope(sessions: SessionsService): {
 }
 
 function registerBuiltinSidebarTools(options: {
+  openExternalPath(path: string): Promise<void>
   panels: DesktopPanels
   reviewComments: ReviewCommentsService
   service: WorkspaceToolsService
@@ -1252,6 +1280,7 @@ function registerBuiltinSidebarTools(options: {
   workspaces: WorkspacesService
 }): () => void {
   const {
+    openExternalPath,
     panels,
     reviewComments,
     service,
@@ -1322,7 +1351,7 @@ function registerBuiltinSidebarTools(options: {
         <FileView
           {...props}
           scope={activeSidebarScope(sessions)}
-          onOpenPath={async path => { await workspaces.openPath(path) }}
+          onOpenPath={openExternalPath}
           sidebar={sidebar}
           t={t}
         />
@@ -1354,7 +1383,7 @@ function registerBuiltinSidebarTools(options: {
       order: 100,
       render: input => (
         <BinaryFileViewer
-          onOpen={async () => { await workspaces.openPath(input.path) }}
+          onOpen={async () => { await openExternalPath(input.path) }}
           path={input.path}
           title={input.title}
           t={t}
@@ -1416,6 +1445,7 @@ function sidebarLabel(value: string | (() => string)): string {
 
 function SidebarSettingsRow({
   reset,
+  runtime,
   setOpenByDefault,
   setTabEnabled,
   setViewerEnabled,
@@ -1425,8 +1455,18 @@ function SidebarSettingsRow({
   useStore,
 }: SidebarSettingsProps): JSX.Element {
   const state = useStore(snapshot => snapshot)
+  const runtimeState = useSyncExternalStore(
+    runtime.subscribe,
+    runtime.getSnapshot,
+  )
   const tabs = sidebar.getTabs().filter(descriptor => descriptor.hidden !== true)
   const viewers = sidebar.getViewers()
+  const updateRuntime = (
+    key: keyof SidebarRuntimePreferences,
+    enabled: boolean,
+  ): void => {
+    void runtime.update({ [key]: enabled })
+  }
   return (
     <div className="oh-dsh-sidebar-settings">
       <div className="oh-dsh-sidebar-settings-heading">
@@ -1454,13 +1494,86 @@ function SidebarSettingsRow({
         </span>
         <input
           type="range"
-          min="330"
-          max="720"
+          min={SIDEBAR_MIN_WIDTH}
+          max={SIDEBAR_MAX_WIDTH}
           step="10"
           value={state.width}
           onChange={event => { setWidth(Number(event.currentTarget.value)) }}
         />
       </label>
+      <section>
+        <h4>{t('settings.runtime')}</h4>
+        <p>{t('settings.runtime-description')}</p>
+        <label className="oh-dsh-sidebar-settings-row">
+          <span>
+            <strong>{t('settings.agent-terminal-tools')}</strong>
+            <small>{t('settings.agent-terminal-tools-description')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={runtimeState.preferences.agentTerminalTools}
+            disabled={runtimeState.busy}
+            onChange={event => {
+              updateRuntime('agentTerminalTools', event.currentTarget.checked)
+            }}
+          />
+        </label>
+        <label className="oh-dsh-sidebar-settings-row">
+          <span>
+            <strong>{t('settings.bottom-terminal')}</strong>
+            <small>{t('settings.bottom-terminal-description')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={runtimeState.preferences.bottomPanelAutoTerminal}
+            disabled={runtimeState.busy}
+            onChange={event => {
+              updateRuntime(
+                'bottomPanelAutoTerminal',
+                event.currentTarget.checked,
+              )
+            }}
+          />
+        </label>
+        <label className="oh-dsh-sidebar-settings-row">
+          <span>
+            <strong>{t('settings.open-files')}</strong>
+            <small>{t('settings.open-files-description')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={runtimeState.preferences.interceptOpenPath}
+            disabled={runtimeState.busy}
+            onChange={event => {
+              updateRuntime('interceptOpenPath', event.currentTarget.checked)
+            }}
+          />
+        </label>
+        <label className="oh-dsh-sidebar-settings-row">
+          <span>
+            <strong>{t('settings.open-links')}</strong>
+            <small>{t('settings.open-links-description')}</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={runtimeState.preferences.browserInterceptLinks}
+            disabled={runtimeState.busy}
+            onChange={event => {
+              updateRuntime(
+                'browserInterceptLinks',
+                event.currentTarget.checked,
+              )
+            }}
+          />
+        </label>
+        {runtimeState.error !== null && (
+          <p className="oh-dsh-sidebar-settings-error" role="alert">
+            {t(runtimeState.error === 'load'
+              ? 'settings.runtime-load-failed'
+              : 'settings.runtime-save-failed')}
+          </p>
+        )}
+      </section>
       <section>
         <h4>{t('settings.tools')}</h4>
         <p>{t('settings.tools-description')}</p>
@@ -1514,6 +1627,18 @@ function syncSidebarSettings(
   )
 }
 
+function pathBelongsToActiveWorkspace(
+  sessions: SessionsService,
+  path: string,
+): boolean {
+  const cwd = activeWorkspace(sessions)
+  if (cwd === undefined) return false
+  const normalizedRoot = cwd.replaceAll('\\', '/').replace(/\/+$/, '')
+  const normalizedPath = path.replaceAll('\\', '/').replace(/\/+$/, '')
+  return normalizedPath === normalizedRoot
+    || normalizedPath.startsWith(`${normalizedRoot}/`)
+}
+
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
   const slots = ctx.get('slots') as SlotsService
@@ -1527,6 +1652,10 @@ export function apply(ctx: ClientContext): void {
   const sessions = ctx.get('sessions') as SessionsService
   const slash = ctx.get('slash') as ReviewSlashService
   const workspaces = ctx.get('workspaces') as WorkspacesService
+  const originalOpenPath = workspaces.openPath
+  const openExternalPath = async (path: string): Promise<void> => {
+    await originalOpenPath.call(workspaces, path)
+  }
   const reviewComments = new ReviewCommentsService(
     sessions,
     slash,
@@ -1535,6 +1664,7 @@ export function apply(ctx: ClientContext): void {
   const desktopSidebar = new DesktopSidebarService(
     new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
   )
+  const runtimeSettings = new SidebarRuntimeSettingsService()
   const service = new WorkspaceToolsService(
     desktopSidebar,
     panels,
@@ -1545,6 +1675,7 @@ export function apply(ctx: ClientContext): void {
     workspaces,
   )
   const unregisterBuiltins = registerBuiltinSidebarTools({
+    openExternalPath,
     panels,
     reviewComments,
     service,
@@ -1589,6 +1720,50 @@ export function apply(ctx: ClientContext): void {
     const stopSettings = desktopSidebar.subscribe(() => {
       syncSidebarSettings(settingsActions, desktopSidebar.getSnapshot())
     })
+    const syncRuntime = (): void => {
+      panels.setAutoOpenTerminal(
+        runtimeSettings.getSnapshot().preferences.bottomPanelAutoTerminal,
+      )
+    }
+    const stopRuntime = runtimeSettings.subscribe(syncRuntime)
+    const interceptOpenPath = async (path: string): Promise<void> => {
+      const runtime = runtimeSettings.getSnapshot().preferences
+      const snapshot = desktopSidebar.getSnapshot()
+      if (runtime.interceptOpenPath
+        && snapshot.ready
+        && desktopSidebar.isTabEnabled('file')
+        && pathBelongsToActiveWorkspace(sessions, path)) {
+        service.openFile(path)
+        return
+      }
+      await openExternalPath(path)
+    }
+    const interceptExternalLink = (event: MouseEvent): void => {
+      if (event.defaultPrevented || event.button !== 0
+        || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return
+      }
+      const target = event.target
+      const anchor = target instanceof Element
+        ? target.closest<HTMLAnchorElement>('a[href]')
+        : null
+      if (anchor === null || anchor.hasAttribute('download')) return
+      let url: URL
+      try { url = new URL(anchor.href, window.location.href) } catch { return }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+      if (url.origin === window.location.origin) return
+      const runtime = runtimeSettings.getSnapshot().preferences
+      const snapshot = desktopSidebar.getSnapshot()
+      if (!runtime.browserInterceptLinks
+        || !snapshot.ready
+        || !desktopSidebar.isTabEnabled('browser')) return
+      event.preventDefault()
+      service.openBrowserUrl(url.href)
+    }
+    workspaces.openPath = interceptOpenPath
+    document.addEventListener('click', interceptExternalLink, true)
+    syncRuntime()
+    void runtimeSettings.start()
     void desktopSidebar.start()
     service.mount()
     const removeSidebar = ctx.reflect.provide(
@@ -1600,16 +1775,22 @@ export function apply(ctx: ClientContext): void {
     return () => {
       stopSessions()
       stopSettings()
+      stopRuntime()
+      document.removeEventListener('click', interceptExternalLink, true)
+      if (workspaces.openPath === interceptOpenPath) {
+        workspaces.openPath = originalOpenPath
+      }
       service.dispose()
       unregisterBuiltins()
       reviewComments.dispose()
       desktopSidebar.dispose()
+      runtimeSettings.dispose()
       void removeSidebar?.()
       void removeService?.()
     }
   }, 'oh-dsh-desktop: workspace tools and panel toolbar')
 
-  slots.inject('settings.general.item', () => slots.register({
+  slots.inject('settings.section', () => slots.register({
     id: 'oh-dsh-desktop-sidebar',
     inject: actions => {
       settingsActions = actions
@@ -1626,6 +1807,7 @@ export function apply(ctx: ClientContext): void {
           for (const descriptor of desktopSidebar.getViewers()) {
             desktopSidebar.setViewerEnabled(descriptor.id, true)
           }
+          void runtimeSettings.reset()
         },
         setOpenByDefault: open => { desktopSidebar.setOpenByDefault(open) },
         setTabEnabled: (id, enabled) => {
@@ -1635,12 +1817,14 @@ export function apply(ctx: ClientContext): void {
           desktopSidebar.setViewerEnabled(id, enabled)
         },
         setWidth: width => { desktopSidebar.setWidth(width) },
+        runtime: runtimeSettings,
         sidebar: desktopSidebar,
       }
     },
+    label: () => t('settings.title'),
     locale: 'oh-dsh.desktop-sidebar',
-    name: 'settings.general.item',
-    order: 30,
+    name: 'settings.section',
+    order: 40,
     store: settingsStore,
   }, SidebarSettingsRow))
 }
