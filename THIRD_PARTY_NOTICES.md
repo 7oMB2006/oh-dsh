@@ -3,9 +3,10 @@
 Oh-DSH-Desktop is distributed under the BSD 3-Clause License. The projects
 below informed independently implemented bundled plugins.
 
-Upstream UI, themes, and component styling are not vendored. Oh-DSH adapts
-compatible features to its own service, persistence, layout, localization,
-and theme contracts. Upstream releases and features are reviewed regularly.
+Upstream UI, themes, and component styling are not bundled. Oh-DSH adapts
+compatible features to its own persistence, layout, localization, and theme
+contracts. The Better Sidebar Host source is tracked separately as a pinned
+submodule. Upstream releases and features are reviewed regularly.
 
 ## dsh-web-panel
 
@@ -13,21 +14,23 @@ and theme contracts. Upstream releases and features are reviewed regularly.
 - Declared license: BSD 3-Clause
 - Oh-DSH component: `@oh-dsh/panel-controls`
 
-Oh-DSH rewrites the PTY host and Terminal dock for its desktop layout,
-session model, themes, and localization. No separate Web Terminal plugin is
-required.
+Oh-DSH adapts the Terminal dock for its desktop layout, session model, themes,
+and localization. The dock uses the shared Better Sidebar PTY Host, so no
+separate Web Terminal or shell plugin is required.
 
 ## DSH-better-sidebar
 
 - Project: <https://github.com/dsh-external/DSH-better-sidebar>
-- Audited revision: `a465bdee3895330c8d100c954a16363e57589333`
+- Pinned revision: `bf54a60e37085a4c40f4b8bd5200e14a2f26f0c6`
 - Declared license: MIT
-- Oh-DSH component: `@oh-dsh/desktop-sidebar`
+- Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
+  `@oh-dsh/desktop-sidebar`
 
-Oh-DSH-Desktop is a downstream consumer of the project's design work around
-sidebar registration lifecycles, per-session tabs, viewer selection, feature
-switches, and unavailable-provider recovery. We thank the maintainers for
-making those ideas available to the DSH ecosystem.
+Oh-DSH compiles the pinned upstream Host for PTY, bounded Files, Git status,
+branch operations, history, and commit diffs. It does not load the upstream
+client UI. The Oh-DSH sidebar adapts those capabilities into its own tabs,
+viewers, Git Review, line comments, themes, and bilingual desktop layout. We
+thank the maintainers and review upstream features regularly.
 
 ## plugin-registry and dsh-hub
 

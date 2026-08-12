@@ -33,14 +33,15 @@ Oh-DSH-Desktop 保留 DSH React UI，把固定版本的 DSH runtime、Node.js、
 Electron 和本地能力打包进一个 macOS 应用。模型仍运行在云端，桌面端负责
 终端、Workspace、Git、浏览器、窗口集成和 plugin 生命周期。
 
-它不是另一套 DSH 前端，也不需要额外安装 Web Terminal。桌面能力通过独立
-plugins 注册，并尽量沿用 DSH 官方的 Profile、Loader、locale、settings 和
-ThemeService 契约。
+它不是另一套 DSH 前端，也不需要额外安装 Web Terminal 或 shell plugin。
+`@oh-dsh/desktop` 提供统一桌面入口，功能模块继续沿用 DSH 官方的 Profile、
+Loader、locale、settings 和 ThemeService 契约。
 
 ## 主要能力
 
 - 自包含的 Apple Silicon macOS 应用与安装包。
-- 多标签 PTY Terminal、Workspace Review、Browser 和 Files。
+- 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
+- Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
 - 支持隔离预览、放弃、应用和恢复的插件市场。
 - 中英文实时切换，以及四套 Oh-DSH 自有桌面皮肤。
@@ -80,10 +81,14 @@ Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并�
 Line Tools。
 
 ```sh
+git submodule update --init --recursive
 pnpm install
 pnpm run build:dsh
 pnpm start
 ```
+
+Better Sidebar Host 以固定 Git submodule 跟踪。源码构建需要该私有仓库的
+SSH/`gh` 访问权限；已发布的 DMG 和 ZIP 已包含编译产物，不需要仓库权限。
 
 发行构建固定使用 DSH `0.0.1-rc.1`：
 
@@ -123,22 +128,26 @@ Side Panel 可以独立开关。
 ```mermaid
 flowchart TB
   App["Oh-DSH-Desktop.app<br/>Electron shell"]
+  Desktop["@oh-dsh/desktop<br/>window · menu · unified entry"]
   Runtime["Bundled Node.js + DSH runtime"]
   UI["DSH React UI"]
-  Shell["desktop-shell<br/>window · menu · PTY"]
-  Panels["panel-controls<br/>terminal · bottom panel"]
-  Sidebar["desktop-sidebar<br/>registry · review · browser · files"]
+  Host["better-sidebar-runtime<br/>PTY · files · Git · commit diff"]
+  Panels["panel-controls<br/>Terminal dock"]
+  Sidebar["desktop-sidebar<br/>review UI · comments · tools"]
   Summary["pinned-summary<br/>session summary"]
   Market["plugin-marketplace<br/>preview · apply · recover"]
   Skins["desktop-skins<br/>theme · persist"]
 
+  App --> Desktop
   App --> Runtime --> UI
-  Runtime --> Shell
+  Runtime --> Host
   UI --> Panels
   UI --> Sidebar
   UI --> Summary
   UI --> Market
   UI --> Skins
+  Panels --> Host
+  Sidebar --> Host
 ```
 
 `cordis.patch.yml` 复用 `dsh-base` 与 `dsh-web-app`，在随机 loopback 端口
@@ -149,13 +158,13 @@ Profile 和 Loader 管理。
 
 | Plugin | 来源关系 | Oh-DSH 改造 |
 | --- | --- | --- |
-| `@oh-dsh/desktop-shell` | Oh-DSH 自研 | Electron bridge、原生菜单、窗口和 Agent 管理能力 |
-| `@oh-dsh/panel-controls` | 基于 [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) 的下游改造 | 重写 PTY host 与 Terminal dock，适配现有 UI、主题、双语和 Session 状态；不再安装独立 Web Terminal |
+| `@oh-dsh/desktop` | Oh-DSH 自研 | 统一桌面入口、Electron bridge、原生菜单、窗口、Agent 能力与内置 plugin 注册顺序 |
+| `@oh-dsh/better-sidebar-runtime` | 固定跟踪 [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) submodule | 仅编译上游 Host，提供 PTY、Files、Git、history 和 commit diff；不加载上游 UI |
+| `@oh-dsh/panel-controls` | 基于 [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) 的下游改造 | 保留 Oh-DSH Terminal dock、主题、双语和 Session 状态，复用统一 PTY Host；不再安装独立 Web Terminal |
 | `@oh-dsh/pinned-summary` | Oh-DSH 自研 | 当前 Session 摘要、半高卡片和正文 gutter 管理 |
-| `@oh-dsh/desktop-sidebar` | 基于 [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) 的下游改造 | 吸收注册生命周期、Session tabs、viewer 和功能开关，保留 Oh-DSH 的内嵌 UI、图标与主题 |
+| `@oh-dsh/desktop-sidebar` | [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) 的 Oh-DSH UI 下游 | 复用统一 Host，提供 Session tabs、viewer、Files、Git Review、逐行评论和 Agent composer 引用，保留现有布局、图标与主题 |
 | `@oh-dsh/plugin-marketplace` | 炼化 [`plugin-registry`](https://github.com/dsh-external/plugin-registry) 与 [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | 统一隔离预览、风险确认、TOFU 来源锁、应用与恢复流程，并适配桌面导航和双语 UI |
 | `@oh-dsh/desktop-skins` | 基于 [`dsh-skins`](https://github.com/dsh-external/dsh-skins) 的下游改造 | 沿用 ThemeService 扩展思路，重做皮肤、设置 UI 和 Host 持久化 |
-| `@oh-dsh/desktop` | Oh-DSH 自研 | 根 bundle，固定内置 plugins 的注册顺序 |
 
 标记为“下游改造”或“炼化”的 plugin 会定期检查上游 release 和 feature，选择
 与当前 DSH 契约兼容的能力同步。同步以 feature 为单位重新适配，不直接覆盖
@@ -190,7 +199,7 @@ gh auth login
 
 - DSH Web runtime 与 Agent 管理通道只监听随机 loopback 端口。
 - Browser 使用独立 Electron partition，不注入 Node.js 或 preload。
-- Files API 校验 realpath，拒绝越过当前 Workspace。
+- Better Sidebar Host 对 Files 和 Git 请求执行 Session 与 Workspace 边界校验。
 - 市场固定 Git commit，默认阻止安装脚本，应用前不修改当前 Profile。
 - pnpm release-age 策略保持启用，只排除 `@deepseek-ai/*`。
 

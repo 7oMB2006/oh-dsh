@@ -34,14 +34,16 @@ Node.js, Electron, and local capabilities into a macOS application. Models
 still run in the cloud. The desktop owns the terminal, workspaces, Git,
 browser, window integration, and plugin lifecycle.
 
-It is not a second DSH frontend and does not require a separate Web Terminal.
-Desktop capabilities register as plugins and retain the official DSH Profile,
-Loader, locale, settings, and ThemeService contracts where possible.
+It is not a second DSH frontend and requires neither a separate Web Terminal
+nor a shell plugin. `@oh-dsh/desktop` is the unified desktop entry while
+feature modules retain the official DSH Profile, Loader, locale, settings,
+and ThemeService contracts.
 
 ## Capabilities
 
 - Self-contained Apple Silicon macOS application and installers.
-- Multi-tab PTY Terminal, Workspace Review, Browser, and Files.
+- Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
+- Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
 - Plugin marketplace with isolated preview, discard, apply, and recovery.
 - Live Chinese/English switching and four original Oh-DSH skins.
@@ -83,10 +85,15 @@ Requirements: macOS 12+, Apple Silicon, Node.js 24+, pnpm 11+, and Xcode
 Command Line Tools.
 
 ```sh
+git submodule update --init --recursive
 pnpm install
 pnpm run build:dsh
 pnpm start
 ```
+
+The Better Sidebar Host is pinned as a Git submodule. Source builds need
+SSH/`gh` access to that private repository. Published DMG and ZIP artifacts
+already contain the compiled output and require no repository access.
 
 Release builds pin DSH `0.0.1-rc.1` at:
 
@@ -128,22 +135,26 @@ control. Terminal and Side Panel remain independently toggleable.
 ```mermaid
 flowchart TB
   App["Oh-DSH-Desktop.app<br/>Electron shell"]
+  Desktop["@oh-dsh/desktop<br/>window · menu · unified entry"]
   Runtime["Bundled Node.js + DSH runtime"]
   UI["DSH React UI"]
-  Shell["desktop-shell<br/>window · menu · PTY"]
-  Panels["panel-controls<br/>terminal · bottom panel"]
-  Sidebar["desktop-sidebar<br/>registry · review · browser · files"]
+  Host["better-sidebar-runtime<br/>PTY · files · Git · commit diff"]
+  Panels["panel-controls<br/>Terminal dock"]
+  Sidebar["desktop-sidebar<br/>review UI · comments · tools"]
   Summary["pinned-summary<br/>session summary"]
   Market["plugin-marketplace<br/>preview · apply · recover"]
   Skins["desktop-skins<br/>theme · persist"]
 
+  App --> Desktop
   App --> Runtime --> UI
-  Runtime --> Shell
+  Runtime --> Host
   UI --> Panels
   UI --> Sidebar
   UI --> Summary
   UI --> Market
   UI --> Skins
+  Panels --> Host
+  Sidebar --> Host
 ```
 
 `cordis.patch.yml` reuses `dsh-base` and `dsh-web-app`, starts the Web runtime
@@ -154,13 +165,13 @@ Third-party plugins remain managed by the DSH Profile and Loader.
 
 | Plugin | Upstream relationship | Oh-DSH adaptation |
 | --- | --- | --- |
-| `@oh-dsh/desktop-shell` | Original Oh-DSH component | Electron bridge, native menus, windows, and Agent management |
-| `@oh-dsh/panel-controls` | Downstream adaptation of [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) | Rewrites the PTY host and Terminal dock for the current UI, themes, localization, and Session state; no separate Web Terminal installation |
+| `@oh-dsh/desktop` | Original Oh-DSH component | Unified desktop entry, Electron bridge, native menus, windows, Agent capabilities, and bundled plugin order |
+| `@oh-dsh/better-sidebar-runtime` | Pinned [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) submodule | Compiles the upstream Host only for PTY, Files, Git, history, and commit diff; the upstream UI is not loaded |
+| `@oh-dsh/panel-controls` | Downstream adaptation of [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) | Keeps the Oh-DSH Terminal dock, themes, localization, and Session state on the shared PTY Host; no separate Web Terminal installation |
 | `@oh-dsh/pinned-summary` | Original Oh-DSH component | Active Session summary, half-height card, and conversation gutter |
-| `@oh-dsh/desktop-sidebar` | Downstream adaptation of [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) | Distills registration lifecycle, Session tabs, viewers, and feature switches while retaining Oh-DSH layout, icons, and themes |
+| `@oh-dsh/desktop-sidebar` | Oh-DSH UI downstream of [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) | Uses the shared Host for Session tabs, viewers, Files, Git Review, line comments, and Agent composer references while retaining the current layout, icons, and themes |
 | `@oh-dsh/plugin-marketplace` | Distills [`plugin-registry`](https://github.com/dsh-external/plugin-registry) and [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | Unifies isolated preview, risk review, TOFU source locks, apply, and recovery with desktop navigation and bilingual UI |
 | `@oh-dsh/desktop-skins` | Downstream adaptation of [`dsh-skins`](https://github.com/dsh-external/dsh-skins) | Retains the ThemeService extension model but redesigns skins, Settings UI, and Host persistence |
-| `@oh-dsh/desktop` | Original Oh-DSH component | Root bundle with a stable registration order |
 
 Plugins marked as downstream adaptations or distilled designs are reviewed
 against upstream releases and features regularly. Compatible features are
@@ -198,7 +209,7 @@ gh auth login
 
 - DSH Web runtime and Agent management bind only to random loopback ports.
 - Browser uses an isolated Electron partition without Node.js or preload.
-- The Files API validates real paths and rejects Workspace escapes.
+- The Better Sidebar Host enforces Session and Workspace bounds for Files and Git.
 - Marketplace candidates pin Git commits, block install scripts by default,
   and leave the live Profile unchanged until apply.
 - The pnpm release-age policy stays enabled, excluding only `@deepseek-ai/*`.
