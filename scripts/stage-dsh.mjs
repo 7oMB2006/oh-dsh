@@ -17,9 +17,10 @@ import {
 } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveDshSource } from './dsh-source.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const dshSource = resolve(process.env.DSH_SOURCE ?? join(root, '..', 'dsh'))
+const dshSource = resolveDshSource()
 const stage = join(root, '.stage')
 const runtime = join(stage, 'dsh-runtime')
 const nodeRuntime = join(stage, 'node-runtime')
@@ -29,6 +30,11 @@ const nodeFolder = `node-v${nodeVersion}-darwin-arm64`
 const nodeArchiveName = `${nodeFolder}.tar.gz`
 const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
+
+if (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
+  || !existsSync(join(dshSource, 'apps', 'cli', 'lib', 'bin.js'))) {
+  throw new Error(`DSH build artifacts are missing at ${dshSource}; run pnpm run build:dsh first`)
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: 'inherit', ...options })
