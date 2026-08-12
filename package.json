@@ -26,6 +26,7 @@
     "build": "node scripts/build.mjs",
     "build:dsh": "node scripts/build-dsh.mjs",
     "stage:dsh": "node scripts/stage-dsh.mjs",
+    "check:plugins": "node scripts/smoke-runtime.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:app": "node scripts/smoke-runtime.mjs \"release/mac-arm64/Oh-DSH-Desktop.app/Contents/Resources\"",
     "start": "pnpm run build && pnpm run stage:dsh && electron .",

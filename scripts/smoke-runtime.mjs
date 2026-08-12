@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ensureDesktopProfile } from '../src/profile.ts'
+import { BUNDLED_DESKTOP_PLUGINS, ensureDesktopProfile } from '../src/profile.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resources = resolve(process.argv[2] ?? join(root, '.stage'))
@@ -13,6 +13,18 @@ const cliEntry = join(resources, 'dsh-runtime', 'lib', 'bin.js')
 const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-desktop-smoke-'))
 const dshHome = join(smokeRoot, 'dsh-home')
 const lines = []
+
+function parseBootEntries(index) {
+  const marker = 'window.__DSH_BOOT__ = '
+  const start = index.indexOf(marker)
+  assert.notEqual(start, -1, 'DSH index did not contain a client boot graph')
+  const end = index.indexOf('</script>', start)
+  assert.notEqual(end, -1, 'DSH client boot graph script was not closed')
+  const graph = JSON.parse(index.slice(start + marker.length, end))
+  assert.equal(typeof graph.rev, 'string')
+  assert.ok(Array.isArray(graph.entries))
+  return graph.entries
+}
 
 ensureDesktopProfile(dshHome)
 
@@ -47,6 +59,14 @@ const install = spawnSync(nodeBinary, [
 assert.equal(install.status, 0, install.stderr || install.stdout)
 const profileManifest = JSON.parse(readFileSync(join(dshHome, 'profiles', 'desktop', 'package.json'), 'utf8'))
 assert.ok(profileManifest.dsh.profile.bundles.includes('dsh-desktop-smoke-plugin'))
+
+const versionResult = spawnSync(nodeBinary, [cliEntry, '--version'], {
+  cwd: smokeRoot,
+  encoding: 'utf8',
+  env: runtimeEnvironment,
+})
+assert.equal(versionResult.status, 0, versionResult.stderr || versionResult.stdout)
+const dshVersion = versionResult.stdout.trim()
 
 const child = spawn(nodeBinary, [cliEntry, '--profile', 'desktop'], {
   cwd: smokeRoot,
@@ -95,21 +115,30 @@ try {
   assert.equal(indexResponse.status, 200)
   assert.match(index, /<div id="root"><\/div>/)
 
-  const pluginIds = [
-    '@oh-dsh/panel-controls',
-    '@oh-dsh/pinned-summary',
-    '@oh-dsh/plugin-marketplace',
-    '@oh-dsh/workspace-tools',
-    '@oh-dsh/desktop-shell',
-  ]
+  const bootEntries = parseBootEntries(index)
   const loaded = []
-  for (const pluginId of pluginIds) {
-    const bundleUrl = new URL(`/plugins/${pluginId}/client.js`, base)
+  for (const pluginId of BUNDLED_DESKTOP_PLUGINS) {
+    const row = bootEntries.find(entry => entry.id === pluginId)
+    assert.ok(row, `${pluginId} Host entry did not activate in the DSH client graph`)
+    const manifest = JSON.parse(readFileSync(join(
+      resources,
+      'dsh-runtime',
+      'node_modules',
+      ...pluginId.split('/'),
+      'package.json',
+    ), 'utf8'))
+    assert.deepEqual(row.inject ?? [], manifest.dsh.client.inject ?? [])
+    assert.equal(row.immediately === true, manifest.dsh.client.immediately === true)
+    const bundleUrl = new URL(row.url, base)
     const bundleResponse = await fetch(bundleUrl)
     const bundle = await bundleResponse.text()
-    assert.equal(bundleResponse.status, 200)
+    assert.equal(
+      bundleResponse.status,
+      200,
+      `${pluginId} Client bundle returned ${String(bundleResponse.status)}`,
+    )
     assert.ok(bundle.includes(pluginId), `${pluginId} client bundle did not enroll its module id`)
-    loaded.push(`${bundleUrl.href} (${String(bundle.length)} bytes)`)
+    loaded.push({ bytes: bundle.length, id: pluginId })
   }
 
   for (const legacyPackage of ['dsh-web-terminal', '@dsh-external/dsh-web-panel']) {
@@ -173,8 +202,14 @@ try {
     })
   })
 
-  console.log(`Oh-DSH-Desktop profile ready: ${base.href}`)
-  for (const bundle of loaded) console.log(`Bundled client plugin: ${bundle}`)
+  console.log(`Oh-DSH-Desktop profile ready on DSH ${dshVersion}: ${base.href}`)
+  console.log('Plugin compatible: @oh-dsh/desktop (bundle profile active)')
+  for (const plugin of loaded) {
+    console.log(
+      `Plugin compatible: ${plugin.id} (Host active, Client ${String(plugin.bytes)} bytes)`,
+    )
+  }
+  console.log('Workspace tools Host API: ready, bounded workspace verified')
   console.log('Desktop terminal PTY: ready, command execution verified')
 } finally {
   if (child.exitCode === null) child.kill('SIGTERM')
