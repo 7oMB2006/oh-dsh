@@ -9,6 +9,7 @@ rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
+  { directory: 'desktop-skins', id: '@oh-dsh/desktop-skins' },
   { directory: 'desktop-shell', id: '@oh-dsh/desktop-shell' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
@@ -71,7 +72,14 @@ for (const plugin of pluginPackages) {
       sourcemap: true,
       logLevel: 'info',
       loader: { '.css': 'text' },
-      external: ['react', 'react-dom/client', 'react/jsx-runtime'],
+      external: [
+        'react',
+        'react-dom/client',
+        'react/jsx-runtime',
+        ...(plugin.directory === 'desktop-skins'
+          ? ['@deepseek-ai/dsh-client-runtime/client']
+          : []),
+      ],
       banner: {
         js: `window.__ModuleLoader__.load({ id: "${plugin.id}", factory: (require) => { var module = { exports: {} }; var exports = module.exports;`,
       },

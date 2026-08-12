@@ -6,6 +6,7 @@ export const DESKTOP_PROFILE = 'desktop'
 
 /** Individual plugins shipped inside the desktop bundle. */
 export const BUNDLED_DESKTOP_PLUGINS = [
+  '@oh-dsh/desktop-skins',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/workspace-tools',

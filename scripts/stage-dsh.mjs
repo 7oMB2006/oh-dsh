@@ -360,7 +360,14 @@ function installDesktopPackages() {
         [join(root, 'dist', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
-    ...['desktop-shell', 'panel-controls', 'pinned-summary', 'plugin-marketplace', 'workspace-tools'].map(directory => ({
+    ...[
+      'desktop-skins',
+      'desktop-shell',
+      'panel-controls',
+      'pinned-summary',
+      'plugin-marketplace',
+      'workspace-tools',
+    ].map(directory => ({
       manifest: join(root, 'plugins', directory, 'package.json'),
       files: [
         [join(root, 'dist', 'plugins', directory, 'index.js'), 'dist/index.js'],
@@ -415,6 +422,8 @@ if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
 for (const required of [
   'plugin.js',
   'cordis.patch.yml',
+  'plugins/desktop-skins/index.js',
+  'plugins/desktop-skins/client.js',
   'plugins/desktop-shell/index.js',
   'plugins/desktop-shell/client.js',
   'plugins/panel-controls/index.js',

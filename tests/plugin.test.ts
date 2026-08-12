@@ -13,6 +13,7 @@ test('desktop client replaces the hero title and keeps the Preview badge', () =>
 
 test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
+    '../plugins/desktop-skins/src/client/plugin.tsx',
     '../plugins/desktop-shell/src/client.ts',
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
@@ -26,6 +27,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
   }
 
   const dictionaries = [
+    '../plugins/desktop-skins/src/client/i18n.ts',
     '../plugins/panel-controls/src/terminal/i18n.ts',
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',

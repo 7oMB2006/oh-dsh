@@ -15,6 +15,9 @@
     lanAddresses: []
 
 - insert:
+    - id: oh-desktop-skins
+      name: '@oh-dsh/desktop-skins'
+
     - id: oh-panel-controls
       name: '@oh-dsh/panel-controls'
 
