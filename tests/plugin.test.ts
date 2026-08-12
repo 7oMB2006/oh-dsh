@@ -11,6 +11,26 @@ test('desktop client replaces the hero title and keeps the Preview badge', () =>
   assert.doesNotMatch(client, /data-oh-dsh-hero-preview/)
 })
 
+test('desktop Settings owns the full modal layer above desktop surfaces', () => {
+  const client = readFileSync(
+    new URL('../plugins/desktop-shell/src/client.ts', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(
+    client,
+    /#root:has\(\s*\[role='presentation'\] > \[role='dialog'\]\s*\)[^{]*\{[^}]*z-index: 2147483647 !important;[^}]*overflow: visible !important;/s,
+  )
+  assert.match(
+    client,
+    /\[role='presentation'\]:has\(\s*> \[role='dialog'\]\s*\)[^{]*\{[^}]*z-index: 2147483647 !important;[^}]*backdrop-filter: blur\(/s,
+  )
+  assert.match(
+    client,
+    /:has\(\s*#root \[role='presentation'\] > \[role='dialog'\]\s*\) \.oh-dsh-panel-toolbar[^}]*\{[^}]*z-index: 2147483646;/s,
+  )
+})
+
 test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
     '../plugins/desktop-skins/src/client/plugin.tsx',

@@ -78,6 +78,34 @@ html[data-oh-dsh-preview='true'] body::after {
   white-space: nowrap;
 }
 
+html[data-oh-dsh-desktop='true'] #root:has(
+  [role='presentation'] > [role='dialog']
+) {
+  z-index: 2147483647 !important;
+  overflow: visible !important;
+}
+
+html[data-oh-dsh-desktop='true'] #root [role='presentation']:has(
+  > [role='dialog']
+) {
+  z-index: 2147483647 !important;
+  background: rgb(0 0 0 / 22%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(0.9);
+  backdrop-filter: blur(6px) saturate(0.9);
+}
+
+html[data-oh-dsh-desktop='true']:has(
+  #root [role='presentation'] > [role='dialog']
+) body::before,
+html[data-oh-dsh-desktop='true']:has(
+  #root [role='presentation'] > [role='dialog']
+) body::after,
+html[data-oh-dsh-desktop='true']:has(
+  #root [role='presentation'] > [role='dialog']
+) .oh-dsh-panel-toolbar {
+  z-index: 2147483646;
+}
+
 `
 
 /** Wait for the DSH services used by native menu commands. */
