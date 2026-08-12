@@ -24,6 +24,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
+  <img alt="DSH 0.0.1-rc.1" src="https://img.shields.io/badge/DSH-0.0.1--rc.1-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="pnpm 11" src="https://img.shields.io/badge/pnpm-11-f69220?logo=pnpm&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
@@ -89,14 +90,18 @@ Review 只存在于 Side Panel 内，不占用独立顶部图标。打开 Side P
 - Node.js 24+
 - pnpm 11+
 - Xcode Command Line Tools
-- 相邻目录中的 DSH 源码，默认路径为 `../dsh`
+- 能够读取 `dsh-source.json` 所固定 DSH 快照的 Git/SSH 凭证
 
 ```sh
 pnpm install
-pnpm run build
-pnpm run stage:dsh
+pnpm run build:dsh
 pnpm start
 ```
+
+发行构建固定使用 DSH `0.0.1-rc.1` 的完整 Git commit
+`e7f2790a2a863bfc23e5db483778fd12801cf9bf`。源码首次构建时下载到
+`.cache/dsh-source/`，后续构建会校验版本与 commit。开发其他 DSH
+checkout 时可以显式设置 `DSH_SOURCE=/absolute/path`；版本仍必须与固定版本一致。
 
 DSH 的可写数据位于：
 
@@ -227,6 +232,10 @@ plugins 保留自己的安装顺序。
 词典。设置页切换语言后，Terminal、Pinned Summary、Workspace tools 和
 插件市场会在当前窗口内立即更新，不需要重启 runtime。
 
+每个客户端插件都通过 DSH 标准的 `package.json#dsh.client` 声明平台、
+预取行为与依赖边。Runtime smoke 会从实际 boot graph 校验这些声明，避免
+Host 已打包但 Client bundle 返回 404 的假兼容状态。
+
 ## 安全边界
 
 - DSH Web runtime 只监听随机 loopback 端口。
@@ -242,13 +251,13 @@ plugins 保留自己的安装顺序。
 
 ## 生成 macOS 安装包
 
-完整构建会先重建相邻 DSH：
+完整构建会获取并重建 `dsh-source.json` 固定的 DSH：
 
 ```sh
 pnpm run dist:mac
 ```
 
-DSH 构建产物已经是最新状态时：
+固定 DSH 的缓存构建产物已经是最新状态时：
 
 ```sh
 pnpm run dist:mac:quick
@@ -270,13 +279,16 @@ pnpm run typecheck
 pnpm test
 pnpm run check:screenshot
 pnpm run build
+pnpm run check:plugins
 pnpm run smoke:runtime
 pnpm run smoke:app
 ```
 
 测试覆盖 profile 初始化、runtime 启动、PTY 协议、终端状态、Workspace/Git
 边界、文件访问约束和右侧面板布局契约。截图检查还会确认 UI 图片的四个
-圆角保留真实的 alpha 透明通道。
+圆角保留真实的 alpha 透明通道。`check:plugins` 会逐项报告根 bundle 与五个
+内置 plugin 的 Host 激活、Client bundle、依赖图、Workspace API 和 PTY
+兼容性。
 
 ### 项目结构
 
@@ -293,6 +305,7 @@ pnpm run smoke:app
 ├── scripts/                 # 构建、stage、smoke 和 macOS 打包
 ├── src/                     # Electron 主进程、preload 与根 bundle
 ├── tests/                   # Node test runner 回归测试
+├── dsh-source.json          # DSH 版本、ref 与完整 commit 固定
 └── cordis.patch.yml         # DSH bundle layer
 ```
 

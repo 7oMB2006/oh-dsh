@@ -24,6 +24,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
+  <img alt="DSH 0.0.1-rc.1" src="https://img.shields.io/badge/DSH-0.0.1--rc.1-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="pnpm 11" src="https://img.shields.io/badge/pnpm-11-f69220?logo=pnpm&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
@@ -95,14 +96,19 @@ Requirements:
 - Node.js 24+
 - pnpm 11+
 - Xcode Command Line Tools
-- A sibling DSH source tree, expected at `../dsh` by default
+- Git/SSH access to the DSH snapshot pinned by `dsh-source.json`
 
 ```sh
 pnpm install
-pnpm run build
-pnpm run stage:dsh
+pnpm run build:dsh
 pnpm start
 ```
+
+Release builds pin DSH `0.0.1-rc.1` at the full Git commit
+`e7f2790a2a863bfc23e5db483778fd12801cf9bf`. The first build downloads it
+under `.cache/dsh-source/`; later builds verify both its version and commit.
+Set `DSH_SOURCE=/absolute/path` to develop against another checkout. Its
+package version must still match the pinned version.
 
 Writable DSH state is stored in:
 
@@ -246,6 +252,11 @@ registers `zh` / `en` dictionaries. Changing the language in Settings updates
 Terminal, Pinned Summary, Workspace tools, and the marketplace in the current
 window without restarting the runtime.
 
+Each client plugin declares its platform, prefetch behavior, and dependency
+edges through the standard `package.json#dsh.client` contract. Runtime smoke
+checks those declarations against the real boot graph, so a packaged Host with
+a missing Client bundle cannot be reported as compatible.
+
 ## Security boundaries
 
 - The DSH Web runtime listens only on a random loopback port.
@@ -268,13 +279,14 @@ window without restarting the runtime.
 
 ## Build the macOS installer
 
-A complete build rebuilds the sibling DSH source tree first:
+A complete build fetches and rebuilds the DSH source pinned by
+`dsh-source.json`:
 
 ```sh
 pnpm run dist:mac
 ```
 
-When the DSH build output is already current:
+When the cached pinned DSH build is already current:
 
 ```sh
 pnpm run dist:mac:quick
@@ -296,6 +308,7 @@ pnpm run typecheck
 pnpm test
 pnpm run check:screenshot
 pnpm run build
+pnpm run check:plugins
 pnpm run smoke:runtime
 pnpm run smoke:app
 ```
@@ -303,7 +316,9 @@ pnpm run smoke:app
 The test suite covers profile initialization, runtime startup, the PTY
 protocol, terminal state, Workspace/Git boundaries, file access constraints,
 and right-panel layout contracts. The screenshot check also verifies that all
-four corners retain a real alpha channel.
+four corners retain a real alpha channel. `check:plugins` reports Host
+activation, Client bundles, dependency edges, the Workspace API, and PTY
+compatibility for the root bundle and all five built-in plugins.
 
 ### Project layout
 
@@ -320,6 +335,7 @@ four corners retain a real alpha channel.
 ├── scripts/                 # Build, staging, smoke, and macOS packaging
 ├── src/                     # Electron main process, preload, and root bundle
 ├── tests/                   # Node test runner regression tests
+├── dsh-source.json          # Pinned DSH version, ref, and full commit
 └── cordis.patch.yml         # DSH bundle layer
 ```
 
