@@ -40,6 +40,24 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
   }
 })
 
+test('desktop sidebar exposes one configurable tool registry in settings', () => {
+  const client = readFileSync(
+    new URL('../plugins/desktop-sidebar/src/client/plugin.tsx', import.meta.url),
+    'utf8',
+  )
+  const manifest = readFileSync(
+    new URL('../plugins/desktop-sidebar/package.json', import.meta.url),
+    'utf8',
+  )
+
+  assert.match(client, /defineStore<SidebarSettingsState>/)
+  assert.match(client, /slots\.inject\('settings\.general\.item'/)
+  assert.match(client, /desktopSidebar\.setTabEnabled/)
+  assert.match(client, /desktopSidebar\.setViewerEnabled/)
+  assert.match(manifest, /@deepseek-ai\/dsh-client-ui-settings/)
+  assert.match(manifest, /@deepseek-ai\/dsh-client-ui-slots/)
+})
+
 test('desktop-shell Host plugin publishes capability, prompt, and bash environment', () => {
   const previous = {
     appData: process.env.DSH_DESKTOP_APP_DATA,

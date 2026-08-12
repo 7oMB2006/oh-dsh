@@ -154,6 +154,12 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   const sidebar = new DesktopSidebarService(storage)
   await sidebar.start()
   sidebar.registerTab(tab('browser'))
+  sidebar.registerViewer({
+    extensions: [],
+    fetchStrategy: 'text',
+    id: 'text',
+    title: 'Text',
+  })
   sidebar.setSession('conversation-1')
   sidebar.openTab({
     resource: 'https://example.com',
@@ -162,10 +168,14 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   })
   sidebar.setWidth(512)
   sidebar.setOpenByDefault(true)
+  sidebar.setTabEnabled('browser', false)
+  sidebar.setViewerEnabled('text', false)
   await sidebar.settle()
 
   assert.equal(storage.value.defaultWidth, 512)
   assert.equal(storage.value.openByDefault, true)
+  assert.equal(storage.value.tabsEnabled.browser, false)
+  assert.equal(storage.value.viewersEnabled.text, false)
   assert.equal(storage.value.sessions['conversation-1']?.tabs.length, 1)
   assert.equal(storage.writes.length, 1)
 })

@@ -76,7 +76,7 @@ for (const plugin of pluginPackages) {
         'react',
         'react-dom/client',
         'react/jsx-runtime',
-        ...(plugin.directory === 'desktop-skins'
+        ...(['desktop-skins', 'desktop-sidebar'].includes(plugin.directory)
           ? ['@deepseek-ai/dsh-client-runtime/client']
           : []),
       ],

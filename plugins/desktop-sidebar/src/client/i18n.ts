@@ -46,6 +46,17 @@ export type WorkspaceMessage =
   | 'side.tab-limit'
   | 'side.tool-disabled'
   | 'side.tool-missing'
+  | 'settings.title'
+  | 'settings.description'
+  | 'settings.reset'
+  | 'settings.open-by-default'
+  | 'settings.open-by-default-description'
+  | 'settings.width'
+  | 'settings.width-value'
+  | 'settings.tools'
+  | 'settings.tools-description'
+  | 'settings.viewers'
+  | 'settings.viewers-description'
   | 'workspace.request-failed'
   | 'workspace.title'
   | 'workspace.refresh'
@@ -120,6 +131,17 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'side.tab-limit': 'Close an existing tab before opening another.',
     'side.tool-disabled': 'This side panel tool is disabled.',
     'side.tool-missing': 'This side panel tool is no longer registered.',
+    'settings.title': 'Side panel',
+    'settings.description': 'Choose which tools and file previews are available in the desktop side panel.',
+    'settings.reset': 'Reset',
+    'settings.open-by-default': 'Open at launch',
+    'settings.open-by-default-description': 'Restore the side panel automatically when the desktop starts.',
+    'settings.width': 'Default width',
+    'settings.width-value': '{width} px',
+    'settings.tools': 'Tools',
+    'settings.tools-description': 'Disabled tools are removed from the side panel launcher.',
+    'settings.viewers': 'File previews',
+    'settings.viewers-description': 'Higher-priority enabled previews are selected automatically.',
     'workspace.request-failed': 'Workspace request failed ({status})',
     'workspace.title': 'Workspace',
     'workspace.refresh': 'Refresh workspace',
@@ -193,6 +215,17 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'side.tab-limit': '请先关闭一个已有标签页。',
     'side.tool-disabled': '此侧边栏工具已被禁用。',
     'side.tool-missing': '此侧边栏工具已不再注册。',
+    'settings.title': '侧边栏',
+    'settings.description': '选择桌面侧边栏中可用的工具和文件预览。',
+    'settings.reset': '恢复默认',
+    'settings.open-by-default': '启动时打开',
+    'settings.open-by-default-description': '桌面端启动时自动恢复侧边栏。',
+    'settings.width': '默认宽度',
+    'settings.width-value': '{width} 像素',
+    'settings.tools': '工具',
+    'settings.tools-description': '禁用的工具会从侧边栏启动器中移除。',
+    'settings.viewers': '文件预览',
+    'settings.viewers-description': '系统会自动选择优先级更高且已启用的预览器。',
     'workspace.request-failed': '工作区请求失败（{status}）',
     'workspace.title': '工作区',
     'workspace.refresh': '刷新工作区',

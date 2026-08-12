@@ -5,6 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'
@@ -16,6 +17,7 @@ import type {
   WorkspaceSnapshot,
 } from '../protocol.ts'
 import { WORKSPACE_API_PATH } from '../protocol.ts'
+import { DEFAULT_SIDEBAR_PREFERENCES } from '../sidebar-preferences.ts'
 import {
   BrowserView,
   FilesView,
@@ -90,6 +92,50 @@ interface ClientContext {
   }
 }
 
+interface SidebarSettingsState {
+  openByDefault: boolean
+  revision: number
+  tabsEnabled: Record<string, boolean>
+  viewersEnabled: Record<string, boolean>
+  width: number
+}
+
+interface BoundSidebarSettingsActions {
+  sync(
+    openByDefault: boolean,
+    revision: number,
+    tabsEnabled: Record<string, boolean>,
+    viewersEnabled: Record<string, boolean>,
+    width: number,
+  ): void
+}
+
+interface SidebarSettingsProps {
+  reset(): void
+  setOpenByDefault(open: boolean): void
+  setTabEnabled(id: string, enabled: boolean): void
+  setViewerEnabled(id: string, enabled: boolean): void
+  setWidth(width: number): void
+  sidebar: DesktopSidebar
+  t: Translate<WorkspaceMessage>
+  useStore<T>(selector: (state: SidebarSettingsState) => T): T
+}
+
+interface SlotsService {
+  inject(name: string, register: () => unknown): void
+  register(options: {
+    id: string
+    inject(actions: BoundSidebarSettingsActions): Omit<
+      SidebarSettingsProps,
+      't' | 'useStore'
+    >
+    locale: string
+    name: string
+    order: number
+    store: unknown
+  }, component: (props: SidebarSettingsProps) => JSX.Element): unknown
+}
+
 interface WorkspaceToolsState {
   maximized: boolean
   open: boolean
@@ -119,7 +165,14 @@ declare global {
   }
 }
 
-export const inject = ['desktopPanels', 'locale', 'pinnedSummary', 'sessions', 'workspaces']
+export const inject = [
+  'desktopPanels',
+  'locale',
+  'pinnedSummary',
+  'sessions',
+  'slots',
+  'workspaces',
+]
 
 const EMPTY_CONVERSATION: ConversationSnapshot = { runningCalls: [] }
 
@@ -1021,8 +1074,113 @@ function registerBuiltinSidebarTools(options: {
   }
 }
 
+function sidebarLabel(value: string | (() => string)): string {
+  return typeof value === 'function' ? value() : value
+}
+
+function SidebarSettingsRow({
+  reset,
+  setOpenByDefault,
+  setTabEnabled,
+  setViewerEnabled,
+  setWidth,
+  sidebar,
+  t,
+  useStore,
+}: SidebarSettingsProps): JSX.Element {
+  const state = useStore(snapshot => snapshot)
+  const tabs = sidebar.getTabs().filter(descriptor => descriptor.hidden !== true)
+  const viewers = sidebar.getViewers()
+  return (
+    <div className="oh-dsh-sidebar-settings">
+      <div className="oh-dsh-sidebar-settings-heading">
+        <div>
+          <strong>{t('settings.title')}</strong>
+          <p>{t('settings.description')}</p>
+        </div>
+        <button type="button" onClick={reset}>{t('settings.reset')}</button>
+      </div>
+      <label className="oh-dsh-sidebar-settings-row">
+        <span>
+          <strong>{t('settings.open-by-default')}</strong>
+          <small>{t('settings.open-by-default-description')}</small>
+        </span>
+        <input
+          type="checkbox"
+          checked={state.openByDefault}
+          onChange={event => { setOpenByDefault(event.currentTarget.checked) }}
+        />
+      </label>
+      <label className="oh-dsh-sidebar-settings-size">
+        <span>
+          <strong>{t('settings.width')}</strong>
+          <small>{t('settings.width-value', { width: state.width })}</small>
+        </span>
+        <input
+          type="range"
+          min="330"
+          max="720"
+          step="10"
+          value={state.width}
+          onChange={event => { setWidth(Number(event.currentTarget.value)) }}
+        />
+      </label>
+      <section>
+        <h4>{t('settings.tools')}</h4>
+        <p>{t('settings.tools-description')}</p>
+        <div className="oh-dsh-sidebar-settings-list">
+          {tabs.map(descriptor => (
+            <label key={descriptor.id}>
+              <span>{sidebarLabel(descriptor.title)}</span>
+              <input
+                type="checkbox"
+                checked={state.tabsEnabled[descriptor.id] !== false}
+                onChange={event => {
+                  setTabEnabled(descriptor.id, event.currentTarget.checked)
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h4>{t('settings.viewers')}</h4>
+        <p>{t('settings.viewers-description')}</p>
+        <div className="oh-dsh-sidebar-settings-list">
+          {viewers.map(descriptor => (
+            <label key={descriptor.id}>
+              <span>{sidebarLabel(descriptor.title)}</span>
+              <input
+                type="checkbox"
+                checked={state.viewersEnabled[descriptor.id] !== false}
+                onChange={event => {
+                  setViewerEnabled(descriptor.id, event.currentTarget.checked)
+                }}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function syncSidebarSettings(
+  actions: BoundSidebarSettingsActions | undefined,
+  snapshot: DesktopSidebarSnapshot,
+): void {
+  actions?.sync(
+    snapshot.openByDefault,
+    snapshot.revision,
+    { ...snapshot.tabsEnabled },
+    { ...snapshot.viewersEnabled },
+    snapshot.width,
+  )
+}
+
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
+  const slots = ctx.get('slots') as SlotsService
   const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.desktop-sidebar')
   ctx.effect(
     () => locale.register('oh-dsh.desktop-sidebar', WORKSPACE_MESSAGES),
@@ -1052,12 +1210,42 @@ export function apply(ctx: ClientContext): void {
     t,
     workspaces,
   })
+  const settingsStore = defineStore<SidebarSettingsState>({
+    init: () => ({
+      openByDefault: false,
+      revision: -1,
+      tabsEnabled: {},
+      viewersEnabled: {},
+      width: DEFAULT_SIDEBAR_PREFERENCES.defaultWidth,
+    }),
+    actions: {
+      sync: (
+        draft,
+        openByDefault: boolean,
+        revision: number,
+        tabsEnabled: Record<string, boolean>,
+        viewersEnabled: Record<string, boolean>,
+        width: number,
+      ) => {
+        if (revision < draft.revision) return
+        draft.openByDefault = openByDefault
+        draft.revision = revision
+        draft.tabsEnabled = tabsEnabled
+        draft.viewersEnabled = viewersEnabled
+        draft.width = width
+      },
+    },
+  })
+  let settingsActions: BoundSidebarSettingsActions | undefined
   ctx.effect(() => {
     const syncSession = (): void => {
       desktopSidebar.setSession(sessions.list.getSnapshot().current ?? null)
     }
     syncSession()
     const stopSessions = sessions.list.subscribe(syncSession)
+    const stopSettings = desktopSidebar.subscribe(() => {
+      syncSidebarSettings(settingsActions, desktopSidebar.getSnapshot())
+    })
     void desktopSidebar.start()
     service.mount()
     const removeSidebar = ctx.reflect.provide(
@@ -1068,6 +1256,7 @@ export function apply(ctx: ClientContext): void {
     const removeService = ctx.reflect.provide('workspaceTools', service, undefined)
     return () => {
       stopSessions()
+      stopSettings()
       service.dispose()
       unregisterBuiltins()
       desktopSidebar.dispose()
@@ -1075,4 +1264,39 @@ export function apply(ctx: ClientContext): void {
       void removeService?.()
     }
   }, 'oh-dsh-desktop: workspace tools and panel toolbar')
+
+  slots.inject('settings.general.item', () => slots.register({
+    id: 'oh-dsh-desktop-sidebar',
+    inject: actions => {
+      settingsActions = actions
+      syncSidebarSettings(settingsActions, desktopSidebar.getSnapshot())
+      return {
+        reset: () => {
+          desktopSidebar.setOpenByDefault(
+            DEFAULT_SIDEBAR_PREFERENCES.openByDefault,
+          )
+          desktopSidebar.setWidth(DEFAULT_SIDEBAR_PREFERENCES.defaultWidth)
+          for (const descriptor of desktopSidebar.getTabs()) {
+            desktopSidebar.setTabEnabled(descriptor.id, true)
+          }
+          for (const descriptor of desktopSidebar.getViewers()) {
+            desktopSidebar.setViewerEnabled(descriptor.id, true)
+          }
+        },
+        setOpenByDefault: open => { desktopSidebar.setOpenByDefault(open) },
+        setTabEnabled: (id, enabled) => {
+          desktopSidebar.setTabEnabled(id, enabled)
+        },
+        setViewerEnabled: (id, enabled) => {
+          desktopSidebar.setViewerEnabled(id, enabled)
+        },
+        setWidth: width => { desktopSidebar.setWidth(width) },
+        sidebar: desktopSidebar,
+      }
+    },
+    locale: 'oh-dsh.desktop-sidebar',
+    name: 'settings.general.item',
+    order: 30,
+    store: settingsStore,
+  }, SidebarSettingsRow))
 }
