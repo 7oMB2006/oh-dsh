@@ -16,13 +16,23 @@ import type {
   WorkspaceSnapshot,
 } from '../protocol.ts'
 import { WORKSPACE_API_PATH } from '../protocol.ts'
-import { SideToolsPanel, type DesktopToolView } from './SideToolsPanel.tsx'
+import {
+  BrowserView,
+  FilesView,
+  FileView,
+  SideToolsPanel,
+  ToolIcon,
+} from './SideToolsPanel.tsx'
 import sideToolsCss from './side-tools.css'
 import workspaceCss from './desktop-sidebar.css'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import { WORKSPACE_MESSAGES, type WorkspaceMessage } from './i18n.ts'
-import { DesktopSidebarService } from './sidebar-service.ts'
+import {
+  DesktopSidebarService,
+  type DesktopSidebar,
+  type DesktopSidebarSnapshot,
+} from './sidebar-service.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 
 interface ObservableSnapshot<T> {
@@ -83,7 +93,7 @@ interface ClientContext {
 interface WorkspaceToolsState {
   maximized: boolean
   open: boolean
-  view: DesktopToolView
+  view: string
   width: number
 }
 
@@ -111,39 +121,7 @@ declare global {
 
 export const inject = ['desktopPanels', 'locale', 'pinnedSummary', 'sessions', 'workspaces']
 
-const OPEN_KEY = 'oh-dsh-desktop.workspace-tools.open'
-const WIDTH_KEY = 'oh-dsh-desktop.workspace-tools.width'
-const VIEW_KEY = 'oh-dsh-desktop.workspace-tools.view'
-const DEFAULT_WIDTH = 390
-const MIN_WIDTH = 330
-const MAX_WIDTH = 620
 const EMPTY_CONVERSATION: ConversationSnapshot = { runningCalls: [] }
-
-function readBoolean(key: string): boolean {
-  try { return localStorage.getItem(key) === 'true' } catch { return false }
-}
-
-function readWidth(): number {
-  try {
-    const value = Number(localStorage.getItem(WIDTH_KEY))
-    return Number.isFinite(value) ? Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value)) : DEFAULT_WIDTH
-  } catch {
-    return DEFAULT_WIDTH
-  }
-}
-
-function readView(): DesktopToolView {
-  try {
-    const value = localStorage.getItem(VIEW_KEY)
-    return value === 'menu' || value === 'browser' || value === 'files' ? value : 'review'
-  } catch {
-    return 'review'
-  }
-}
-
-function persist(key: string, value: string): void {
-  try { localStorage.setItem(key, value) } catch { /* best effort */ }
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -203,18 +181,14 @@ function flattenRunningCalls(calls: readonly RunningToolCall[]): RunningToolCall
 }
 
 class WorkspaceToolsService implements WorkspaceTools {
-  private state: WorkspaceToolsState = {
-    maximized: false,
-    open: readBoolean(OPEN_KEY),
-    view: readView(),
-    width: readWidth(),
-  }
+  private state: WorkspaceToolsState
   private readonly listeners = new Set<() => void>()
   private style: HTMLStyleElement | undefined
   private element: HTMLDivElement | undefined
   private layout: HTMLDivElement | undefined
   private appRoot: HTMLElement | undefined
   private root: Root | undefined
+  private stopSidebar: (() => void) | undefined
   private readonly narrowViewport = window.matchMedia('(max-width: 900px)')
   private readonly handleViewportChange = (): void => { this.applyLayout() }
   private readonly handleShortcut = (event: KeyboardEvent): void => {
@@ -242,13 +216,16 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 
   constructor(
+    private readonly sidebar: DesktopSidebar,
     private readonly panels: DesktopPanels,
     private readonly locale: LocaleService,
     private readonly t: Translate<WorkspaceMessage>,
     private readonly pinnedSummary: PinnedSummary,
     private readonly sessions: SessionsService,
     private readonly workspaces: WorkspacesService,
-  ) {}
+  ) {
+    this.state = this.project(sidebar.getSnapshot())
+  }
 
   getSnapshot = (): WorkspaceToolsState => this.state
 
@@ -261,11 +238,8 @@ class WorkspaceToolsService implements WorkspaceTools {
 
   setOpen(open: boolean): void {
     if (open) this.pinnedSummary.setOpen(false)
-    if (this.state.open === open) return
-    this.publish({ ...this.state, maximized: open ? this.state.maximized : false, open })
+    this.sidebar.setOpen(open)
     if (!open) delete document.documentElement.dataset.ohDshPanelMaximized
-    persist(OPEN_KEY, String(open))
-    this.applyLayout()
   }
 
   toggle(): void {
@@ -279,15 +253,20 @@ class WorkspaceToolsService implements WorkspaceTools {
 
   openFiles(): void {
     const list = this.sessions.list.getSnapshot()
-    if (list.current === undefined || list.byId[list.current]?.cwd === undefined) return
-    this.openView('files')
+    const cwd = list.current === undefined ? undefined : list.byId[list.current]?.cwd
+    if (cwd === undefined) return
+    this.openView('files', cwd)
   }
 
-  openMenu(): void { this.openView('menu') }
+  openMenu(): void {
+    this.pinnedSummary.setOpen(false)
+    this.sidebar.activateTab(null)
+    this.sidebar.setOpen(true)
+  }
 
   toggleSidePanel(): void {
     if (this.state.open) this.setOpen(false)
-    else this.openView('menu')
+    else this.openMenu()
   }
 
   async openSideChat(): Promise<void> {
@@ -315,22 +294,18 @@ class WorkspaceToolsService implements WorkspaceTools {
   togglePanelMaximized(): void {
     if (!this.state.open) return
     const maximized = !this.state.maximized
-    this.publish({ ...this.state, maximized })
+    this.sidebar.setMaximized(maximized)
     if (maximized) document.documentElement.dataset.ohDshPanelMaximized = 'true'
     else delete document.documentElement.dataset.ohDshPanelMaximized
-    this.applyLayout()
   }
 
   setWidth(width: number): void {
-    const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)))
-    if (clamped === this.state.width) return
-    this.publish({ ...this.state, width: clamped })
-    persist(WIDTH_KEY, String(clamped))
-    this.applyLayout()
+    this.sidebar.setWidth(width)
   }
 
   mount(): void {
     if (this.state.open) this.pinnedSummary.setOpen(false)
+    this.stopSidebar = this.sidebar.subscribe(() => { this.syncSidebar() })
     this.style = document.createElement('style')
     this.style.dataset.ohDshDesktopSidebarStyles = 'true'
     this.style.textContent = `${workspaceCss}\n${sideToolsCss}`
@@ -355,6 +330,7 @@ class WorkspaceToolsService implements WorkspaceTools {
         pinnedSummary={this.pinnedSummary}
         sessions={this.sessions}
         workspaces={this.workspaces}
+        sidebar={this.sidebar}
       />,
     )
     this.narrowViewport.addEventListener('change', this.handleViewportChange)
@@ -363,6 +339,7 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 
   dispose(): void {
+    this.stopSidebar?.()
     window.removeEventListener('keydown', this.handleShortcut, true)
     this.narrowViewport.removeEventListener('change', this.handleViewportChange)
     this.root?.unmount()
@@ -386,12 +363,34 @@ class WorkspaceToolsService implements WorkspaceTools {
     for (const listener of this.listeners) listener()
   }
 
-  private openView(view: DesktopToolView): void {
+  private openView(view: string, resource?: string): void {
     this.pinnedSummary.setOpen(false)
-    if (this.state.open && this.state.view === view) return
-    this.publish({ ...this.state, maximized: this.state.open ? this.state.maximized : false, open: true, view })
-    persist(OPEN_KEY, 'true')
-    persist(VIEW_KEY, view)
+    this.sidebar.openTab({
+      type: view,
+      ...(resource !== undefined ? { resource } : {}),
+    })
+    this.sidebar.setOpen(true)
+  }
+
+  private project(snapshot: DesktopSidebarSnapshot): WorkspaceToolsState {
+    const active = snapshot.tabs.find(tab => tab.id === snapshot.activeId)
+    return {
+      maximized: snapshot.maximized,
+      open: snapshot.open,
+      view: active?.type ?? 'menu',
+      width: snapshot.width,
+    }
+  }
+
+  private syncSidebar(): void {
+    const next = this.project(this.sidebar.getSnapshot())
+    if (next.open) this.pinnedSummary.setOpen(false)
+    this.publish(next)
+    if (next.maximized) {
+      document.documentElement.dataset.ohDshPanelMaximized = 'true'
+    } else {
+      delete document.documentElement.dataset.ohDshPanelMaximized
+    }
     this.applyLayout()
   }
 
@@ -767,6 +766,7 @@ function WorkspaceToolsSurface(props: {
   locale: LocaleService
   t: Translate<WorkspaceMessage>
   service: WorkspaceToolsService
+  sidebar: DesktopSidebar
   panels: DesktopPanels
   pinnedSummary: PinnedSummary
   sessions: SessionsService
@@ -787,35 +787,238 @@ function WorkspaceToolsSurface(props: {
       <SideToolsPanel
         cwd={cwd}
         open={panelState.open}
-        review={(
-          <WorkspacePanel
-            service={props.service}
-            sessions={props.sessions}
-            workspaces={props.workspaces}
-            t={t}
-          />
-        )}
-        view={panelState.view}
         width={panelState.width}
         maximized={panelState.maximized}
+        sidebar={props.sidebar}
         t={t}
         onClose={() => { props.service.setOpen(false) }}
         onResize={width => { props.service.setWidth(width) }}
-        onReview={() => { props.service.openReview() }}
-        onTerminal={() => { props.panels.toggleBottomPanel() }}
-        onView={view => {
-          if (view === 'browser') props.service.openBrowser()
-          else if (view === 'files') props.service.openFiles()
-          else if (view === 'review') props.service.openReview()
-          else props.service.openMenu()
-        }}
-        onFiles={() => { props.service.openFiles() }}
-        onSideChat={async () => { await props.service.openSideChat() }}
-        onTrajectory={() => { props.service.openTrajectory() }}
-        onOpenPath={async path => { await props.workspaces.openPath(path) }}
       />
     </>
   )
+}
+
+function TextFileViewer({
+  content,
+  path,
+  title,
+}: {
+  content: string
+  path: string
+  title: string
+}): JSX.Element {
+  return (
+    <div className="oh-dsh-file-preview">
+      <div><strong title={path}>{title}</strong></div>
+      <pre>{content}</pre>
+    </div>
+  )
+}
+
+function BinaryFileViewer({
+  onOpen,
+  path,
+  title,
+  t,
+}: {
+  onOpen(): Promise<void>
+  path: string
+  title: string
+  t: Translate<WorkspaceMessage>
+}): JSX.Element {
+  return (
+    <div className="oh-dsh-file-preview">
+      <div>
+        <strong title={path}>{title}</strong>
+        <button type="button" onClick={() => { void onOpen() }}>
+          {t('files.open')}
+        </button>
+      </div>
+      <div className="oh-dsh-side-muted">{t('files.viewer.binary')}</div>
+    </div>
+  )
+}
+
+function HtmlFileViewer({
+  content,
+  path,
+  title,
+}: {
+  content: string
+  path: string
+  title: string
+}): JSX.Element {
+  return (
+    <div className="oh-dsh-file-preview oh-dsh-html-preview">
+      <div><strong title={path}>{title}</strong></div>
+      <iframe title={title} sandbox="" srcDoc={content} />
+    </div>
+  )
+}
+
+function activeWorkspace(sessions: SessionsService): string | undefined {
+  const snapshot = sessions.list.getSnapshot()
+  return snapshot.current === undefined
+    ? undefined
+    : snapshot.byId[snapshot.current]?.cwd
+}
+
+function registerBuiltinSidebarTools(options: {
+  panels: DesktopPanels
+  service: WorkspaceToolsService
+  sessions: SessionsService
+  sidebar: DesktopSidebar
+  t: Translate<WorkspaceMessage>
+  workspaces: WorkspacesService
+}): () => void {
+  const { panels, service, sessions, sidebar, t, workspaces } = options
+  const disposers = [
+    sidebar.registerTab({
+      chrome: 'custom',
+      icon: <ToolIcon kind="review" />,
+      id: 'review',
+      order: 10,
+      render: () => (
+        <WorkspacePanel
+          service={service}
+          sessions={sessions}
+          workspaces={workspaces}
+          t={t}
+        />
+      ),
+      requiresWorkspace: true,
+      shortcut: '⌃⇧G',
+      single: true,
+      title: () => t('review'),
+    }),
+    sidebar.registerTab({
+      action: () => { panels.toggleBottomPanel() },
+      icon: <ToolIcon kind="terminal" />,
+      id: 'terminal',
+      order: 20,
+      shortcut: '⌘J',
+      title: () => t('terminal'),
+    }),
+    sidebar.registerTab({
+      icon: <ToolIcon kind="browser" />,
+      id: 'browser',
+      order: 30,
+      render: props => <BrowserView {...props} t={t} />,
+      shortcut: '⌘T',
+      title: () => t('browser'),
+    }),
+    sidebar.registerTab({
+      dedupeKey: tab => tab.resource,
+      icon: <ToolIcon kind="files" />,
+      id: 'files',
+      order: 40,
+      render: props => (
+        <FilesView
+          {...props}
+          cwd={activeWorkspace(sessions)}
+          sidebar={sidebar}
+          t={t}
+        />
+      ),
+      requiresWorkspace: true,
+      shortcut: '⌘P',
+      title: () => t('files'),
+    }),
+    sidebar.registerTab({
+      dedupeKey: tab => tab.resource,
+      hidden: true,
+      icon: <ToolIcon kind="file" />,
+      id: 'file',
+      render: props => (
+        <FileView
+          {...props}
+          cwd={activeWorkspace(sessions)}
+          onOpenPath={async path => { await workspaces.openPath(path) }}
+          sidebar={sidebar}
+          t={t}
+        />
+      ),
+      requiresWorkspace: true,
+      title: () => t('files'),
+    }),
+    sidebar.registerTab({
+      action: async () => { await service.openSideChat() },
+      icon: <ToolIcon kind="chat" />,
+      id: 'side-chat',
+      order: 50,
+      shortcut: '⌥⌘S',
+      title: () => t('side-chat'),
+    }),
+    sidebar.registerTab({
+      action: () => { service.openTrajectory() },
+      icon: <ToolIcon kind="trajectory" />,
+      id: 'trajectory',
+      order: 60,
+      requiresWorkspace: true,
+      title: () => t('trajectory'),
+    }),
+    sidebar.registerViewer({
+      detect: (_path, head) => head.includes(0),
+      extensions: [],
+      fetchStrategy: 'binary-download',
+      id: 'binary',
+      order: 100,
+      render: input => (
+        <BinaryFileViewer
+          onOpen={async () => { await workspaces.openPath(input.path) }}
+          path={input.path}
+          title={input.title}
+          t={t}
+        />
+      ),
+      title: () => t('files.viewer.binary'),
+    }),
+    sidebar.registerViewer({
+      extensions: ['html', 'htm'],
+      fetchStrategy: 'text',
+      id: 'html',
+      order: 30,
+      render: input => (
+        <HtmlFileViewer
+          content={input.content ?? ''}
+          path={input.path}
+          title={input.title}
+        />
+      ),
+      title: () => t('files.viewer.html'),
+    }),
+    sidebar.registerViewer({
+      extensions: ['md', 'markdown', 'mdx'],
+      fetchStrategy: 'text',
+      id: 'markdown',
+      order: 20,
+      render: input => (
+        <TextFileViewer
+          content={input.content ?? ''}
+          path={input.path}
+          title={input.title}
+        />
+      ),
+      title: () => t('files.viewer.markdown'),
+    }),
+    sidebar.registerViewer({
+      extensions: [],
+      fetchStrategy: 'text',
+      id: 'text',
+      order: -100,
+      render: input => (
+        <TextFileViewer
+          content={input.content ?? ''}
+          path={input.path}
+          title={input.title}
+        />
+      ),
+      title: () => t('files.viewer.text'),
+    }),
+  ]
+  return () => {
+    for (const dispose of disposers.reverse()) dispose()
+  }
 }
 
 export function apply(ctx: ClientContext): void {
@@ -825,18 +1028,36 @@ export function apply(ctx: ClientContext): void {
     () => locale.register('oh-dsh.desktop-sidebar', WORKSPACE_MESSAGES),
     'oh-dsh-desktop: workspace tools dictionaries',
   )
-  const service = new WorkspaceToolsService(
-    ctx.get('desktopPanels') as DesktopPanels,
-    locale,
-    t,
-    ctx.get('pinnedSummary') as PinnedSummary,
-    ctx.get('sessions') as SessionsService,
-    ctx.get('workspaces') as WorkspacesService,
-  )
+  const panels = ctx.get('desktopPanels') as DesktopPanels
+  const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
+  const sessions = ctx.get('sessions') as SessionsService
+  const workspaces = ctx.get('workspaces') as WorkspacesService
   const desktopSidebar = new DesktopSidebarService(
     new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
   )
+  const service = new WorkspaceToolsService(
+    desktopSidebar,
+    panels,
+    locale,
+    t,
+    pinnedSummary,
+    sessions,
+    workspaces,
+  )
+  const unregisterBuiltins = registerBuiltinSidebarTools({
+    panels,
+    service,
+    sessions,
+    sidebar: desktopSidebar,
+    t,
+    workspaces,
+  })
   ctx.effect(() => {
+    const syncSession = (): void => {
+      desktopSidebar.setSession(sessions.list.getSnapshot().current ?? null)
+    }
+    syncSession()
+    const stopSessions = sessions.list.subscribe(syncSession)
     void desktopSidebar.start()
     service.mount()
     const removeSidebar = ctx.reflect.provide(
@@ -846,7 +1067,9 @@ export function apply(ctx: ClientContext): void {
     )
     const removeService = ctx.reflect.provide('workspaceTools', service, undefined)
     return () => {
+      stopSessions()
       service.dispose()
+      unregisterBuiltins()
       desktopSidebar.dispose()
       void removeSidebar?.()
       void removeService?.()

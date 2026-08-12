@@ -31,8 +31,21 @@ export type WorkspaceMessage =
   | 'files.open'
   | 'files.binary'
   | 'files.preview-truncated'
+  | 'files.not-file'
+  | 'files.no-viewer'
+  | 'files.viewer.binary'
+  | 'files.viewer.html'
+  | 'files.viewer.markdown'
+  | 'files.viewer.text'
   | 'side.back'
   | 'side.close'
+  | 'side.close-tab'
+  | 'side.close-named-tab'
+  | 'side.not-ready'
+  | 'side.orphaned-tab'
+  | 'side.tab-limit'
+  | 'side.tool-disabled'
+  | 'side.tool-missing'
   | 'workspace.request-failed'
   | 'workspace.title'
   | 'workspace.refresh'
@@ -92,8 +105,21 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'files.open': 'Open',
     'files.binary': 'Binary file · {size}',
     'files.preview-truncated': 'preview truncated',
+    'files.not-file': 'The selected path is not a regular file.',
+    'files.no-viewer': 'No preview is available for this file ({size}).',
+    'files.viewer.binary': 'Binary file',
+    'files.viewer.html': 'HTML preview',
+    'files.viewer.markdown': 'Markdown preview',
+    'files.viewer.text': 'Text preview',
     'side.back': 'Back to side panel',
     'side.close': 'Close side panel',
+    'side.close-tab': 'Close active tab',
+    'side.close-named-tab': 'Close {title}',
+    'side.not-ready': 'The side panel is still starting.',
+    'side.orphaned-tab': 'Its provider is not currently available. You can close this tab without losing the rest of the session.',
+    'side.tab-limit': 'Close an existing tab before opening another.',
+    'side.tool-disabled': 'This side panel tool is disabled.',
+    'side.tool-missing': 'This side panel tool is no longer registered.',
     'workspace.request-failed': 'Workspace request failed ({status})',
     'workspace.title': 'Workspace',
     'workspace.refresh': 'Refresh workspace',
@@ -152,8 +178,21 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'files.open': '打开',
     'files.binary': '二进制文件 · {size}',
     'files.preview-truncated': '预览已截断',
+    'files.not-file': '所选路径不是常规文件。',
+    'files.no-viewer': '此文件没有可用的预览（{size}）。',
+    'files.viewer.binary': '二进制文件',
+    'files.viewer.html': 'HTML 预览',
+    'files.viewer.markdown': 'Markdown 预览',
+    'files.viewer.text': '文本预览',
     'side.back': '返回侧边栏',
     'side.close': '关闭侧边栏',
+    'side.close-tab': '关闭当前标签页',
+    'side.close-named-tab': '关闭 {title}',
+    'side.not-ready': '侧边栏仍在启动。',
+    'side.orphaned-tab': '当前无法找到它的提供者。关闭此标签页不会影响会话中的其他内容。',
+    'side.tab-limit': '请先关闭一个已有标签页。',
+    'side.tool-disabled': '此侧边栏工具已被禁用。',
+    'side.tool-missing': '此侧边栏工具已不再注册。',
     'workspace.request-failed': '工作区请求失败（{status}）',
     'workspace.title': '工作区',
     'workspace.refresh': '刷新工作区',

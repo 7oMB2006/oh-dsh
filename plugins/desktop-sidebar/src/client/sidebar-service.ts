@@ -29,6 +29,7 @@ export interface DesktopSidebarRenderProps {
 export interface DesktopSidebarTabDescriptor {
   action?: () => void | Promise<void>
   available?: () => boolean
+  chrome?: 'custom' | 'standard'
   createTab?: (
     seed: DesktopSidebarTabSeed,
     tabs: readonly DesktopSidebarTab[],
