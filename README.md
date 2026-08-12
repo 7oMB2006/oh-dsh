@@ -14,6 +14,8 @@
   <p>
     <a href="#快速开始">快速开始</a> ·
     <a href="#核心能力">核心能力</a> ·
+    <a href="#可扩展-side-panel">Side Panel</a> ·
+    <a href="#桌面换肤">桌面换肤</a> ·
     <a href="#插件市场">插件市场</a> ·
     <a href="#架构">架构</a> ·
     <a href="#插件机制">插件机制</a> ·
@@ -59,10 +61,11 @@ Electron 和所需原生模块一起装进 macOS 应用，安装后即可启动�
 | 原生终端 | 自有 PTY host、多标签 Terminal、会话级尺寸与字体偏好 |
 | Workspace Review | Changes、diff、分支切换、创建分支、commit/push 和后台进程 |
 | Pinned Summary | 跟随当前 Session 的半高摘要卡片，并为正文自然预留空间 |
-| 内嵌 Side Panel | Review、Browser、Files、Side chat、Trajectory 共用右侧工具列 |
+| 可扩展 Side Panel | Review、Browser、Files、Side chat、Trajectory 共用注册式右侧工具区 |
 | 专注模式 | Side Panel 可展开覆盖 Chat，按 Esc 恢复 |
 | 事务化插件市场 | 浏览 `dsh-external`，隔离预览安装、更新、启停和卸载，可应用、放弃或恢复 |
 | 对话式插件管理 | Agent 与人类 UI 共用同一个风险、预览、应用和恢复事务内核 |
+| 桌面换肤 | 四套 Oh-DSH 自有皮肤，通过 DSH 官方主题服务即时切换并跨启动保存 |
 | 双语插件 UI | 设置中的中文 / English 会实时更新全部内置 Oh-DSH plugins |
 | macOS 集成 | 隐藏式标题栏、窗口拖动、原生菜单、文件选择器和外链处理 |
 
@@ -131,6 +134,37 @@ DeepSeek API key 可以从 DSH 设置页配置，也可以写入该目录中的 
 - Side Panel 打开时隐藏 Pinned Summary，显示展开按钮。
 - Terminal 和 Side Panel 始终可以独立切换。
 
+## 可扩展 Side Panel
+
+`@oh-dsh/desktop-sidebar` 是右侧工具区的唯一实现，不再并行维护
+`workspace-tools` 或第二个 Side Panel plugin。内置 Review、Browser、Files、
+Side chat 和 Trajectory 都通过同一套 `desktopSidebar` 服务注册；第三方
+plugin 也可以注册自己的标签页和文件查看器。
+
+侧边栏会按 Session 保存打开的标签页、当前标签、宽度和启动偏好。相同资源
+可按规则去重；暂时缺失的 plugin 会留下可安全关闭的 orphan 标签，不会破坏
+其他 Session 状态。文件预览按优先级、扩展名、内容探测和启用状态选择，HTML
+预览运行在无脚本权限的 sandbox iframe 中。
+
+在 **设置 → 通用 → 侧边栏** 中可以调整默认宽度和启动状态，并分别启停工具
+与文件查看器。设置通过 Host preference API 保存，不依赖随机 loopback 端口
+对应的 Web Storage。
+
+## 桌面换肤
+
+`@oh-dsh/desktop-skins` 在 **设置 → 通用 → 桌面皮肤** 中提供四套
+Oh-DSH 自有外观：**深海流光**、**翡翠回路**、**青白瓷**和
+**余烬暮色**。它只复用 DSH 官方 `ThemeService` 的注册与切换接口，
+配色、命名和预览均由本项目重新设计。
+
+选择后立即应用，无需重启。皮肤偏好由 Host plugin 写入应用数据目录，
+不依赖随机 loopback 端口对应的浏览器存储，因此重新启动桌面端后仍会
+恢复。选择 **原始外观** 会回到启用皮肤前的 Light、Dark 或 System
+设置；在原生 Appearance 中切换时，皮肤插件会主动让出控制权。
+
+所有主背景、侧栏、底部 Terminal 和右侧工具区使用同一个不透明基色，
+避免透明纹理在 Pinned Summary 下方或面板边缘透出不同肤色。
+
 ## 架构
 
 ```mermaid
@@ -139,10 +173,11 @@ flowchart TB
   Runtime["Bundled Node.js + DSH runtime"]
   UI["DSH React UI"]
   Shell["@oh-dsh/desktop-shell<br/>window · menu · PTY"]
-  Panels["@oh-dsh/panel-controls<br/>terminal · sidebar"]
+  Panels["@oh-dsh/panel-controls<br/>terminal · bottom panel"]
   Summary["@oh-dsh/pinned-summary<br/>session summary"]
-  Tools["@oh-dsh/workspace-tools<br/>review · browser · files"]
+  Tools["@oh-dsh/desktop-sidebar<br/>registry · review · browser · files"]
   Market["@oh-dsh/plugin-marketplace<br/>discover · preview · recover"]
+  Skins["@oh-dsh/desktop-skins<br/>theme · persist · restore"]
 
   App --> Runtime
   Runtime --> UI
@@ -151,6 +186,7 @@ flowchart TB
   UI --> Summary
   UI --> Tools
   UI --> Market
+  UI --> Skins
 ```
 
 ### 内置 plugins
@@ -158,10 +194,11 @@ flowchart TB
 | Plugin | 职责 |
 | --- | --- |
 | `@oh-dsh/desktop-shell` | Electron/DSH bridge、PTY WebSocket host、原生菜单与桌面能力 |
-| `@oh-dsh/panel-controls` | 多标签 Terminal、底部面板、侧栏、字体与高度偏好 |
+| `@oh-dsh/panel-controls` | 多标签 Terminal、底部面板、DSH 左侧栏、字体与高度偏好 |
 | `@oh-dsh/pinned-summary` | 当前 Session 摘要和正文 gutter 管理 |
-| `@oh-dsh/workspace-tools` | Workspace/Git API、内嵌 Review 和 Side Panel 工具 |
+| `@oh-dsh/desktop-sidebar` | 唯一的右侧工具区、扩展注册表、Workspace/Git Review、Browser 与 Files |
 | `@oh-dsh/plugin-marketplace` | `dsh-external` 目录、隔离候选 Profile、更新检查和回滚 |
+| `@oh-dsh/desktop-skins` | 自有皮肤图库、官方 ThemeService 适配和 Host 持久化 |
 | `@oh-dsh/desktop` | 根 bundle，按固定顺序注册所有桌面 plugins |
 
 `cordis.patch.yml` 复用 `dsh-base` 与 `dsh-web-app`，绑定临时 loopback
@@ -229,8 +266,8 @@ dsh plugin --profile desktop add <plugin-directory>
 plugins 保留自己的安装顺序。
 
 所有内置客户端插件都注入 DSH 官方 `locale` 服务并注册 `zh` / `en`
-词典。设置页切换语言后，Terminal、Pinned Summary、Workspace tools 和
-插件市场会在当前窗口内立即更新，不需要重启 runtime。
+词典。设置页切换语言后，Desktop skins、Terminal、Pinned Summary、
+Desktop sidebar 和插件市场会在当前窗口内立即更新，不需要重启 runtime。
 
 每个客户端插件都通过 DSH 标准的 `package.json#dsh.client` 声明平台、
 预取行为与依赖边。Runtime smoke 会从实际 boot graph 校验这些声明，避免
@@ -272,6 +309,39 @@ release/
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
+当前仓库不依赖 GitHub Actions 生成发行包。发布前必须先在本机完成编译、
+runtime 烟测、应用烟测和安装包校验：
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm test
+pnpm run dist:mac
+pnpm run smoke:app
+codesign --verify --deep --strict \
+  release/mac-arm64/Oh-DSH-Desktop.app
+hdiutil verify release/Oh-DSH-Desktop-0.1.0-arm64.dmg
+```
+
+本地验证通过后，再手动创建或更新 GitHub Release：
+
+```sh
+gh release create v0.1.0 \
+  release/Oh-DSH-Desktop-0.1.0-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.0-arm64.zip \
+  --title "Oh-DSH-Desktop 0.1.0" \
+  --generate-notes
+
+# Release 已存在时使用：
+gh release upload v0.1.0 \
+  release/Oh-DSH-Desktop-0.1.0-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.0-arm64.zip \
+  --clobber
+```
+
+`release/` 是本地构建目录，不提交进 Git；Release 中只上传验证过的 DMG
+和 ZIP。
+
 ## 开发与验证
 
 ```sh
@@ -286,7 +356,7 @@ pnpm run smoke:app
 
 测试覆盖 profile 初始化、runtime 启动、PTY 协议、终端状态、Workspace/Git
 边界、文件访问约束和右侧面板布局契约。截图检查还会确认 UI 图片的四个
-圆角保留真实的 alpha 透明通道。`check:plugins` 会逐项报告根 bundle 与五个
+圆角保留真实的 alpha 透明通道。`check:plugins` 会逐项报告根 bundle 与六个
 内置 plugin 的 Host 激活、Client bundle、依赖图、Workspace API 和 PTY
 兼容性。
 
@@ -296,12 +366,13 @@ pnpm run smoke:app
 .
 ├── assets/                  # 鲸鱼图标与 UI 截图
 ├── plugins/
+│   ├── desktop-skins/       # 皮肤注册、设置图库与 Host 持久化
+│   ├── desktop-sidebar/     # 右侧工具注册表、Review、Browser 与 Files
 │   ├── desktop-shell/       # Electron bridge 与 PTY host
 │   ├── panel-controls/      # Terminal 和面板控制
 │   ├── pinned-summary/      # Session 摘要
 │   ├── plugin-marketplace/  # 目录、隔离预览、更新与恢复
-│   ├── shared/              # 内置 plugins 共用的 locale 契约
-│   └── workspace-tools/     # Review、Git、Browser 与 Files
+│   └── shared/              # 内置 plugins 共用的 locale 契约
 ├── scripts/                 # 构建、stage、smoke 和 macOS 打包
 ├── src/                     # Electron 主进程、preload 与根 bundle
 ├── tests/                   # Node test runner 回归测试
@@ -322,6 +393,19 @@ Signed-off-by: Your Name <you@example.com>
 ```
 
 正文每行不超过 72 个字符。可以使用 `git commit -s` 自动添加签名。
+
+## 致谢与下游关系
+
+`@oh-dsh/desktop-sidebar` 是
+[`dsh-external/DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar)
+的下游独立实现。我们参考并吸收了它成熟的注册/注销生命周期、Session 标签
+恢复、文件查看器优先级、功能开关和 orphan 容错设计。感谢原项目维护者在
+DSH 侧边栏扩展机制上的探索。
+
+本项目没有照搬上游 UI、主题或组件样式；Oh-DSH 继续使用现有的内嵌布局、
+图标、尺寸和 `desktop-skins` 主题系统，并把能力收敛到单一
+`@oh-dsh/desktop-sidebar` plugin。上游项目使用 MIT License；详细说明见
+[第三方声明](./THIRD_PARTY_NOTICES.md)。
 
 ## License
 

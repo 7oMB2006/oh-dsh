@@ -14,6 +14,8 @@
   <p>
     <a href="#quick-start">Quick Start</a> ·
     <a href="#capabilities">Capabilities</a> ·
+    <a href="#extensible-side-panel">Side Panel</a> ·
+    <a href="#desktop-skins">Desktop Skins</a> ·
     <a href="#plugin-marketplace">Plugin Marketplace</a> ·
     <a href="#architecture">Architecture</a> ·
     <a href="#plugin-system">Plugin System</a> ·
@@ -63,10 +65,11 @@ on its own.
 | Native terminal | First-party PTY host, multiple terminal tabs, and session-level size and font preferences |
 | Workspace Review | Changes, diffs, branch switching and creation, commit/push, and background processes |
 | Pinned Summary | Half-height summary card that follows the active Session and reserves space in the conversation |
-| Embedded Side Panel | Review, Browser, Files, Side chat, and Trajectory share one right-hand tool area |
+| Extensible Side Panel | Review, Browser, Files, Side chat, and Trajectory share one registered right-hand tool area |
 | Focus mode | The Side Panel can cover Chat completely and returns with Esc |
 | Transactional plugin marketplace | Browse `dsh-external`; preview install, update, enable, disable, or remove; then apply, discard, or recover |
 | Conversational plugin management | Agent and human UI share one risk, preview, apply, and recovery transaction owner |
+| Desktop skins | Four original Oh-DSH skins switch through the official DSH theme service and persist across launches |
 | Bilingual plugin UI | The Settings Chinese / English choice updates every bundled Oh-DSH plugin live |
 | macOS integration | Hidden title bar, draggable window regions, native menus, file pickers, and external links |
 
@@ -139,6 +142,41 @@ The top toolbar only shows controls that make sense for the current state:
 - Opening the Side Panel hides Pinned Summary and reveals the expand control.
 - Terminal and Side Panel controls remain independently available.
 
+## Extensible Side Panel
+
+`@oh-dsh/desktop-sidebar` is the only right-hand tool implementation. There
+is no parallel `workspace-tools` package or second Side Panel plugin. Review,
+Browser, Files, Side chat, and Trajectory all register through the same
+`desktopSidebar` service, and third-party plugins can add tabs or viewers.
+
+The service persists open tabs, active tab, width, and launch preference per
+Session. Resources can deduplicate by policy. A temporarily missing plugin
+leaves a safe, closable orphan tab instead of damaging other Session state.
+File previews are selected by priority, extension, content sniffing, and
+enablement; HTML previews run inside a script-free sandbox iframe.
+
+Use **Settings → General → Side panel** to configure launch state, default
+width, individual tools, and file viewers. The Host preference API stores
+these choices independently from Web Storage on a random loopback port.
+
+## Desktop skins
+
+`@oh-dsh/desktop-skins` adds four original choices under
+**Settings → General → Desktop skin**: **Deep Current**,
+**Jade Circuit**, **Porcelain**, and **Ember Dusk**. It reuses only the
+official DSH `ThemeService` registration and switching contract. Names,
+palettes, and previews are designed for Oh-DSH-Desktop.
+
+Selections apply immediately. The Host plugin writes the preference under
+the application data directory instead of relying on browser storage tied to
+a random loopback port, so the skin returns after a complete desktop restart.
+Choosing **Original** restores the Light, Dark, or System appearance that was
+active before the skin. A native Appearance change takes control cleanly.
+
+The main canvas, sidebar, bottom Terminal, and right-hand tools share one
+opaque base color. This prevents a texture or transparent layer from showing
+a different tone below Pinned Summary or along panel edges.
+
 ## Architecture
 
 ```mermaid
@@ -147,10 +185,11 @@ flowchart TB
   Runtime["Bundled Node.js + DSH runtime"]
   UI["DSH React UI"]
   Shell["@oh-dsh/desktop-shell<br/>window · menu · PTY"]
-  Panels["@oh-dsh/panel-controls<br/>terminal · sidebar"]
+  Panels["@oh-dsh/panel-controls<br/>terminal · bottom panel"]
   Summary["@oh-dsh/pinned-summary<br/>session summary"]
-  Tools["@oh-dsh/workspace-tools<br/>review · browser · files"]
+  Tools["@oh-dsh/desktop-sidebar<br/>registry · review · browser · files"]
   Market["@oh-dsh/plugin-marketplace<br/>discover · preview · recover"]
+  Skins["@oh-dsh/desktop-skins<br/>theme · persist · restore"]
 
   App --> Runtime
   Runtime --> UI
@@ -159,6 +198,7 @@ flowchart TB
   UI --> Summary
   UI --> Tools
   UI --> Market
+  UI --> Skins
 ```
 
 ### Bundled plugins
@@ -166,10 +206,11 @@ flowchart TB
 | Plugin | Responsibility |
 | --- | --- |
 | `@oh-dsh/desktop-shell` | Electron/DSH bridge, PTY WebSocket host, native menus, and desktop capabilities |
-| `@oh-dsh/panel-controls` | Multi-tab Terminal, bottom panel, sidebar, font, and height preferences |
+| `@oh-dsh/panel-controls` | Multi-tab Terminal, bottom panel, DSH left sidebar, font, and height preferences |
 | `@oh-dsh/pinned-summary` | Active Session summary and conversation gutter management |
-| `@oh-dsh/workspace-tools` | Workspace/Git API, embedded Review, and Side Panel tools |
+| `@oh-dsh/desktop-sidebar` | The sole right-hand tool area, extension registry, Workspace/Git Review, Browser, and Files |
 | `@oh-dsh/plugin-marketplace` | `dsh-external` catalog, isolated candidate Profiles, update checks, and recovery |
+| `@oh-dsh/desktop-skins` | Original skin gallery, official ThemeService adapter, and Host persistence |
 | `@oh-dsh/desktop` | Root bundle that registers every desktop plugin in a stable order |
 
 `cordis.patch.yml` reuses `dsh-base` and `dsh-web-app`, binds the runtime to a
@@ -249,8 +290,8 @@ installation order.
 
 Every bundled client plugin injects the official DSH `locale` service and
 registers `zh` / `en` dictionaries. Changing the language in Settings updates
-Terminal, Pinned Summary, Workspace tools, and the marketplace in the current
-window without restarting the runtime.
+Desktop skins, Terminal, Pinned Summary, Desktop sidebar, and the marketplace
+in the current window without restarting the runtime.
 
 Each client plugin declares its platform, prefetch behavior, and dependency
 edges through the standard `package.json#dsh.client` contract. Runtime smoke
@@ -301,6 +342,39 @@ release/
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
+The repository does not rely on GitHub Actions to produce release artifacts.
+Compile, smoke-test, and verify the installer locally before upload:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run typecheck
+pnpm test
+pnpm run dist:mac
+pnpm run smoke:app
+codesign --verify --deep --strict \
+  release/mac-arm64/Oh-DSH-Desktop.app
+hdiutil verify release/Oh-DSH-Desktop-0.1.0-arm64.dmg
+```
+
+After local verification, create or update the GitHub Release manually:
+
+```sh
+gh release create v0.1.0 \
+  release/Oh-DSH-Desktop-0.1.0-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.0-arm64.zip \
+  --title "Oh-DSH-Desktop 0.1.0" \
+  --generate-notes
+
+# Use this when the Release already exists:
+gh release upload v0.1.0 \
+  release/Oh-DSH-Desktop-0.1.0-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.0-arm64.zip \
+  --clobber
+```
+
+`release/` is a local build directory and is not committed. Upload only the
+verified DMG and ZIP assets.
+
 ## Development and validation
 
 ```sh
@@ -318,7 +392,7 @@ protocol, terminal state, Workspace/Git boundaries, file access constraints,
 and right-panel layout contracts. The screenshot check also verifies that all
 four corners retain a real alpha channel. `check:plugins` reports Host
 activation, Client bundles, dependency edges, the Workspace API, and PTY
-compatibility for the root bundle and all five built-in plugins.
+compatibility for the root bundle and all six built-in plugins.
 
 ### Project layout
 
@@ -326,12 +400,13 @@ compatibility for the root bundle and all five built-in plugins.
 .
 ├── assets/                  # Whale artwork and UI screenshot
 ├── plugins/
+│   ├── desktop-skins/       # Skin registry, settings gallery, Host persistence
+│   ├── desktop-sidebar/     # Right tool registry, Review, Browser, Files
 │   ├── desktop-shell/       # Electron bridge and PTY host
 │   ├── panel-controls/      # Terminal and panel controls
 │   ├── pinned-summary/      # Session summary
 │   ├── plugin-marketplace/  # Catalog, isolated preview, updates, recovery
-│   ├── shared/              # Locale contracts shared by bundled plugins
-│   └── workspace-tools/     # Review, Git, Browser, and Files
+│   └── shared/              # Locale contracts shared by bundled plugins
 ├── scripts/                 # Build, staging, smoke, and macOS packaging
 ├── src/                     # Electron main process, preload, and root bundle
 ├── tests/                   # Node test runner regression tests
@@ -353,6 +428,19 @@ Signed-off-by: Your Name <you@example.com>
 
 Keep every body line within 72 characters. `git commit -s` adds the sign-off
 automatically.
+
+## Acknowledgments and downstream relationship
+
+`@oh-dsh/desktop-sidebar` is an independent downstream implementation of
+[`dsh-external/DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar).
+It distills the upstream project's mature registration lifecycle, per-Session
+tab restoration, viewer priority, feature switches, and orphan recovery.
+Thank you to its maintainers for advancing DSH side-panel extensibility.
+
+No upstream UI, theme, or component styling is reused. Oh-DSH retains its
+embedded layout, icons, sizing, and `desktop-skins` theme system while
+consolidating the capability into one `@oh-dsh/desktop-sidebar` plugin. The
+upstream project is MIT-licensed; see [Third-Party Notices](./THIRD_PARTY_NOTICES.md).
 
 ## License
 

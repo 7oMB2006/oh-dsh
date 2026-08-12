@@ -61,6 +61,7 @@
       "dist/preload.cjs",
       "dist/splash.html",
       "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
       "package.json"
     ],
     "extraResources": [
