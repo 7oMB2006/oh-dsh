@@ -83,6 +83,19 @@ export type WorkspaceMessage =
   | 'workspace.no-background-processes'
   | 'workspace.loading-diff'
   | 'workspace.no-text-diff'
+  | 'workspace.review-history'
+  | 'workspace.no-commits'
+  | 'workspace.review-commit'
+  | 'workspace.comment-commit'
+  | 'workspace.comment-line'
+  | 'workspace.comment-placeholder'
+  | 'workspace.add-comment'
+  | 'workspace.cancel'
+  | 'workspace.comment-added'
+  | 'workspace.comment-saved'
+  | 'workspace.pending-comments'
+  | 'workspace.remove-comment'
+  | 'workspace.diff-truncated'
 
 export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
   en: {
@@ -168,6 +181,19 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'workspace.no-background-processes': 'No background processes',
     'workspace.loading-diff': 'Loading diff…',
     'workspace.no-text-diff': 'No textual diff is available.',
+    'workspace.review-history': 'Commit history',
+    'workspace.no-commits': 'No commits on this branch',
+    'workspace.review-commit': 'Commit',
+    'workspace.comment-commit': 'Comment on commit',
+    'workspace.comment-line': 'Comment on this line',
+    'workspace.comment-placeholder': 'Describe the change you want…',
+    'workspace.add-comment': 'Add comment',
+    'workspace.cancel': 'Cancel',
+    'workspace.comment-added': 'Added to the message composer.',
+    'workspace.comment-saved': 'Saved. Open a chat to send this review.',
+    'workspace.pending-comments': 'Pending review comments',
+    'workspace.remove-comment': 'Remove review comment',
+    'workspace.diff-truncated': '{count} more lines are hidden',
   },
   zh: {
     'panels.label': '桌面面板',
@@ -252,5 +278,18 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'workspace.no-background-processes': '没有后台进程',
     'workspace.loading-diff': '正在加载差异…',
     'workspace.no-text-diff': '没有可用的文本差异。',
+    'workspace.review-history': '提交历史',
+    'workspace.no-commits': '当前分支没有提交',
+    'workspace.review-commit': '提交',
+    'workspace.comment-commit': '评论此提交',
+    'workspace.comment-line': '评论此行',
+    'workspace.comment-placeholder': '描述希望修改的内容…',
+    'workspace.add-comment': '添加评论',
+    'workspace.cancel': '取消',
+    'workspace.comment-added': '已添加到消息输入框。',
+    'workspace.comment-saved': '已保存，请打开对话发送此次审查。',
+    'workspace.pending-comments': '待发送的审查评论',
+    'workspace.remove-comment': '移除审查评论',
+    'workspace.diff-truncated': '另有 {count} 行已隐藏',
   },
 }

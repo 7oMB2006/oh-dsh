@@ -282,6 +282,209 @@ html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-desktop-sidebar-root {
   white-space: pre;
 }
 
+.oh-dsh-review-commit-list {
+  display: grid;
+  gap: 2px;
+  padding: 0 2px 8px 30px;
+}
+
+.oh-dsh-review-commit-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 32px;
+  gap: 7px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.oh-dsh-review-commit-row:hover,
+.oh-dsh-review-commit-row[data-selected] {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
+}
+
+.oh-dsh-review-commit-row:disabled { cursor: default; opacity: 0.65; }
+.oh-dsh-review-commit-row code {
+  color: var(--dsw-alias-label-secondary, #57606a);
+  font: 9px/1.3 var(--ds-font-family-code, ui-monospace, monospace);
+}
+.oh-dsh-review-commit-row > span {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oh-dsh-review-commit-row small {
+  overflow: hidden;
+  max-width: 72px;
+  color: var(--dsw-alias-label-dimmed, #8c959f);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oh-dsh-review-commit-detail {
+  margin: 2px 2px 10px 30px;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 13%));
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+}
+
+.oh-dsh-review-commit-detail > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+.oh-dsh-review-commit-detail > header > div { display: grid; min-width: 0; gap: 3px; }
+.oh-dsh-review-commit-detail > header code,
+.oh-dsh-review-commit-detail > header small {
+  color: var(--dsw-alias-label-dimmed, #8c959f);
+  font-size: 9px;
+}
+.oh-dsh-review-commit-detail > header strong { font-size: 11px; }
+.oh-dsh-review-commit-detail button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.oh-dsh-review-commit-detail > header > button {
+  flex: none;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
+  font-size: 9px;
+}
+
+.oh-dsh-review-commit-detail details {
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+.oh-dsh-review-commit-detail details:last-of-type { border-bottom: 0; }
+.oh-dsh-review-commit-detail summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  font: 10px/1.35 var(--ds-font-family-code, ui-monospace, monospace);
+}
+.oh-dsh-review-commit-detail summary > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oh-dsh-review-commit-detail summary small { color: #cf222e; }
+.oh-dsh-review-commit-detail summary b { color: #2da44e; font-weight: 500; }
+
+.oh-dsh-review-diff-lines {
+  max-height: 420px;
+  overflow: auto;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+.oh-dsh-review-diff-lines > button {
+  display: grid;
+  grid-template-columns: 30px 30px minmax(max-content, 1fr);
+  width: 100%;
+  min-width: max-content;
+  padding: 0;
+  text-align: left;
+  font: 9px/1.55 var(--ds-font-family-code, ui-monospace, monospace);
+}
+.oh-dsh-review-diff-lines > button:hover {
+  box-shadow: inset 2px 0 var(--dsw-alias-accent, #0969da);
+}
+.oh-dsh-review-diff-lines > button[data-type='addition'] {
+  background: color-mix(in srgb, #2da44e 10%, transparent);
+}
+.oh-dsh-review-diff-lines > button[data-type='deletion'] {
+  background: color-mix(in srgb, #cf222e 9%, transparent);
+}
+.oh-dsh-review-diff-lines > button > span {
+  padding: 1px 5px;
+  color: var(--dsw-alias-label-dimmed, #8c959f);
+  text-align: right;
+  user-select: none;
+}
+.oh-dsh-review-diff-lines > button > code {
+  padding: 1px 8px;
+  color: var(--dsw-alias-label-primary, #1f2328);
+  white-space: pre;
+}
+
+.oh-dsh-review-comments {
+  display: grid;
+  gap: 5px;
+  padding: 8px 9px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+.oh-dsh-review-comments > strong { font-size: 10px; }
+.oh-dsh-review-comments > div {
+  position: relative;
+  padding: 7px 28px 7px 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
+}
+.oh-dsh-review-comments span {
+  color: var(--dsw-alias-label-dimmed, #8c959f);
+  font: 9px/1.3 var(--ds-font-family-code, ui-monospace, monospace);
+}
+.oh-dsh-review-comments p { margin: 3px 0 0; font-size: 10px; line-height: 1.45; }
+.oh-dsh-review-comments button { position: absolute; top: 4px; right: 4px; }
+
+.oh-dsh-review-comment-form {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border-top: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 8%));
+}
+.oh-dsh-review-comment-form strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.oh-dsh-review-comment-form textarea {
+  min-height: 68px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 7px;
+  border: 1px solid var(--dsw-alias-border-l2, rgb(0 0 0 / 13%));
+  border-radius: 6px;
+  outline: 0;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  color: inherit;
+  font: 10px/1.45 inherit;
+}
+.oh-dsh-review-comment-form textarea:focus {
+  border-color: var(--dsw-alias-accent, #0969da);
+}
+.oh-dsh-review-comment-form > div { display: flex; justify-content: flex-end; gap: 6px; }
+.oh-dsh-review-comment-form button {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
+  font-size: 9px;
+}
+.oh-dsh-review-comment-form button:disabled { cursor: default; opacity: 0.45; }
+.oh-dsh-review-comment-notice {
+  margin: 0;
+  padding: 0 9px 9px;
+  color: var(--dsw-alias-label-secondary, #57606a);
+  font-size: 9px;
+}
+
 .oh-dsh-workspace-facts { display: grid; gap: 1px; }
 
 .oh-dsh-workspace-fact select {

@@ -38,9 +38,19 @@ import {
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 import {
   betterSidebarApi,
+  type BetterSidebarGitLogEntry,
   type BetterSidebarScope,
   workspaceChangesFromBetterSidebar,
 } from './better-sidebar-api.ts'
+import {
+  nextReviewCommentId,
+  ReviewCommentsService,
+  type ReviewCommentSide,
+  type ReviewSessionsService,
+  type ReviewSlashService,
+} from './review-comments.ts'
+import { reviewCommitFromBetterSidebar } from './review-diff.ts'
+import type { GitReviewCommit } from './review-types.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -72,7 +82,7 @@ interface SessionBinding {
   session: ObservableSnapshot<ConversationSnapshot>
 }
 
-interface SessionsService {
+interface SessionsService extends ReviewSessionsService {
   list: ObservableSnapshot<SessionListState>
   binding(id: string): SessionBinding | undefined
   fork(options: { sessionId: string; increaseTitle?: boolean }): Promise<string>
@@ -175,6 +185,7 @@ export const inject = [
   'locale',
   'pinnedSummary',
   'sessions',
+  'slash',
   'slots',
   'workspaces',
 ]
@@ -214,6 +225,22 @@ function statusLabel(status: WorkspaceSnapshot['changes'][number]['status']): st
     untracked: 'U',
     conflicted: '!',
   }[status]
+}
+
+type ReviewCommentTarget = {
+  kind: 'commit'
+} | {
+  kind: 'line'
+  filePath: string
+  line: number
+  side: Exclude<ReviewCommentSide, null>
+}
+
+function reviewLineNumber(
+  oldLine: number | null,
+  newLine: number | null,
+): number | null {
+  return newLine ?? oldLine
 }
 
 function processTitle(call: RunningToolCall): string {
@@ -559,11 +586,13 @@ function useActiveConversation(sessions: SessionsService, sessionId: string | un
 }
 
 function WorkspacePanel({
+  reviewComments,
   service,
   sessions,
   workspaces,
   t,
 }: {
+  reviewComments: ReviewCommentsService
   service: WorkspaceToolsService
   sessions: SessionsService
   workspaces: WorkspacesService
@@ -586,11 +615,36 @@ function WorkspacePanel({
   const [commitOpen, setCommitOpen] = useState(false)
   const [commitMessage, setCommitMessage] = useState('')
   const [newBranch, setNewBranch] = useState('')
+  const [history, setHistory] = useState<BetterSidebarGitLogEntry[]>([])
+  const [selectedCommit, setSelectedCommit] = useState<GitReviewCommit | null>(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [commentTarget, setCommentTarget] = useState<ReviewCommentTarget | null>(null)
+  const [commentBody, setCommentBody] = useState('')
+  const [commentNotice, setCommentNotice] = useState('')
+  const comments = useSyncExternalStore(
+    reviewComments.subscribe,
+    reviewComments.getSnapshot,
+  )
   const visibleChanges = snapshot?.changes.slice(0, 200) ?? []
-  const scope: BetterSidebarScope | undefined = sessionId === undefined
-    || cwd === undefined
-    ? undefined
-    : { sessionId, cwd }
+  const scope = useMemo<BetterSidebarScope | undefined>(
+    () => sessionId === undefined || cwd === undefined
+      ? undefined
+      : { sessionId, cwd },
+    [cwd, sessionId],
+  )
+  const branch = snapshot?.branch ?? null
+  const selectedComments = useMemo(() => comments.filter(comment =>
+    selectedCommit !== null
+    && comment.commitId === selectedCommit.id
+    && comment.sessionId === (sessionId ?? null)
+    && comment.workspacePath === cwd
+    && comment.branch === branch), [
+    branch,
+    comments,
+    cwd,
+    selectedCommit,
+    sessionId,
+  ])
 
   const refresh = useCallback(async (): Promise<void> => {
     if (cwd === undefined || sessionId === undefined) {
@@ -604,6 +658,8 @@ function WorkspacePanel({
         betterSidebarApi.gitStatus(nextScope),
       ])
       if (!status.isRepo) {
+        setHistory([])
+        setSelectedCommit(null)
         setSnapshot({
           ...facts,
           kind: 'directory',
@@ -612,12 +668,16 @@ function WorkspacePanel({
           changes: [],
         })
       } else {
-        const branch = await betterSidebarApi.gitBranch(nextScope)
+        const [nextBranch, nextHistory] = await Promise.all([
+          betterSidebarApi.gitBranch(nextScope),
+          betterSidebarApi.gitLog(nextScope).catch(() => []),
+        ])
+        setHistory(nextHistory)
         setSnapshot({
           ...facts,
           kind: 'repository',
-          branch: status.branch ?? branch.current,
-          branches: branch.names,
+          branch: status.branch ?? nextBranch.current,
+          branches: nextBranch.names,
           changes: workspaceChangesFromBetterSidebar(status.entries),
         })
       }
@@ -642,7 +702,17 @@ function WorkspacePanel({
   useEffect(() => {
     setSelectedPath(null)
     setDiff('')
+    setHistory([])
+    setSelectedCommit(null)
+    setCommentTarget(null)
+    setCommentBody('')
+    setCommentNotice('')
   }, [cwd])
+
+  useEffect(() => {
+    if (cwd === undefined || branch === null) return
+    reviewComments.activate(sessionId ?? null, cwd, branch)
+  }, [branch, cwd, reviewComments, sessionId])
 
   const mutate = async (mutation: WorkspaceMutation): Promise<void> => {
     if (cwd === undefined || scope === undefined || busy) return
@@ -692,6 +762,54 @@ function WorkspacePanel({
     } catch (nextError) {
       setDiff(errorMessage(nextError))
     }
+  }
+
+  const showCommit = async (entry: BetterSidebarGitLogEntry): Promise<void> => {
+    if (scope === undefined || reviewLoading) return
+    if (selectedCommit?.id === entry.hashFull) {
+      setSelectedCommit(null)
+      setCommentTarget(null)
+      return
+    }
+    setReviewLoading(true)
+    setCommentTarget(null)
+    setCommentBody('')
+    setCommentNotice('')
+    try {
+      const result = await betterSidebarApi.gitCommitDiff(
+        scope,
+        entry.hashFull,
+      )
+      setSelectedCommit(reviewCommitFromBetterSidebar(entry, result.diff))
+      setError('')
+    } catch (nextError) {
+      setError(errorMessage(nextError))
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+
+  const addReviewComment = (): void => {
+    if (selectedCommit === null || cwd === undefined || branch === null
+      || commentTarget === null || commentBody.trim() === '') return
+    const lineTarget = commentTarget.kind === 'line' ? commentTarget : null
+    const result = reviewComments.add(selectedCommit, {
+      id: nextReviewCommentId(),
+      sessionId: sessionId ?? null,
+      workspacePath: cwd,
+      branch,
+      commitId: selectedCommit.id,
+      filePath: lineTarget?.filePath ?? null,
+      line: lineTarget?.line ?? null,
+      side: lineTarget?.side ?? null,
+      body: commentBody.trim(),
+      createdAt: new Date().toISOString(),
+    })
+    setCommentBody('')
+    setCommentTarget(null)
+    setCommentNotice(result === 'inserted'
+      ? t('workspace.comment-added')
+      : t('workspace.comment-saved'))
   }
 
   const chooseWorkspace = async (): Promise<void> => {
@@ -758,6 +876,164 @@ function WorkspacePanel({
                 )}
               </div>
             </section>
+
+            {snapshot?.kind === 'repository' && (
+              <section className="oh-dsh-review-history">
+                <div className="oh-dsh-workspace-section-title">
+                  <span className="oh-dsh-workspace-section-icon">◷</span>
+                  <strong>{t('workspace.review-history')}</strong>
+                  <span className="oh-dsh-workspace-count">{history.length}</span>
+                </div>
+                <div className="oh-dsh-review-commit-list">
+                  {history.map(entry => (
+                    <button
+                      type="button"
+                      key={entry.hashFull}
+                      className="oh-dsh-review-commit-row"
+                      data-selected={selectedCommit?.id === entry.hashFull || undefined}
+                      disabled={reviewLoading}
+                      onClick={() => { void showCommit(entry) }}
+                    >
+                      <code>{entry.hash}</code>
+                      <span title={entry.subject}>{entry.subject}</span>
+                      <small>{entry.author}</small>
+                    </button>
+                  ))}
+                  {history.length === 0 && (
+                    <div className="oh-dsh-workspace-muted">
+                      {t('workspace.no-commits')}
+                    </div>
+                  )}
+                </div>
+
+                {selectedCommit !== null && (
+                  <div className="oh-dsh-review-commit-detail">
+                    <header>
+                      <div>
+                        <code>{selectedCommit.shortId}</code>
+                        <strong>{selectedCommit.subject}</strong>
+                        <small>
+                          {selectedCommit.author} · {selectedCommit.authoredAt}
+                        </small>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCommentTarget({ kind: 'commit' })
+                          setCommentNotice('')
+                        }}
+                      >{t('workspace.comment-commit')}</button>
+                    </header>
+
+                    {selectedComments.length > 0 && (
+                      <div className="oh-dsh-review-comments">
+                        <strong>{t('workspace.pending-comments')}</strong>
+                        {selectedComments.map(comment => (
+                          <div key={comment.id}>
+                            <span>
+                              {comment.filePath === null
+                                ? t('workspace.review-commit')
+                                : `${comment.filePath}:${String(comment.line)}`}
+                            </span>
+                            <p>{comment.body}</p>
+                            <button
+                              type="button"
+                              aria-label={t('workspace.remove-comment')}
+                              title={t('workspace.remove-comment')}
+                              onClick={() => { reviewComments.remove(comment.id) }}
+                            >×</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedCommit.files.map(file => (
+                      <details key={`${file.oldPath ?? ''}:${file.path}`} open>
+                        <summary>
+                          <span title={file.path}>{file.path}</span>
+                          <small>
+                            <b>+{file.additions}</b> −{file.deletions}
+                          </small>
+                        </summary>
+                        <div className="oh-dsh-review-diff-lines">
+                          {file.lines.slice(0, 400).map(line => {
+                            const lineNumber = reviewLineNumber(
+                              line.oldLine,
+                              line.newLine,
+                            )
+                            return (
+                              <button
+                                type="button"
+                                key={line.key}
+                                data-type={line.type}
+                                disabled={lineNumber === null}
+                                title={t('workspace.comment-line')}
+                                onClick={() => {
+                                  if (lineNumber === null) return
+                                  setCommentTarget({
+                                    kind: 'line',
+                                    filePath: file.path,
+                                    line: lineNumber,
+                                    side: line.type === 'deletion' ? 'old' : 'new',
+                                  })
+                                  setCommentNotice('')
+                                }}
+                              >
+                                <span>{line.oldLine ?? ''}</span>
+                                <span>{line.newLine ?? ''}</span>
+                                <code>{line.content || ' '}</code>
+                              </button>
+                            )
+                          })}
+                          {file.lines.length > 400 && (
+                            <div className="oh-dsh-workspace-muted">
+                              {t('workspace.diff-truncated', {
+                                count: file.lines.length - 400,
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+
+                    {commentTarget !== null && (
+                      <div className="oh-dsh-review-comment-form">
+                        <strong>
+                          {commentTarget.kind === 'commit'
+                            ? t('workspace.comment-commit')
+                            : `${commentTarget.filePath}:${String(commentTarget.line)}`}
+                        </strong>
+                        <textarea
+                          autoFocus
+                          value={commentBody}
+                          placeholder={t('workspace.comment-placeholder')}
+                          onChange={event => { setCommentBody(event.currentTarget.value) }}
+                        />
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommentTarget(null)
+                              setCommentBody('')
+                            }}
+                          >{t('workspace.cancel')}</button>
+                          <button
+                            type="button"
+                            disabled={commentBody.trim() === ''}
+                            onClick={addReviewComment}
+                          >{t('workspace.add-comment')}</button>
+                        </div>
+                      </div>
+                    )}
+                    {commentNotice !== '' && (
+                      <p className="oh-dsh-review-comment-notice">
+                        {commentNotice}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="oh-dsh-workspace-facts">
               <label className="oh-dsh-workspace-fact">
@@ -968,13 +1244,22 @@ function activeSidebarScope(sessions: SessionsService): {
 
 function registerBuiltinSidebarTools(options: {
   panels: DesktopPanels
+  reviewComments: ReviewCommentsService
   service: WorkspaceToolsService
   sessions: SessionsService
   sidebar: DesktopSidebar
   t: Translate<WorkspaceMessage>
   workspaces: WorkspacesService
 }): () => void {
-  const { panels, service, sessions, sidebar, t, workspaces } = options
+  const {
+    panels,
+    reviewComments,
+    service,
+    sessions,
+    sidebar,
+    t,
+    workspaces,
+  } = options
   const disposers = [
     sidebar.registerTab({
       chrome: 'custom',
@@ -983,6 +1268,7 @@ function registerBuiltinSidebarTools(options: {
       order: 10,
       render: () => (
         <WorkspacePanel
+          reviewComments={reviewComments}
           service={service}
           sessions={sessions}
           workspaces={workspaces}
@@ -1239,7 +1525,13 @@ export function apply(ctx: ClientContext): void {
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
   const sessions = ctx.get('sessions') as SessionsService
+  const slash = ctx.get('slash') as ReviewSlashService
   const workspaces = ctx.get('workspaces') as WorkspacesService
+  const reviewComments = new ReviewCommentsService(
+    sessions,
+    slash,
+    window.localStorage,
+  )
   const desktopSidebar = new DesktopSidebarService(
     new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
   )
@@ -1254,6 +1546,7 @@ export function apply(ctx: ClientContext): void {
   )
   const unregisterBuiltins = registerBuiltinSidebarTools({
     panels,
+    reviewComments,
     service,
     sessions,
     sidebar: desktopSidebar,
@@ -1309,6 +1602,7 @@ export function apply(ctx: ClientContext): void {
       stopSettings()
       service.dispose()
       unregisterBuiltins()
+      reviewComments.dispose()
       desktopSidebar.dispose()
       void removeSidebar?.()
       void removeService?.()

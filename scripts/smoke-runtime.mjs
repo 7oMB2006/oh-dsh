@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -71,6 +79,22 @@ const versionResult = spawnSync(nodeBinary, [cliEntry, '--version'], {
 })
 assert.equal(versionResult.status, 0, versionResult.stderr || versionResult.stdout)
 const dshVersion = versionResult.stdout.trim()
+
+const git = (...args) => {
+  const result = spawnSync('git', args, {
+    cwd: smokeRoot,
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+  return result.stdout
+}
+git('init', '-b', 'main')
+git('config', 'user.name', 'Oh DSH Smoke')
+git('config', 'user.email', 'oh-dsh-smoke@example.test')
+writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'before\n')
+git('add', 'review-smoke.txt')
+git('commit', '-m', 'review smoke baseline')
+writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'after\n')
 
 const child = spawn(nodeBinary, [cliEntry, '--profile', 'desktop'], {
   cwd: smokeRoot,
@@ -156,7 +180,11 @@ try {
     )), `${pluginId} Host bundle is missing`)
   }
 
-  for (const legacyPackage of ['dsh-web-terminal', '@dsh-external/dsh-web-panel']) {
+  for (const legacyPackage of [
+    'dsh-web-terminal',
+    '@dsh-external/dsh-web-panel',
+    '@oh-dsh/desktop-shell',
+  ]) {
     assert.equal(
       existsSync(join(resources, 'dsh-runtime', 'node_modules', ...legacyPackage.split('/'))),
       false,
@@ -180,6 +208,31 @@ try {
   assert.equal(sessionCwd.cwd, smokeRoot)
   const workspaceTree = await sidebarCall('fs.tree', sidebarScope)
   assert.equal(workspaceTree.path, smokeRoot)
+  const gitStatus = await sidebarCall('git.status', sidebarScope)
+  assert.equal(gitStatus.isRepo, true)
+  assert.ok(gitStatus.entries.some(entry => entry.path === 'review-smoke.txt'))
+  const gitBranches = await sidebarCall('git.branch', sidebarScope)
+  assert.equal(gitBranches.current, 'main')
+  const gitLog = await sidebarCall('git.log', {
+    ...sidebarScope,
+    count: 5,
+    skip: 0,
+  })
+  assert.equal(gitLog[0]?.subject, 'review smoke baseline')
+  const commitDiff = await sidebarCall('git.commit-diff', {
+    ...sidebarScope,
+    hash: gitLog[0].hashFull,
+  })
+  assert.match(commitDiff.diff, /review-smoke\.txt/)
+
+  const workspaceFactsResponse = await fetch(new URL(
+    `/oh-dsh-desktop/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
+    base,
+  ))
+  const workspaceFacts = await workspaceFactsResponse.json()
+  assert.equal(workspaceFactsResponse.status, 200)
+  assert.equal(workspaceFacts.kind, 'repository')
+  assert.equal(realpathSync(workspaceFacts.root), realpathSync(smokeRoot))
 
   const terminalUrl = new URL('/sidebar/ws/terminal', base)
   terminalUrl.protocol = 'ws:'
@@ -226,6 +279,7 @@ try {
     )
   }
   console.log('Better Sidebar Host API: ready, bounded workspace verified')
+  console.log('Better Sidebar Git API: ready, history and commit diff verified')
   console.log('Better Sidebar terminal PTY: ready, command execution verified')
 } finally {
   if (child.exitCode === null) child.kill('SIGTERM')
