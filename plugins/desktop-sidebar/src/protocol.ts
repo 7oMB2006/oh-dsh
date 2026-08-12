@@ -1,6 +1,4 @@
 export const WORKSPACE_API_PATH = '/oh-dsh-desktop/workspace'
-export const FILES_API_PATH = '/oh-dsh-desktop/files'
-
 export type WorkspaceFileKind = 'directory' | 'file' | 'symlink'
 
 export interface WorkspaceFileEntry {
@@ -37,17 +35,20 @@ export interface WorkspaceChange {
   staged: boolean
 }
 
-export interface WorkspaceSnapshot {
+export interface WorkspaceFacts {
   kind: 'directory' | 'repository'
   cwd: string
   root: string
   name: string
-  branch: string | null
-  branches: string[]
-  changes: WorkspaceChange[]
   ahead: number
   behind: number
   hasRemote: boolean
+}
+
+export interface WorkspaceSnapshot extends WorkspaceFacts {
+  branch: string | null
+  branches: string[]
+  changes: WorkspaceChange[]
 }
 
 export type WorkspaceMutation = {
@@ -63,11 +64,12 @@ export type WorkspaceMutation = {
   action: 'push'
 }
 
-export interface WorkspaceMutationResponse {
-  message: string
-  snapshot: WorkspaceSnapshot
-}
+export type WorkspaceHostMutation = Extract<
+  WorkspaceMutation,
+  { action: 'create-branch' | 'push' }
+>
 
-export interface WorkspaceDiffResponse {
-  diff: string
+export interface WorkspaceHostMutationResponse {
+  message: string
+  facts: WorkspaceFacts
 }

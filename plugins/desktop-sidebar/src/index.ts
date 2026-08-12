@@ -1,8 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { WorkspaceMutation } from './protocol.ts'
-import { FILES_API_PATH, WORKSPACE_API_PATH } from './protocol.ts'
-import { mutateWorkspace, readWorkspaceDiff, readWorkspaceSnapshot } from './git-workspace.ts'
-import { readWorkspaceFiles } from './workspace-files.ts'
+import type { WorkspaceHostMutation } from './protocol.ts'
+import { WORKSPACE_API_PATH } from './protocol.ts'
+import { mutateWorkspace, readWorkspaceFacts } from './git-workspace.ts'
 import {
   mountSidebarPreferences,
   type SidebarDesktopCapability,
@@ -57,12 +56,11 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
 }
 
-function isMutation(value: unknown): value is WorkspaceMutation {
+function isMutation(value: unknown): value is WorkspaceHostMutation {
   if (typeof value !== 'object' || value === null) return false
   const input = value as Record<string, unknown>
   if (input.action === 'push') return true
-  if (input.action === 'checkout' || input.action === 'create-branch') return typeof input.branch === 'string'
-  return input.action === 'commit' && typeof input.message === 'string'
+  return input.action === 'create-branch' && typeof input.branch === 'string'
 }
 
 export function apply(ctx: HostContext): void {
@@ -81,12 +79,7 @@ export function apply(ctx: HostContext): void {
         const url = new URL(request.url ?? '/', 'http://oh-dsh.internal')
         const cwd = url.searchParams.get('cwd') ?? undefined
         if (request.method === 'GET') {
-          const diffPath = url.searchParams.get('diff')
-          if (diffPath !== null) {
-            sendJson(response, 200, { diff: await readWorkspaceDiff(cwd, diffPath) })
-          } else {
-            sendJson(response, 200, await readWorkspaceSnapshot(cwd))
-          }
+          sendJson(response, 200, await readWorkspaceFacts(cwd))
           return
         }
         if (request.method === 'POST') {
@@ -108,26 +101,4 @@ export function apply(ctx: HostContext): void {
       }
     },
   }), 'oh-dsh-desktop: workspace Git API')
-  ctx.effect(() => ctx.httpServer.register({
-    kind: 'exact',
-    path: FILES_API_PATH,
-    handler: async (request, response) => {
-      if (request.method !== 'GET') {
-        response.writeHead(405, { allow: 'GET' })
-        response.end()
-        return
-      }
-      try {
-        const url = new URL(request.url ?? '/', 'http://oh-dsh.internal')
-        sendJson(response, 200, await readWorkspaceFiles(
-          url.searchParams.get('cwd') ?? undefined,
-          url.searchParams.get('path') ?? undefined,
-        ))
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[workspace-files] ${message}`)
-        sendJson(response, 400, { error: message })
-      }
-    },
-  }), 'oh-dsh-desktop: workspace files API')
 }

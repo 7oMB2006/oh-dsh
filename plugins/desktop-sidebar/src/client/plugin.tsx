@@ -11,9 +11,9 @@ import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'
 import type { PinnedSummary } from '../../../pinned-summary/src/client.ts'
 import type {
-  WorkspaceDiffResponse,
+  WorkspaceFacts,
+  WorkspaceHostMutationResponse,
   WorkspaceMutation,
-  WorkspaceMutationResponse,
   WorkspaceSnapshot,
 } from '../protocol.ts'
 import { WORKSPACE_API_PATH } from '../protocol.ts'
@@ -36,6 +36,11 @@ import {
   type DesktopSidebarSnapshot,
 } from './sidebar-service.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
+import {
+  betterSidebarApi,
+  type BetterSidebarScope,
+  workspaceChangesFromBetterSidebar,
+} from './better-sidebar-api.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -193,10 +198,9 @@ async function responseJson<T>(
   return payload
 }
 
-function workspaceUrl(cwd: string, diff?: string): string {
+function workspaceUrl(cwd: string): string {
   const url = new URL(WORKSPACE_API_PATH, window.location.origin)
   url.searchParams.set('cwd', cwd)
-  if (diff !== undefined) url.searchParams.set('diff', diff)
   return url.href
 }
 
@@ -583,19 +587,45 @@ function WorkspacePanel({
   const [commitMessage, setCommitMessage] = useState('')
   const [newBranch, setNewBranch] = useState('')
   const visibleChanges = snapshot?.changes.slice(0, 200) ?? []
+  const scope: BetterSidebarScope | undefined = sessionId === undefined
+    || cwd === undefined
+    ? undefined
+    : { sessionId, cwd }
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (cwd === undefined) {
+    if (cwd === undefined || sessionId === undefined) {
       setSnapshot(null)
       return
     }
     try {
-      setSnapshot(await responseJson<WorkspaceSnapshot>(await fetch(workspaceUrl(cwd)), t))
+      const nextScope = { sessionId, cwd }
+      const [facts, status] = await Promise.all([
+        responseJson<WorkspaceFacts>(await fetch(workspaceUrl(cwd)), t),
+        betterSidebarApi.gitStatus(nextScope),
+      ])
+      if (!status.isRepo) {
+        setSnapshot({
+          ...facts,
+          kind: 'directory',
+          branch: null,
+          branches: [],
+          changes: [],
+        })
+      } else {
+        const branch = await betterSidebarApi.gitBranch(nextScope)
+        setSnapshot({
+          ...facts,
+          kind: 'repository',
+          branch: status.branch ?? branch.current,
+          branches: branch.names,
+          changes: workspaceChangesFromBetterSidebar(status.entries),
+        })
+      }
       setError('')
     } catch (nextError) {
       setError(errorMessage(nextError))
     }
-  }, [cwd])
+  }, [cwd, sessionId, t])
 
   useEffect(() => {
     if (!panelState.open || panelState.view !== 'review' || cwd === undefined) return
@@ -615,18 +645,25 @@ function WorkspacePanel({
   }, [cwd])
 
   const mutate = async (mutation: WorkspaceMutation): Promise<void> => {
-    if (cwd === undefined || busy) return
+    if (cwd === undefined || scope === undefined || busy) return
     setBusy(true)
     try {
-      const response = await fetch(workspaceUrl(cwd), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(mutation),
-      })
-      const result = await responseJson<WorkspaceMutationResponse>(response, t)
-      setSnapshot(result.snapshot)
+      if (mutation.action === 'checkout') {
+        await betterSidebarApi.gitCheckout(scope, mutation.branch)
+      } else if (mutation.action === 'commit') {
+        await betterSidebarApi.gitStage(scope)
+        await betterSidebarApi.gitCommit(scope, mutation.message)
+        setCommitMessage('')
+      } else {
+        const response = await fetch(workspaceUrl(cwd), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(mutation),
+        })
+        await responseJson<WorkspaceHostMutationResponse>(response, t)
+      }
+      await refresh()
       setError('')
-      if (mutation.action === 'commit') setCommitMessage('')
     } catch (nextError) {
       setError(errorMessage(nextError))
     } finally {
@@ -634,19 +671,22 @@ function WorkspacePanel({
     }
   }
 
-  const showDiff = async (path: string): Promise<void> => {
-    if (cwd === undefined) return
-    if (selectedPath === path) {
+  const showDiff = async (
+    change: WorkspaceSnapshot['changes'][number],
+  ): Promise<void> => {
+    if (scope === undefined) return
+    if (selectedPath === change.path) {
       setSelectedPath(null)
       setDiff('')
       return
     }
-    setSelectedPath(path)
+    setSelectedPath(change.path)
     setDiff(t('workspace.loading-diff'))
     try {
-      const response = await responseJson<WorkspaceDiffResponse>(
-        await fetch(workspaceUrl(cwd, path)),
-        t,
+      const response = await betterSidebarApi.gitDiff(
+        scope,
+        change.path,
+        change.staged,
       )
       setDiff(response.diff || t('workspace.no-text-diff'))
     } catch (nextError) {
@@ -694,7 +734,7 @@ function WorkspacePanel({
                       type="button"
                       className="oh-dsh-change-row"
                       data-selected={selectedPath === change.path || undefined}
-                      onClick={() => { void showDiff(change.path) }}
+                      onClick={() => { void showDiff(change) }}
                     >
                       <span className={`oh-dsh-change-status is-${change.status}`}>{statusLabel(change.status)}</span>
                       <span title={change.path}>{change.path}</span>

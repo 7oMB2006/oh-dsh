@@ -6,21 +6,21 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import {
   mutateWorkspace,
-  parseGitStatus,
-  readWorkspaceDiff,
-  readWorkspaceSnapshot,
+  readWorkspaceFacts,
 } from '../plugins/desktop-sidebar/src/git-workspace.ts'
 import {
   mapBetterSidebarFile,
   mapBetterSidebarTree,
+  workspaceChangesFromBetterSidebar,
 } from '../plugins/desktop-sidebar/src/client/better-sidebar-api.ts'
 
-function git(cwd: string, args: string[]): void {
+function git(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
   assert.equal(result.status, 0, result.stderr || result.stdout)
+  return result.stdout
 }
 
-test('workspace tools project changes, diffs, branches, and commits', async () => {
+test('workspace extension provides repository facts and branch creation', async () => {
   const workspace = mkdtempSync(join(tmpdir(), 'oh-dsh-workspace-tools-'))
   try {
     git(workspace, ['init', '-b', 'main'])
@@ -29,32 +29,27 @@ test('workspace tools project changes, diffs, branches, and commits', async () =
     writeFileSync(join(workspace, 'README.md'), 'first\n')
     git(workspace, ['add', 'README.md'])
     git(workspace, ['commit', '-m', 'initial'])
-    writeFileSync(join(workspace, 'README.md'), 'second\n')
-    writeFileSync(join(workspace, 'new.txt'), 'new\n')
+    const facts = await readWorkspaceFacts(workspace)
+    assert.equal(facts.kind, 'repository')
+    assert.equal(facts.name, workspace.split('/').pop())
+    assert.equal(facts.hasRemote, false)
 
-    const snapshot = await readWorkspaceSnapshot(workspace)
-    assert.equal(snapshot.kind, 'repository')
-    assert.equal(snapshot.branch, 'main')
-    assert.deepEqual(snapshot.changes.map(change => [change.path, change.status]), [
-      ['new.txt', 'untracked'],
-      ['README.md', 'modified'],
-    ])
-    assert.match(await readWorkspaceDiff(workspace, 'README.md'), /-first[\s\S]*\+second/)
-
-    const committed = await mutateWorkspace(workspace, { action: 'commit', message: 'workspace panel commit' })
-    assert.equal(committed.snapshot.changes.length, 0)
     const branched = await mutateWorkspace(workspace, { action: 'create-branch', branch: 'panel-test' })
-    assert.equal(branched.snapshot.branch, 'panel-test')
-    assert.ok(branched.snapshot.branches.includes('main'))
+    assert.equal(branched.facts.kind, 'repository')
+    assert.equal(git(workspace, ['branch', '--show-current']).trim(), 'panel-test')
   } finally {
     rmSync(workspace, { recursive: true, force: true })
   }
 })
 
-test('porcelain status parser preserves staged and rename metadata', () => {
-  assert.deepEqual(parseGitStatus('M  staged.ts\0R  renamed.ts\0old.ts\0?? loose.txt\0'), [
+test('Better Sidebar status maps into the Oh-DSH workspace model', () => {
+  assert.deepEqual(workspaceChangesFromBetterSidebar([
+    { path: 'staged.ts', xy: 'M ' },
+    { path: 'renamed.ts', xy: 'R ' },
+    { path: 'loose.txt', xy: '??' },
+  ]), [
     { path: 'loose.txt', oldPath: null, status: 'untracked', staged: false },
-    { path: 'renamed.ts', oldPath: 'old.ts', status: 'renamed', staged: true },
+    { path: 'renamed.ts', oldPath: null, status: 'renamed', staged: true },
     { path: 'staged.ts', oldPath: null, status: 'modified', staged: true },
   ])
 })
