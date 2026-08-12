@@ -10,11 +10,11 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'desktop-skins', id: '@oh-dsh/desktop-skins' },
+  { directory: 'desktop-sidebar', id: '@oh-dsh/desktop-sidebar' },
   { directory: 'desktop-shell', id: '@oh-dsh/desktop-shell' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
   { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
-  { directory: 'workspace-tools', id: '@oh-dsh/workspace-tools' },
 ]
 
 const shared = {

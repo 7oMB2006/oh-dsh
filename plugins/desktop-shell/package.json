@@ -17,7 +17,7 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@oh-dsh/panel-controls",
         "@oh-dsh/pinned-summary",
-        "@oh-dsh/workspace-tools",
+        "@oh-dsh/desktop-sidebar",
         "@oh-dsh/plugin-marketplace"
       ],
       "platform": "web",

@@ -3,9 +3,14 @@ import type { WorkspaceMutation } from './protocol.ts'
 import { FILES_API_PATH, WORKSPACE_API_PATH } from './protocol.ts'
 import { mutateWorkspace, readWorkspaceDiff, readWorkspaceSnapshot } from './git-workspace.ts'
 import { readWorkspaceFiles } from './workspace-files.ts'
+import {
+  mountSidebarPreferences,
+  type SidebarDesktopCapability,
+} from './preferences-server.ts'
 
 interface HostContext {
   effect(effect: () => (() => void) | void, label?: string): void
+  get(name: string): unknown
   httpServer: {
     register(route: {
       kind: 'exact'
@@ -18,8 +23,8 @@ interface HostContext {
   }
 }
 
-export const name = 'oh-dsh-workspace-tools'
-export const inject = ['httpServer']
+export const name = 'oh-dsh-desktop-sidebar'
+export const inject = ['desktop', 'httpServer']
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {
   response.writeHead(status, {
@@ -61,6 +66,13 @@ function isMutation(value: unknown): value is WorkspaceMutation {
 }
 
 export function apply(ctx: HostContext): void {
+  ctx.effect(
+    () => mountSidebarPreferences(
+      ctx,
+      ctx.get('desktop') as SidebarDesktopCapability,
+    ),
+    'oh-dsh-desktop: sidebar preferences',
+  )
   ctx.effect(() => ctx.httpServer.register({
     kind: 'exact',
     path: WORKSPACE_API_PATH,
@@ -91,7 +103,7 @@ export function apply(ctx: HostContext): void {
         response.end()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[workspace-tools] ${message}`)
+        ctx.logger.warn(`[desktop-sidebar] ${message}`)
         sendJson(response, 400, { error: message })
       }
     },

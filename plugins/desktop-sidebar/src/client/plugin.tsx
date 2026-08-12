@@ -18,10 +18,12 @@ import type {
 import { WORKSPACE_API_PATH } from '../protocol.ts'
 import { SideToolsPanel, type DesktopToolView } from './SideToolsPanel.tsx'
 import sideToolsCss from './side-tools.css'
-import workspaceCss from './workspace-tools.css'
+import workspaceCss from './desktop-sidebar.css'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import { WORKSPACE_MESSAGES, type WorkspaceMessage } from './i18n.ts'
+import { DesktopSidebarService } from './sidebar-service.ts'
+import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 
 interface ObservableSnapshot<T> {
   getSnapshot(): T
@@ -330,13 +332,13 @@ class WorkspaceToolsService implements WorkspaceTools {
   mount(): void {
     if (this.state.open) this.pinnedSummary.setOpen(false)
     this.style = document.createElement('style')
-    this.style.dataset.ohDshWorkspaceToolsStyles = 'true'
+    this.style.dataset.ohDshDesktopSidebarStyles = 'true'
     this.style.textContent = `${workspaceCss}\n${sideToolsCss}`
     document.head.append(this.style)
     this.element = document.createElement('div')
-    this.element.id = 'oh-dsh-workspace-tools-root'
+    this.element.id = 'oh-dsh-desktop-sidebar-root'
     const appRoot = document.getElementById('root')
-    if (appRoot === null) throw new Error('workspace-tools: app root is unavailable')
+    if (appRoot === null) throw new Error('desktop-sidebar: app root is unavailable')
     const layout = document.createElement('div')
     layout.id = 'oh-dsh-embedded-layout'
     appRoot.before(layout)
@@ -370,10 +372,10 @@ class WorkspaceToolsService implements WorkspaceTools {
       this.layout.remove()
     }
     this.style?.remove()
-    delete document.documentElement.dataset.ohDshWorkspaceToolsOpen
+    delete document.documentElement.dataset.ohDshDesktopSidebarOpen
     delete document.documentElement.dataset.ohDshPanelMaximized
-    document.documentElement.style.removeProperty('--oh-dsh-workspace-tools-width')
-    if (document.documentElement.dataset.ohDshRightPanelOwner === 'workspace-tools') {
+    document.documentElement.style.removeProperty('--oh-dsh-desktop-sidebar-width')
+    if (document.documentElement.dataset.ohDshRightPanelOwner === 'desktop-sidebar') {
       delete document.documentElement.dataset.ohDshRightPanelOwner
       document.getElementById('root')?.style.removeProperty('padding-right')
     }
@@ -394,16 +396,16 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 
   private applyLayout(): void {
-    document.documentElement.style.setProperty('--oh-dsh-workspace-tools-width', `${String(this.state.width)}px`)
+    document.documentElement.style.setProperty('--oh-dsh-desktop-sidebar-width', `${String(this.state.width)}px`)
     const html = document.documentElement
     const appRoot = document.getElementById('root')
     if (this.state.open) {
-      html.dataset.ohDshWorkspaceToolsOpen = 'true'
-      html.dataset.ohDshRightPanelOwner = 'workspace-tools'
+      html.dataset.ohDshDesktopSidebarOpen = 'true'
+      html.dataset.ohDshRightPanelOwner = 'desktop-sidebar'
       appRoot?.style.removeProperty('padding-right')
     } else {
-      delete html.dataset.ohDshWorkspaceToolsOpen
-      if (html.dataset.ohDshRightPanelOwner === 'workspace-tools') {
+      delete html.dataset.ohDshDesktopSidebarOpen
+      if (html.dataset.ohDshRightPanelOwner === 'desktop-sidebar') {
         delete html.dataset.ohDshRightPanelOwner
         appRoot?.style.removeProperty('padding-right')
       }
@@ -818,9 +820,9 @@ function WorkspaceToolsSurface(props: {
 
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
-  const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.workspace-tools')
+  const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.desktop-sidebar')
   ctx.effect(
-    () => locale.register('oh-dsh.workspace-tools', WORKSPACE_MESSAGES),
+    () => locale.register('oh-dsh.desktop-sidebar', WORKSPACE_MESSAGES),
     'oh-dsh-desktop: workspace tools dictionaries',
   )
   const service = new WorkspaceToolsService(
@@ -831,11 +833,22 @@ export function apply(ctx: ClientContext): void {
     ctx.get('sessions') as SessionsService,
     ctx.get('workspaces') as WorkspacesService,
   )
+  const desktopSidebar = new DesktopSidebarService(
+    new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
+  )
   ctx.effect(() => {
+    void desktopSidebar.start()
     service.mount()
+    const removeSidebar = ctx.reflect.provide(
+      'desktopSidebar',
+      desktopSidebar,
+      undefined,
+    )
     const removeService = ctx.reflect.provide('workspaceTools', service, undefined)
     return () => {
       service.dispose()
+      desktopSidebar.dispose()
+      void removeSidebar?.()
       void removeService?.()
     }
   }, 'oh-dsh-desktop: workspace tools and panel toolbar')

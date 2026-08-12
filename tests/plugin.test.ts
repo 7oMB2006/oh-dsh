@@ -18,7 +18,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
-    '../plugins/workspace-tools/src/client/plugin.tsx',
+    '../plugins/desktop-sidebar/src/client/plugin.tsx',
   ]
   for (const path of clients) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -31,7 +31,7 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
     '../plugins/panel-controls/src/terminal/i18n.ts',
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',
-    '../plugins/workspace-tools/src/client/i18n.ts',
+    '../plugins/desktop-sidebar/src/client/i18n.ts',
   ]
   for (const path of dictionaries) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')

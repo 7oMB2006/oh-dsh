@@ -18,14 +18,14 @@
     - id: oh-desktop-skins
       name: '@oh-dsh/desktop-skins'
 
+    - id: oh-desktop-sidebar
+      name: '@oh-dsh/desktop-sidebar'
+
     - id: oh-panel-controls
       name: '@oh-dsh/panel-controls'
 
     - id: oh-pinned-summary
       name: '@oh-dsh/pinned-summary'
-
-    - id: oh-workspace-tools
-      name: '@oh-dsh/workspace-tools'
 
     - id: oh-plugin-marketplace
       name: '@oh-dsh/plugin-marketplace'

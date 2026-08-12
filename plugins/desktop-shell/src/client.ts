@@ -3,7 +3,7 @@
 import type { DesktopBridge, DesktopCommand } from '../../../src/contracts.ts'
 import type { DesktopPanels } from '../../panel-controls/src/client.ts'
 import type { PinnedSummary } from '../../pinned-summary/src/client.ts'
-import type { WorkspaceTools } from '../../workspace-tools/src/client.ts'
+import type { WorkspaceTools } from '../../desktop-sidebar/src/client.ts'
 import type {
   LocaleMessages,
   LocaleService,

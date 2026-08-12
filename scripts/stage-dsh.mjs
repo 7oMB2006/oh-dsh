@@ -362,11 +362,11 @@ function installDesktopPackages() {
     },
     ...[
       'desktop-skins',
+      'desktop-sidebar',
       'desktop-shell',
       'panel-controls',
       'pinned-summary',
       'plugin-marketplace',
-      'workspace-tools',
     ].map(directory => ({
       manifest: join(root, 'plugins', directory, 'package.json'),
       files: [
@@ -424,6 +424,8 @@ for (const required of [
   'cordis.patch.yml',
   'plugins/desktop-skins/index.js',
   'plugins/desktop-skins/client.js',
+  'plugins/desktop-sidebar/index.js',
+  'plugins/desktop-sidebar/client.js',
   'plugins/desktop-shell/index.js',
   'plugins/desktop-shell/client.js',
   'plugins/panel-controls/index.js',
@@ -432,8 +434,6 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
-  'plugins/workspace-tools/index.js',
-  'plugins/workspace-tools/client.js',
 ]) {
   if (!existsSync(join(root, 'dist', required))) {
     throw new Error(`desktop artifact missing: dist/${required}; run pnpm run build first`)

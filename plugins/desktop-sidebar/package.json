@@ -1,7 +1,7 @@
 {
-  "name": "@oh-dsh/workspace-tools",
+  "name": "@oh-dsh/desktop-sidebar",
   "version": "0.1.0",
-  "description": "Workspace changes, Git actions, process panel, and desktop panel toolbar",
+  "description": "Extensible Oh-DSH side panel with workspace and desktop tools",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

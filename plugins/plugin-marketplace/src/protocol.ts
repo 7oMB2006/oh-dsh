@@ -20,6 +20,7 @@ export type MarketplaceConfirmation =
 
 const PROTECTED_PLUGIN_IDS = new Set([
   'desktop-shell',
+  'desktop-sidebar',
   'oh-dsh-desktop',
   'panel-controls',
   'pinned-summary',

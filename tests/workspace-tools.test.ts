@@ -9,8 +9,8 @@ import {
   parseGitStatus,
   readWorkspaceDiff,
   readWorkspaceSnapshot,
-} from '../plugins/workspace-tools/src/git-workspace.ts'
-import { readWorkspaceFiles } from '../plugins/workspace-tools/src/workspace-files.ts'
+} from '../plugins/desktop-sidebar/src/git-workspace.ts'
+import { readWorkspaceFiles } from '../plugins/desktop-sidebar/src/workspace-files.ts'
 
 function git(cwd: string, args: string[]): void {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })

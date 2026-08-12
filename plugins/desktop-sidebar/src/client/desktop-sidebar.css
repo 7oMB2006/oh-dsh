@@ -1,5 +1,5 @@
 html {
-  --oh-dsh-workspace-tools-width: 390px;
+  --oh-dsh-desktop-sidebar-width: 390px;
 }
 
 #oh-dsh-embedded-layout {
@@ -20,7 +20,7 @@ html {
   overflow: hidden;
 }
 
-#oh-dsh-workspace-tools-root {
+#oh-dsh-desktop-sidebar-root {
   position: relative;
   width: 100%;
   height: 100%;
@@ -28,7 +28,7 @@ html {
   overflow: hidden;
 }
 
-html[data-oh-dsh-workspace-tools-open='true'] #oh-dsh-workspace-tools-root {
+html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-desktop-sidebar-root {
   overflow: visible;
 }
 
