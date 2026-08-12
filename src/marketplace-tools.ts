@@ -4,11 +4,11 @@ import type {
   MarketplaceConfirmation,
   MarketplacePlugin,
   MarketplaceSnapshot,
-} from '../../../plugin-marketplace/src/protocol.ts'
+} from '../plugins/plugin-marketplace/src/protocol.ts'
 import {
   MARKETPLACE_AGENT_TOKEN_ENV,
   MARKETPLACE_AGENT_URL_ENV,
-} from '../../../plugin-marketplace/src/host/agent-gateway.ts'
+} from '../plugins/plugin-marketplace/src/host/agent-gateway.ts'
 
 interface ToolRunContext {
   concludeTurn(): void

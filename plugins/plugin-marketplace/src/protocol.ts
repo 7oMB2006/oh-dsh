@@ -20,7 +20,7 @@ export type MarketplaceConfirmation =
 
 const PROTECTED_PLUGIN_IDS = new Set([
   'better-sidebar-runtime',
-  'desktop-shell',
+  'desktop',
   'desktop-sidebar',
   'oh-dsh-desktop',
   'panel-controls',

@@ -15,6 +15,9 @@
     lanAddresses: []
 
 - insert:
+    - id: oh-desktop
+      name: '@oh-dsh/desktop'
+
     - id: oh-better-sidebar-runtime
       name: '@oh-dsh/better-sidebar-runtime'
 
@@ -32,6 +35,3 @@
 
     - id: oh-plugin-marketplace
       name: '@oh-dsh/plugin-marketplace'
-
-    - id: oh-desktop-shell
-      name: '@oh-dsh/desktop-shell'

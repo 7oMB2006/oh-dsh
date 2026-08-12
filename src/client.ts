@@ -1,14 +1,14 @@
 /** Browser face for the native Oh-DSH-Desktop bridge. */
 
-import type { DesktopBridge, DesktopCommand } from '../../../src/contracts.ts'
-import type { DesktopPanels } from '../../panel-controls/src/client.ts'
-import type { PinnedSummary } from '../../pinned-summary/src/client.ts'
-import type { WorkspaceTools } from '../../desktop-sidebar/src/client.ts'
+import type { DesktopBridge, DesktopCommand } from './contracts.ts'
+import type { DesktopPanels } from '../plugins/panel-controls/src/client.ts'
+import type { PinnedSummary } from '../plugins/pinned-summary/src/client.ts'
+import type { WorkspaceTools } from '../plugins/desktop-sidebar/src/client.ts'
 import type {
   LocaleMessages,
   LocaleService,
   Translate,
-} from '../../shared/i18n.ts'
+} from '../plugins/shared/i18n.ts'
 
 interface WorkspaceView {
   workspaceId: string
@@ -247,12 +247,12 @@ export function apply(ctx: ClientContext): void {
   }
   const workspaces = ctx.get('workspaces') as WorkspacesService
   const locale = ctx.get('locale') as LocaleService
-  const t: Translate<DesktopShellMessage> = locale.bind('oh-dsh.desktop-shell')
+  const t: Translate<DesktopShellMessage> = locale.bind('oh-dsh.desktop')
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
   const workspaceTools = ctx.get('workspaceTools') as WorkspaceTools
   ctx.effect(
-    () => locale.register('oh-dsh.desktop-shell', DESKTOP_SHELL_MESSAGES),
+    () => locale.register('oh-dsh.desktop', DESKTOP_SHELL_MESSAGES),
     'oh-dsh-desktop: shell dictionaries',
   )
   ctx.reflect.provide('desktopShell', bridge, undefined)

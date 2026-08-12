@@ -10,16 +10,31 @@
     ".": {
       "default": "./dist/plugin.js"
     },
+    "./client": "./dist/client.js",
     "./cordis.patch.yml": "./dist/cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "dist/plugin.js",
+    "dist/client.js",
+    "dist/client.js.map",
     "dist/cordis.patch.yml"
   ],
   "dsh": {
     "bundle": {
       "patch": "./dist/cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@oh-dsh/panel-controls",
+        "@oh-dsh/pinned-summary",
+        "@oh-dsh/desktop-sidebar",
+        "@oh-dsh/plugin-marketplace"
+      ],
+      "platform": "web",
+      "immediately": true
     }
   },
   "scripts": {

@@ -45,7 +45,7 @@ interface ClientContext {
   }
 }
 
-/** Public toggle face consumed by desktop-shell. */
+/** Public toggle face consumed by the unified desktop client. */
 export interface PinnedSummary {
   isOpen(): boolean
   setOpen(open: boolean): void

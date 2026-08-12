@@ -6,12 +6,12 @@ export const DESKTOP_PROFILE = 'desktop'
 
 /** Plugins that enroll a browser-side entry in the desktop client graph. */
 export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
+  '@oh-dsh/desktop',
   '@oh-dsh/desktop-skins',
   '@oh-dsh/desktop-sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
-  '@oh-dsh/desktop-shell',
 ] as const
 
 /** Host-only capability providers shipped inside the desktop runtime. */

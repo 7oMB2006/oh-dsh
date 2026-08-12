@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { apply } from '../plugins/desktop-shell/src/index.ts'
-import { mountMarketplaceAgentTools } from '../plugins/desktop-shell/src/marketplace/tools.ts'
+import { apply } from '../src/plugin.ts'
+import { mountMarketplaceAgentTools } from '../src/marketplace-tools.ts'
 
 test('desktop client replaces the hero title and keeps the Preview badge', () => {
-  const client = readFileSync(new URL('../plugins/desktop-shell/src/client.ts', import.meta.url), 'utf8')
+  const client = readFileSync(new URL('../src/client.ts', import.meta.url), 'utf8')
   assert.match(client, /element\.textContent = 'Oh-DSH-Desktop'/)
   assert.match(client, /\['Into the Unknown', '探索未知之境'\]/)
   assert.doesNotMatch(client, /data-oh-dsh-hero-preview/)
@@ -13,7 +13,7 @@ test('desktop client replaces the hero title and keeps the Preview badge', () =>
 
 test('desktop Settings owns the full modal layer above desktop surfaces', () => {
   const client = readFileSync(
-    new URL('../plugins/desktop-shell/src/client.ts', import.meta.url),
+    new URL('../src/client.ts', import.meta.url),
     'utf8',
   )
 
@@ -34,7 +34,7 @@ test('desktop Settings owns the full modal layer above desktop surfaces', () => 
 test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
     '../plugins/desktop-skins/src/client/plugin.tsx',
-    '../plugins/desktop-shell/src/client.ts',
+    '../src/client.ts',
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
@@ -78,7 +78,7 @@ test('desktop sidebar exposes one configurable tool registry in settings', () =>
   assert.match(manifest, /@deepseek-ai\/dsh-client-ui-slots/)
 })
 
-test('desktop-shell Host plugin publishes capability, prompt, and bash environment', () => {
+test('desktop Host plugin publishes capability, prompt, and bash environment', () => {
   const previous = {
     appData: process.env.DSH_DESKTOP_APP_DATA,
     profile: process.env.DSH_DESKTOP_PROFILE,

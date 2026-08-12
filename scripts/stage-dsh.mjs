@@ -391,6 +391,8 @@ function installDesktopPackages() {
       manifest: join(root, 'package.json'),
       files: [
         [join(root, 'dist', 'plugin.js'), 'dist/plugin.js'],
+        [join(root, 'dist', 'client.js'), 'dist/client.js'],
+        [join(root, 'dist', 'client.js.map'), 'dist/client.js.map'],
         [join(root, 'dist', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
@@ -406,7 +408,6 @@ function installDesktopPackages() {
     ...[
       'desktop-skins',
       'desktop-sidebar',
-      'desktop-shell',
       'panel-controls',
       'pinned-summary',
       'plugin-marketplace',
@@ -465,14 +466,14 @@ if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
 }
 for (const required of [
   'plugin.js',
+  'client.js',
+  'client.js.map',
   'cordis.patch.yml',
   'plugins/better-sidebar-runtime/index.js',
   'plugins/desktop-skins/index.js',
   'plugins/desktop-skins/client.js',
   'plugins/desktop-sidebar/index.js',
   'plugins/desktop-sidebar/client.js',
-  'plugins/desktop-shell/index.js',
-  'plugins/desktop-shell/client.js',
   'plugins/panel-controls/index.js',
   'plugins/panel-controls/client.js',
   'plugins/pinned-summary/index.js',

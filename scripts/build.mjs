@@ -12,7 +12,6 @@ const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
   { directory: 'desktop-skins', id: '@oh-dsh/desktop-skins' },
   { directory: 'desktop-sidebar', id: '@oh-dsh/desktop-sidebar' },
-  { directory: 'desktop-shell', id: '@oh-dsh/desktop-shell' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
   { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
@@ -48,6 +47,20 @@ const builds = [
     outfile: join(dist, 'plugin.js'),
     platform: 'node',
     format: 'esm',
+  }),
+  build({
+    bundle: true,
+    entryPoints: [join(root, 'src', 'client.ts')],
+    outfile: join(dist, 'client.js'),
+    platform: 'browser',
+    format: 'cjs',
+    target: 'es2022',
+    sourcemap: true,
+    logLevel: 'info',
+    banner: {
+      js: 'window.__ModuleLoader__.load({ id: "@oh-dsh/desktop", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+    },
+    footer: { js: 'return module.exports; } });' },
   }),
 ]
 
