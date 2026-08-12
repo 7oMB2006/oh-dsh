@@ -10,12 +10,14 @@
     "./client": "./dist/client.js",
     "./package.json": "./package.json"
   },
-  "dshClient": {
-    "inject": [
-      "@deepseek-ai/dsh-client-runtime"
-    ],
-    "platform": "web",
-    "immediately": true
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
   },
   "files": [
     "dist/index.js",

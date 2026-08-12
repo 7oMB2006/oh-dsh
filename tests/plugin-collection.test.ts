@@ -14,6 +14,7 @@ test('desktop bundle registers every packaged DSH plugin', () => {
     const directory = plugin.slice(plugin.lastIndexOf('/') + 1)
     const manifest = JSON.parse(readFileSync(join(root, 'plugins', directory, 'package.json'), 'utf8'))
     assert.equal(manifest.name, plugin)
-    assert.equal(manifest.dshClient.platform, 'web')
+    assert.equal(manifest.dsh.client.platform, 'web')
+    assert.equal(manifest.dshClient, undefined)
   }
 })

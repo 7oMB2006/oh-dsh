@@ -10,17 +10,19 @@
     "./client": "./dist/client.js",
     "./package.json": "./package.json"
   },
-  "dshClient": {
-    "inject": [
-      "@deepseek-ai/dsh-client-runtime",
-      "@deepseek-ai/dsh-client-ui-layout",
-      "@oh-dsh/panel-controls",
-      "@oh-dsh/pinned-summary",
-      "@oh-dsh/workspace-tools",
-      "@oh-dsh/plugin-marketplace"
-    ],
-    "platform": "web",
-    "immediately": true
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@oh-dsh/panel-controls",
+        "@oh-dsh/pinned-summary",
+        "@oh-dsh/workspace-tools",
+        "@oh-dsh/plugin-marketplace"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
   },
   "files": [
     "dist/index.js",
