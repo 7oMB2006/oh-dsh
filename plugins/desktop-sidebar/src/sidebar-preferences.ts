@@ -1,9 +1,10 @@
 export const SIDEBAR_PREFERENCES_API_PATH =
   '/oh-dsh-desktop/sidebar/preferences'
 
-export const SIDEBAR_MIN_WIDTH = 330
-export const SIDEBAR_MAX_WIDTH = 720
-export const SIDEBAR_DEFAULT_WIDTH = 390
+export const SIDEBAR_MIN_WIDTH = 280
+export const SIDEBAR_MAX_WIDTH = 480
+export const SIDEBAR_DEFAULT_WIDTH = 300
+const SIDEBAR_LEGACY_MAX_WIDTH = 720
 export const SIDEBAR_MAX_SESSIONS = 50
 export const SIDEBAR_MAX_TABS = 30
 
@@ -120,7 +121,9 @@ export function parseSidebarPreferences(
     return undefined
   }
   if (typeof input.defaultWidth !== 'number'
-    || clampSidebarWidth(input.defaultWidth) !== input.defaultWidth) return undefined
+    || !Number.isFinite(input.defaultWidth)
+    || input.defaultWidth < SIDEBAR_MIN_WIDTH
+    || input.defaultWidth > SIDEBAR_LEGACY_MAX_WIDTH) return undefined
   const tabsEnabled = parseEnabledMap(input.tabsEnabled)
   const viewersEnabled = parseEnabledMap(input.viewersEnabled)
   if (tabsEnabled === undefined || viewersEnabled === undefined) return undefined
@@ -136,7 +139,7 @@ export function parseSidebarPreferences(
     sessions[sessionId] = session
   }
   return {
-    defaultWidth: input.defaultWidth,
+    defaultWidth: clampSidebarWidth(input.defaultWidth),
     openByDefault: input.openByDefault,
     sessions,
     tabsEnabled,

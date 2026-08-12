@@ -128,6 +128,7 @@ function clonePreferences(
 ): DesktopSidebarPreferences {
   return {
     ...preferences,
+    defaultWidth: clampSidebarWidth(preferences.defaultWidth),
     sessions: Object.fromEntries(Object.entries(preferences.sessions).map(
       ([id, session]) => [id, { ...session, tabs: session.tabs.map(tab => ({ ...tab })) }],
     )),

@@ -61,6 +61,10 @@ test('desktop sidebar validates the durable preference envelope', () => {
   }
   assert.deepEqual(parseSidebarPreferences(valid), valid)
   assert.equal(parseSidebarPreferences({ ...valid, defaultWidth: 100 }), undefined)
+  assert.equal(
+    parseSidebarPreferences({ ...valid, defaultWidth: 720 })?.defaultWidth,
+    480,
+  )
   assert.equal(parseSidebarPreferences({
     ...valid,
     sessions: {
@@ -172,7 +176,7 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   sidebar.setViewerEnabled('text', false)
   await sidebar.settle()
 
-  assert.equal(storage.value.defaultWidth, 512)
+  assert.equal(storage.value.defaultWidth, 480)
   assert.equal(storage.value.openByDefault, true)
   assert.equal(storage.value.tabsEnabled.browser, false)
   assert.equal(storage.value.viewersEnabled.text, false)
