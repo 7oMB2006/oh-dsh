@@ -19,6 +19,7 @@ export type MarketplaceConfirmation =
   | 'accept-source-change'
 
 const PROTECTED_PLUGIN_IDS = new Set([
+  'better-sidebar-runtime',
   'desktop-shell',
   'desktop-sidebar',
   'oh-dsh-desktop',

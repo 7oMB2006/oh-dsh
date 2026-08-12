@@ -9,6 +9,7 @@ rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
+  { directory: 'better-sidebar-runtime', hostOnly: true },
   { directory: 'desktop-skins', id: '@oh-dsh/desktop-skins' },
   { directory: 'desktop-sidebar', id: '@oh-dsh/desktop-sidebar' },
   { directory: 'desktop-shell', id: '@oh-dsh/desktop-shell' },
@@ -53,16 +54,21 @@ const builds = [
 for (const plugin of pluginPackages) {
   const source = join(root, 'plugins', plugin.directory, 'src')
   const output = join(dist, 'plugins', plugin.directory)
-  builds.push(
-    build({
-      ...shared,
-      entryPoints: [join(source, 'index.ts')],
-      outfile: join(output, 'index.js'),
-      platform: 'node',
-      format: 'esm',
-      external: plugin.directory === 'desktop-shell' ? ['node-pty', 'ws'] : [],
-    }),
-    build({
+  const hostEntry = plugin.directory === 'better-sidebar-runtime'
+    ? join(root, 'upstream', 'DSH-better-sidebar', 'src', 'index.ts')
+    : join(source, 'index.ts')
+  builds.push(build({
+    ...shared,
+    entryPoints: [hostEntry],
+    outfile: join(output, 'index.js'),
+    platform: 'node',
+    format: 'esm',
+    external: plugin.directory === 'better-sidebar-runtime'
+      ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
+      : plugin.directory === 'desktop-shell' ? ['node-pty', 'ws'] : [],
+  }))
+  if (plugin.hostOnly !== true) {
+    builds.push(build({
       bundle: true,
       entryPoints: [join(source, 'client.ts')],
       outfile: join(output, 'client.js'),
@@ -84,8 +90,8 @@ for (const plugin of pluginPackages) {
         js: `window.__ModuleLoader__.load({ id: "${plugin.id}", factory: (require) => { var module = { exports: {} }; var exports = module.exports;`,
       },
       footer: { js: 'return module.exports; } });' },
-    }),
-  )
+    }))
+  }
 }
 
 await Promise.all(builds)

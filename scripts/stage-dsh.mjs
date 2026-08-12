@@ -307,6 +307,24 @@ function runtimePackageDirectory(name) {
   return join(runtime, 'node_modules', ...name.split('/'))
 }
 
+function resolveDependencyManifest(requireFromPackage, dependency) {
+  try {
+    return requireFromPackage.resolve(`${dependency}/package.json`)
+  } catch (packageJsonError) {
+    let directory = dirname(requireFromPackage.resolve(dependency))
+    for (;;) {
+      const manifestPath = join(directory, 'package.json')
+      if (existsSync(manifestPath)) {
+        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+        if (manifest.name === dependency) return manifestPath
+      }
+      const parent = dirname(directory)
+      if (parent === directory) throw packageJsonError
+      directory = parent
+    }
+  }
+}
+
 function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
   const installRoot = join(packageDir, 'node_modules')
   const installed = new Set()
@@ -336,7 +354,7 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
     const requireFromPackage = createRequire(manifestPath)
     for (const [dependency, optional] of dependencyNames(manifest)) {
       try {
-        installManifest(requireFromPackage.resolve(`${dependency}/package.json`))
+        installManifest(resolveDependencyManifest(requireFromPackage, dependency))
       } catch (error) {
         if (optional) continue
         throw new Error(`${manifest.name} is missing runtime dependency ${dependency}`, { cause: error })
@@ -347,7 +365,23 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
   const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
   const requireFromSource = createRequire(sourceManifestPath)
   for (const dependency of Object.keys(sourceManifest.dependencies ?? {})) {
-    installManifest(requireFromSource.resolve(`${dependency}/package.json`))
+    installManifest(resolveDependencyManifest(requireFromSource, dependency))
+  }
+}
+
+function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) {
+  const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
+  const sourcePackages = discoverSourcePackages()
+  for (const dependency of manifest.ohDsh?.hostDependencies ?? []) {
+    const source = sourcePackages.get(dependency)
+    if (source === undefined) {
+      throw new Error(`${manifest.name} cannot resolve DSH peer ${dependency}`)
+    }
+    const target = stageWorkspaceTarget(source)
+    const link = join(packageDir, 'node_modules', ...dependency.split('/'))
+    mkdirSync(dirname(link), { recursive: true })
+    rmSync(link, { recursive: true, force: true })
+    symlinkSync(relative(dirname(link), target), link)
   }
 }
 
@@ -358,6 +392,15 @@ function installDesktopPackages() {
       files: [
         [join(root, 'dist', 'plugin.js'), 'dist/plugin.js'],
         [join(root, 'dist', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
+      ],
+    },
+    {
+      manifest: join(root, 'plugins', 'better-sidebar-runtime', 'package.json'),
+      files: [
+        [
+          join(root, 'dist', 'plugins', 'better-sidebar-runtime', 'index.js'),
+          'dist/index.js',
+        ],
       ],
     },
     ...[
@@ -389,6 +432,7 @@ function installDesktopPackages() {
     mkdirSync(packageDir, { recursive: true })
     writeFileSync(join(packageDir, 'package.json'), JSON.stringify(manifest, undefined, 2) + '\n')
     installCompiledPackageDependencies(spec.manifest, packageDir)
+    installCompiledPackageHostDependencies(spec.manifest, packageDir)
     for (const [source, target] of spec.files) {
       const output = join(packageDir, target)
       mkdirSync(dirname(output), { recursive: true })
@@ -422,6 +466,7 @@ if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
 for (const required of [
   'plugin.js',
   'cordis.patch.yml',
+  'plugins/better-sidebar-runtime/index.js',
   'plugins/desktop-skins/index.js',
   'plugins/desktop-skins/client.js',
   'plugins/desktop-sidebar/index.js',

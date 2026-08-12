@@ -15,6 +15,9 @@
     lanAddresses: []
 
 - insert:
+    - id: oh-better-sidebar-runtime
+      name: '@oh-dsh/better-sidebar-runtime'
+
     - id: oh-desktop-skins
       name: '@oh-dsh/desktop-skins'
 

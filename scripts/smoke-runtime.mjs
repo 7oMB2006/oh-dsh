@@ -4,7 +4,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BUNDLED_DESKTOP_PLUGINS, ensureDesktopProfile } from '../src/profile.ts'
+import {
+  BUNDLED_DESKTOP_CLIENT_PLUGINS,
+  BUNDLED_DESKTOP_HOST_PLUGINS,
+  ensureDesktopProfile,
+} from '../src/profile.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resources = resolve(process.argv[2] ?? join(root, '.stage'))
@@ -117,7 +121,7 @@ try {
 
   const bootEntries = parseBootEntries(index)
   const loaded = []
-  for (const pluginId of BUNDLED_DESKTOP_PLUGINS) {
+  for (const pluginId of BUNDLED_DESKTOP_CLIENT_PLUGINS) {
     const row = bootEntries.find(entry => entry.id === pluginId)
     assert.ok(row, `${pluginId} Host entry did not activate in the DSH client graph`)
     const manifest = JSON.parse(readFileSync(join(
@@ -139,6 +143,17 @@ try {
     )
     assert.ok(bundle.includes(pluginId), `${pluginId} client bundle did not enroll its module id`)
     loaded.push({ bytes: bundle.length, id: pluginId })
+  }
+
+  for (const pluginId of BUNDLED_DESKTOP_HOST_PLUGINS) {
+    assert.ok(existsSync(join(
+      resources,
+      'dsh-runtime',
+      'node_modules',
+      ...pluginId.split('/'),
+      'dist',
+      'index.js',
+    )), `${pluginId} Host bundle is missing`)
   }
 
   for (const legacyPackage of ['dsh-web-terminal', '@dsh-external/dsh-web-panel']) {

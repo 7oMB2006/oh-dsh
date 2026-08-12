@@ -4,14 +4,25 @@ import { dirname, join } from 'node:path'
 /** Profile name reserved for the packaged desktop surface. */
 export const DESKTOP_PROFILE = 'desktop'
 
-/** Individual plugins shipped inside the desktop bundle. */
-export const BUNDLED_DESKTOP_PLUGINS = [
+/** Plugins that enroll a browser-side entry in the desktop client graph. */
+export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/desktop-skins',
   '@oh-dsh/desktop-sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
   '@oh-dsh/desktop-shell',
+] as const
+
+/** Host-only capability providers shipped inside the desktop runtime. */
+export const BUNDLED_DESKTOP_HOST_PLUGINS = [
+  '@oh-dsh/better-sidebar-runtime',
+] as const
+
+/** Every protected plugin shipped inside the desktop distribution. */
+export const BUNDLED_DESKTOP_PLUGINS = [
+  ...BUNDLED_DESKTOP_CLIENT_PLUGINS,
+  ...BUNDLED_DESKTOP_HOST_PLUGINS,
 ] as const
 
 /** Bundle order owned by the desktop distribution. */
