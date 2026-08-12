@@ -1,0 +1,4 @@
+[submodule "upstream/DSH-better-sidebar"]
+	path = upstream/DSH-better-sidebar
+	url = git@github.com:dsh-external/DSH-better-sidebar.git
+	branch = main
