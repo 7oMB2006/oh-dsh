@@ -164,17 +164,28 @@ try {
     )
   }
 
-  const workspaceResponse = await fetch(new URL(
-    `/oh-dsh-desktop/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
-    base,
-  ))
-  const workspaceSnapshot = await workspaceResponse.json()
-  assert.equal(workspaceResponse.status, 200)
-  assert.equal(workspaceSnapshot.kind, 'directory')
-  assert.equal(workspaceSnapshot.cwd, smokeRoot)
+  const sidebarCall = async (method, payload) => {
+    const response = await fetch(new URL(`/sidebar/api/${method}`, base), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const envelope = await response.json()
+    assert.equal(response.status, 200, JSON.stringify(envelope))
+    assert.equal(envelope.ok, true, JSON.stringify(envelope))
+    return envelope.value
+  }
+  const sidebarScope = { sessionId: 'desktop-smoke', cwd: smokeRoot }
+  const sessionCwd = await sidebarCall('session.cwd', sidebarScope)
+  assert.equal(sessionCwd.cwd, smokeRoot)
+  const workspaceTree = await sidebarCall('fs.tree', sidebarScope)
+  assert.equal(workspaceTree.path, smokeRoot)
 
-  const terminalUrl = new URL('/oh-dsh-desktop/terminal/ws', base)
+  const terminalUrl = new URL('/sidebar/ws/terminal', base)
   terminalUrl.protocol = 'ws:'
+  terminalUrl.searchParams.set('sessionId', sidebarScope.sessionId)
+  terminalUrl.searchParams.set('tab', 'smoke-terminal')
+  terminalUrl.searchParams.set('cwd', smokeRoot)
   await new Promise((resolveTerminal, rejectTerminal) => {
     const socket = new WebSocket(terminalUrl)
     let output = ''
@@ -191,24 +202,14 @@ try {
       else rejectTerminal(error)
     }
     socket.addEventListener('open', () => {
-      socket.send(JSON.stringify({ type: 'start', cols: 80, rows: 24, cwd: smokeRoot }))
+      socket.send(JSON.stringify({ type: 'resize', cols: 80, rows: 24 }))
+      socket.send("printf 'OH_DSH_TERMINAL_SMOKE\\n'; exit\r")
     })
     socket.addEventListener('message', (event) => {
-      const message = JSON.parse(String(event.data))
-      if (message.type === 'ready') {
-        assert.equal(message.cwd, smokeRoot)
-        socket.send(JSON.stringify({ type: 'input', data: "printf 'OH_DSH_TERMINAL_SMOKE\\n'; exit\r" }))
-      } else if (message.type === 'output') {
-        output += message.data
-      } else if (message.type === 'error') {
-        finish(new Error(`terminal host error: ${message.message}`))
-      } else if (message.type === 'exit') {
-        try {
-          assert.match(output, /OH_DSH_TERMINAL_SMOKE/)
-          finish()
-        } catch (error) {
-          finish(error)
-        }
+      output += String(event.data)
+      if (output.includes('OH_DSH_TERMINAL_SMOKE')) {
+        socket.send(JSON.stringify({ type: 'close' }))
+        finish()
       }
     })
     socket.addEventListener('error', () => { finish(new Error('terminal websocket connection failed')) })
@@ -224,8 +225,8 @@ try {
       `Plugin compatible: ${plugin.id} (Host active, Client ${String(plugin.bytes)} bytes)`,
     )
   }
-  console.log('Workspace tools Host API: ready, bounded workspace verified')
-  console.log('Desktop terminal PTY: ready, command execution verified')
+  console.log('Better Sidebar Host API: ready, bounded workspace verified')
+  console.log('Better Sidebar terminal PTY: ready, command execution verified')
 } finally {
   if (child.exitCode === null) child.kill('SIGTERM')
   await new Promise(resolve => {

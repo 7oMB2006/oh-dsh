@@ -39,18 +39,7 @@ importers:
         specifier: 8.21.2
         version: 8.21.2
 
-  plugins/desktop-shell:
-    dependencies:
-      node-pty:
-        specifier: 1.1.0
-        version: 1.1.0
-      ws:
-        specifier: 8.21.2
-        version: 8.21.2
-    devDependencies:
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
+  plugins/desktop-shell: {}
 
   plugins/desktop-sidebar:
     devDependencies:
@@ -406,9 +395,6 @@ packages:
 
   '@types/responselike@1.0.3':
     resolution: {integrity: sha512-H/+L+UkTV33uf49PH5pCAUBVPNj2nDBXTN+qS1dOwyyg24l3CcicicCA7ca+HMvJBZcFgl5r8e+RR6elsb4Lyw==}
-
-  '@types/ws@8.18.1':
-    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
@@ -1667,10 +1653,6 @@ snapshots:
       csstype: 3.2.3
 
   '@types/responselike@1.0.3':
-    dependencies:
-      '@types/node': 24.13.3
-
-  '@types/ws@8.18.1':
     dependencies:
       '@types/node': 24.13.3
 

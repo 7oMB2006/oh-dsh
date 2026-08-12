@@ -1,9 +1,3 @@
-import { DESKTOP_TERMINAL_WS_PATH } from '../../../desktop-shell/src/terminal/endpoint.ts'
-import type {
-  TerminalClientMessage,
-  TerminalServerMessage,
-} from '../../../desktop-shell/src/terminal/protocol.ts'
-
 export interface TerminalSocketHandlers {
   onOutput(data: string): void
   onReady(cwd: string): void
@@ -11,18 +5,31 @@ export interface TerminalSocketHandlers {
   onError(message: string): void
 }
 
-export function terminalWebSocketUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}${DESKTOP_TERMINAL_WS_PATH}`
+export interface TerminalSocketScope {
+  cwd?: string
+  sessionId: string
+  tabId: string
 }
 
+export const BETTER_SIDEBAR_TERMINAL_WS_PATH = '/sidebar/ws/terminal'
+
+export function terminalWebSocketUrl(scope: TerminalSocketScope): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const url = new URL(`${protocol}//${window.location.host}${BETTER_SIDEBAR_TERMINAL_WS_PATH}`)
+  url.searchParams.set('sessionId', scope.sessionId)
+  url.searchParams.set('tab', scope.tabId)
+  if (scope.cwd !== undefined) url.searchParams.set('cwd', scope.cwd)
+  return url.href
+}
+
+/** Oh-DSH terminal UI adapter for Better Sidebar's raw PTY protocol. */
 export class TerminalSocket {
-  private readonly url: string
+  private readonly url: string | undefined
   private socket: WebSocket | undefined
   private status: 'connecting' | 'ready' | 'closed' = 'connecting'
-  private readonly pendingOutput: string[] = []
+  private exitProbe = ''
 
-  constructor(url = terminalWebSocketUrl()) {
+  constructor(url?: string) {
     this.url = url
   }
 
@@ -30,50 +37,25 @@ export class TerminalSocket {
     cols: number,
     rows: number,
     handlers: TerminalSocketHandlers,
-    options?: { cwd?: string; shell?: string },
+    scope: TerminalSocketScope,
   ): void {
     if (this.socket !== undefined) return
-    const socket = new WebSocket(this.url)
+    const socket = new WebSocket(this.url ?? terminalWebSocketUrl(scope))
     this.socket = socket
     this.status = 'connecting'
     socket.onopen = () => {
-      this.send({
-        type: 'start',
-        cols,
-        rows,
-        ...(options?.cwd === undefined ? {} : { cwd: options.cwd }),
-        ...(options?.shell === undefined ? {} : { shell: options.shell }),
-      })
+      this.status = 'ready'
+      handlers.onReady(scope.cwd ?? '')
+      this.sendControl({ type: 'resize', cols, rows })
     }
     socket.onmessage = (event) => {
       if (typeof event.data !== 'string') return
-      let message: TerminalServerMessage
-      try {
-        message = JSON.parse(event.data) as TerminalServerMessage
-      } catch {
-        handlers.onError('received an invalid terminal frame')
-        return
-      }
-      switch (message.type) {
-        case 'ready':
-          this.status = 'ready'
-          handlers.onReady(message.cwd)
-          for (const output of this.pendingOutput) handlers.onOutput(output)
-          this.pendingOutput.length = 0
-          return
-        case 'output':
-          if (this.status === 'ready') handlers.onOutput(message.data)
-          else if (this.pendingOutput.length < 1000) this.pendingOutput.push(message.data)
-          return
-        case 'exit':
-          this.status = 'closed'
-          handlers.onExit(message.code)
-          return
-        case 'error':
-          handlers.onError(message.message)
-          return
-        case 'pong':
-          return
+      handlers.onOutput(event.data)
+      this.exitProbe = (this.exitProbe + event.data).slice(-256)
+      const exit = /\[process exited with code (-?\d+)\]/.exec(this.exitProbe)
+      if (exit !== null && this.status !== 'closed') {
+        this.status = 'closed'
+        handlers.onExit(Number(exit[1]))
       }
     }
     socket.onclose = () => {
@@ -85,11 +67,11 @@ export class TerminalSocket {
   }
 
   sendInput(data: string): void {
-    this.send({ type: 'input', data })
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(data)
   }
 
   sendResize(cols: number, rows: number): void {
-    this.send({ type: 'resize', cols, rows })
+    this.sendControl({ type: 'resize', cols, rows })
   }
 
   close(): void {
@@ -98,11 +80,15 @@ export class TerminalSocket {
     if (socket === undefined) return
     socket.onclose = null
     socket.onerror = null
-    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'kill' }))
+    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'close' }))
     socket.close()
   }
 
-  private send(message: TerminalClientMessage): void {
-    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(message))
+  private sendControl(message: { type: 'resize'; cols: number; rows: number }): void {
+    if (this.socket?.readyState === WebSocket.OPEN) socketSend(this.socket, message)
   }
+}
+
+function socketSend(socket: WebSocket, message: unknown): void {
+  socket.send(JSON.stringify(message))
 }

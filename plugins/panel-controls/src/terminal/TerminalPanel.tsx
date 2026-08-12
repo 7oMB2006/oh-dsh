@@ -225,6 +225,7 @@ export function TerminalPanel({ locale, t: translate, store, scopeKey, cwd, acti
             aria-hidden={tab.id !== state.activeTabId}
           >
             <TerminalView
+              sessionId={scopeKey}
               tabId={tab.id}
               cwd={cwd}
               fontFamily={state.fontFamily}

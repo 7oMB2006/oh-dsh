@@ -8,6 +8,7 @@ import type { Translate } from '../../../shared/i18n.ts'
 import type { TerminalMessage } from './i18n.ts'
 
 export interface TerminalViewProps {
+  sessionId: string
   tabId: string
   cwd?: string | null
   fontFamily: string
@@ -77,7 +78,11 @@ export function TerminalView(props: TerminalViewProps): JSX.Element {
         if (!exited) onStatusRef.current('error')
         terminal.write(`\r\n\x1b[31m[${props.t('terminal.error', { message })}]\x1b[0m\r\n`)
       },
-    }, requestedCwd ? { cwd: requestedCwd } : undefined)
+    }, {
+      sessionId: props.sessionId,
+      tabId: props.tabId,
+      ...(requestedCwd ? { cwd: requestedCwd } : {}),
+    })
 
     const inputSubscription = terminal.onData(data => { socket.sendInput(data) })
     const resizeSubscription = terminal.onResize(({ cols, rows }) => { socket.sendResize(cols, rows) })
@@ -104,7 +109,7 @@ export function TerminalView(props: TerminalViewProps): JSX.Element {
       if (fitAddonRef.current === fitAddon) fitAddonRef.current = null
       terminal.dispose()
     }
-  }, [props.cwd, props.tabId])
+  }, [props.cwd, props.sessionId, props.tabId])
 
   useEffect(() => {
     const terminal = terminalRef.current

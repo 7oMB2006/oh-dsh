@@ -90,17 +90,9 @@ test('desktop-shell Host plugin publishes capability, prompt, and bash environme
   let capability: unknown
   let prompt = ''
   let resolvedEnvironment: Record<string, string> = {}
-  let terminalPath = ''
   const context = {
     effect: <T>(effect: () => T): T => effect(),
     get: () => undefined,
-    httpServer: {
-      port: 4321,
-      registerUpgrade: (route: { path: string }): (() => void) => {
-        terminalPath = route.path
-        return () => {}
-      },
-    },
     logger: {
       debug: () => {},
       warn: () => {},
@@ -142,7 +134,6 @@ test('desktop-shell Host plugin publishes capability, prompt, and bash environme
     })
     assert.match(prompt, /Oh-DSH-Desktop/)
     assert.doesNotMatch(prompt, /ChatGPT|OpenAI/)
-    assert.equal(terminalPath, '/oh-dsh-desktop/terminal/ws')
     assert.deepEqual(resolvedEnvironment, {
       DSH_DESKTOP: '1',
       DSH_DESKTOP_APP_DATA: '/tmp/dsh-desktop-data',

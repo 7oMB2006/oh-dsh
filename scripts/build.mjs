@@ -65,7 +65,7 @@ for (const plugin of pluginPackages) {
     format: 'esm',
     external: plugin.directory === 'better-sidebar-runtime'
       ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
-      : plugin.directory === 'desktop-shell' ? ['node-pty', 'ws'] : [],
+      : [],
   }))
   if (plugin.hostOnly !== true) {
     builds.push(build({

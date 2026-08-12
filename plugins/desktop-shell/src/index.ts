@@ -1,6 +1,5 @@
 /** Host face for the native Oh-DSH-Desktop surface. */
 
-import { mountDesktopTerminal, type DesktopTerminalContext } from './terminal/server.ts'
 import {
   mountMarketplaceAgentTools,
   type MarketplaceToolContext,
@@ -27,7 +26,7 @@ interface HostServices {
   bashEnv: BashEnvService
 }
 
-interface HostContext extends DesktopTerminalContext, MarketplaceToolContext {
+interface HostContext extends MarketplaceToolContext {
   inject(names: string[], callback: (ctx: HostContext & HostServices) => void): void
   provide(name: string, value: unknown): void
   effect(effect: () => (() => void) | void, label?: string): void
@@ -36,8 +35,8 @@ interface HostContext extends DesktopTerminalContext, MarketplaceToolContext {
 /** Stable Cordis plugin name. */
 export const name = 'oh-dsh-desktop-shell'
 
-/** The desktop surface needs the loopback server before publishing facts. */
-export const inject = ['httpServer', 'tools']
+/** Desktop facts and guarded marketplace tools are the only Host concerns. */
+export const inject = ['tools']
 
 /** Immutable Host-side desktop capability published to other DSH plugins. */
 export interface DesktopHostCapability {
@@ -71,7 +70,6 @@ function desktopPrompt(capability: DesktopHostCapability): string {
 export function apply(ctx: HostContext): void {
   const capability = environmentCapability()
   ctx.provide('desktop', capability)
-  ctx.effect(() => mountDesktopTerminal(ctx), 'oh-dsh-desktop: terminal websocket')
   mountMarketplaceAgentTools(ctx)
 
   ctx.inject(['systemPrompt'], (promptCtx) => {
