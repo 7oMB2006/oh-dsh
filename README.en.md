@@ -79,6 +79,15 @@ Open the DMG and drag `Oh-DSH-Desktop.app` into `Applications`. The current
 test build has no Developer ID signature or notarization. On first launch,
 right-click the application in Finder and choose **Open** if required.
 
+If macOS prevents the DMG from opening, first verify that it was downloaded
+from this project's GitHub Release, then remove its quarantine attribute and
+open it again. Replace the example DMG path with the file's actual download
+path:
+
+```sh
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+```
+
 ### Run from source
 
 Requirements: macOS 12+, Apple Silicon, Node.js 24+, pnpm 11+, and Xcode

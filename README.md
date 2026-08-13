@@ -75,6 +75,14 @@ Loader、locale、settings 和 ThemeService 契约。
 Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并选择
 “打开”。
 
+如果 macOS 阻止打开 DMG，请先确认文件下载自本项目的 GitHub Release，
+再移除该 DMG 的 quarantine 属性并重新打开。请将示例中的 DMG 路径替换为
+文件的实际下载路径：
+
+```sh
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+```
+
 ### 从源码运行
 
 要求 macOS 12+、Apple Silicon、Node.js 24+、pnpm 11+ 和 Xcode Command
