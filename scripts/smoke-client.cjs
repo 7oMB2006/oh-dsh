@@ -52,9 +52,38 @@ void app.whenReady().then(async () => {
     try {
       const state = await window.webContents.executeJavaScript(`(() => ({
         body: document.body?.innerText ?? '',
+        navigation: (() => {
+          const pluginsIcon = document.querySelector('.oh-marketplace-nav svg')
+          const settings = [...document.querySelectorAll('button[aria-haspopup="dialog"]')]
+            .find(button => /settings|设置/i.test([
+              button.textContent,
+              button.getAttribute('aria-label'),
+              button.getAttribute('title'),
+            ].filter(Boolean).join(' ')))
+          const settingsIcon = settings?.querySelector('svg')
+          if (!(pluginsIcon instanceof SVGElement)
+            || !(settingsIcon instanceof SVGElement)) return null
+          const pluginsRect = pluginsIcon.getBoundingClientRect()
+          const settingsRect = settingsIcon.getBoundingClientRect()
+          return {
+            delta: Math.abs(
+              pluginsRect.left + pluginsRect.width / 2
+              - settingsRect.left - settingsRect.width / 2
+            ),
+            pluginsCenter: pluginsRect.left + pluginsRect.width / 2,
+            settingsCenter: settingsRect.left + settingsRect.width / 2,
+          }
+        })(),
         ready: document.documentElement.dataset.ohDshDesktop === 'true',
       }))()`)
-      if (state.ready === true) {
+      if (state.ready === true && state.navigation !== null) {
+        if (state.navigation.delta > 0.5) {
+          settle(new Error(
+            'Plugins and Settings icons are not aligned: '
+            + JSON.stringify(state.navigation),
+          ))
+          return
+        }
         settle()
         return
       }
