@@ -45,6 +45,7 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
       DSH_DESKTOP_NODE_PLATFORM: ${{ matrix.node_platform }}
+      npm_config_pm_on_fail: 'ignore'
 
     steps:
       - name: Check out repository
