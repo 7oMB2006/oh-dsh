@@ -21,7 +21,7 @@ export interface DesktopCapability {
 }
 
 export interface DesktopSkinPreferencesHostContext {
-  httpServer: {
+  webServer: {
     register(route: {
       kind: 'exact'
       path: string
@@ -103,7 +103,7 @@ export function mountDesktopSkinPreferences(
     throw new Error('desktop-skins: desktop application data path is unavailable')
   }
   const path = join(desktop.appDataPath, 'desktop-skins.json')
-  return ctx.httpServer.register({
+  return ctx.webServer.register({
     kind: 'exact',
     path: PREFERENCES_API_PATH,
     handler: async (request, response) => {

@@ -10,7 +10,7 @@ import {
 interface HostContext {
   effect(effect: () => (() => void) | void, label?: string): void
   get(name: string): unknown
-  httpServer: {
+  webServer: {
     register(route: {
       kind: 'exact'
       path: string
@@ -23,7 +23,7 @@ interface HostContext {
 }
 
 export const name = 'oh-dsh-desktop-sidebar'
-export const inject = ['desktop', 'httpServer']
+export const inject = ['desktop', 'webServer']
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {
   response.writeHead(status, {
@@ -71,7 +71,7 @@ export function apply(ctx: HostContext): void {
     ),
     'oh-dsh-desktop: sidebar preferences',
   )
-  ctx.effect(() => ctx.httpServer.register({
+  ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: WORKSPACE_API_PATH,
     handler: async (request, response) => {

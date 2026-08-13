@@ -21,7 +21,8 @@ separate Web Terminal or shell plugin is required.
 ## DSH-better-sidebar
 
 - Project: <https://github.com/dsh-external/DSH-better-sidebar>
-- Pinned revision: `bf54a60e37085a4c40f4b8bd5200e14a2f26f0c6`
+- Pinned release: `v0.9.0`
+- Pinned revision: `2e9db44a71bb75c9fa1185330541dce2582deee3`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
   `@oh-dsh/desktop-sidebar`

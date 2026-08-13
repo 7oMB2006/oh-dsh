@@ -12,7 +12,7 @@ interface HostContext extends DesktopSkinPreferencesHostContext {
 }
 
 export const name = 'oh-dsh-desktop-skins'
-export const inject = ['desktop', 'httpServer']
+export const inject = ['desktop', 'webServer']
 
 export function apply(ctx: HostContext): void {
   ctx.effect(

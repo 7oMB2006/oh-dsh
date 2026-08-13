@@ -14,7 +14,7 @@ export interface SidebarDesktopCapability {
 }
 
 export interface SidebarPreferencesHostContext {
-  httpServer: {
+  webServer: {
     register(route: {
       kind: 'exact'
       path: string
@@ -100,7 +100,7 @@ export function mountSidebarPreferences(
     throw new Error('desktop-sidebar: application data path is unavailable')
   }
   const path = join(desktop.appDataPath, 'desktop-sidebar.json')
-  return ctx.httpServer.register({
+  return ctx.webServer.register({
     kind: 'exact',
     path: SIDEBAR_PREFERENCES_API_PATH,
     handler: async (request, response) => {
