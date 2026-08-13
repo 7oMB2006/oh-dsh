@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import electronBinary from 'electron'
 import {
   BUNDLED_DESKTOP_CLIENT_PLUGINS,
   BUNDLED_DESKTOP_HOST_PLUGINS,
@@ -180,6 +181,21 @@ try {
     )), `${pluginId} Host bundle is missing`)
   }
 
+  const client = spawnSync(electronBinary, [
+    join(root, 'scripts', 'smoke-client.cjs'),
+    base.href,
+  ], {
+    cwd: root,
+    encoding: 'utf8',
+    env: runtimeEnvironment,
+    timeout: 30_000,
+  })
+  assert.equal(
+    client.status,
+    0,
+    client.error?.message || client.stderr || client.stdout,
+  )
+
   for (const legacyPackage of [
     'dsh-web-terminal',
     '@dsh-external/dsh-web-panel',
@@ -272,6 +288,7 @@ try {
   })
 
   console.log(`Oh-DSH-Desktop profile ready on DSH ${dshVersion}: ${base.href}`)
+  process.stdout.write(client.stdout)
   console.log('Plugin compatible: @oh-dsh/desktop (bundle profile active)')
   for (const plugin of loaded) {
     console.log(
