@@ -25,7 +25,7 @@ jobs:
             node_arch: arm64
           - name: macOS x64
             id: macos-x64
-            os: macos-15
+            os: macos-15-intel
             dist_script: dist:mac:x64
             node_platform: darwin
             node_arch: x64

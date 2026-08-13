@@ -8,7 +8,14 @@ const dshSource = resolveDshSource()
 const pnpmCli = join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
 
 function run(args) {
-  const result = spawnSync(process.execPath, [pnpmCli, ...args], {
+  // The pinned source declares `packageManager`, which would make pnpm swap
+  // to a native build not present in its frozen lockfile; the harness is
+  // installed with this repo's pinned pnpm instead.
+  const result = spawnSync(process.execPath, [
+    pnpmCli,
+    '--config.manage-package-manager-versions=false',
+    ...args,
+  ], {
     cwd: dshSource,
     env: process.env,
     stdio: 'inherit',

@@ -707,10 +707,11 @@ for (const required of [
 
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
-const pnpmCli = join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
-run(process.execPath, [
-  pnpmCli,
-  '--ignore-scripts',
+  const pnpmCli = join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
+  run(process.execPath, [
+    pnpmCli,
+    '--config.manage-package-manager-versions=false',
+    '--ignore-scripts',
   '--filter', '@deepseek-ai/dsh',
   'deploy', '--prod', '--legacy', runtime,
 ], { cwd: dshSource, env: process.env })
