@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { test } from 'node:test'
 import { parseMarketplaceCatalog } from '../plugins/plugin-marketplace/src/catalog.ts'
 import type {
@@ -9,7 +9,7 @@ import type {
   MarketplaceAuthResult,
   MarketplacePlatform,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
-import { withGitHubCredentials } from '../plugins/plugin-marketplace/src/host/platform.ts'
+import { findGitHubCli, withGitHubCredentials } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import {
   PluginMarketplaceManager,
   type MarketplacePreviewRuntimeInput,
@@ -228,6 +228,19 @@ test('GitHub credentials use an app-owned config without command-line pairs', ()
     assert.doesNotMatch(config, /token|unsafe/i)
   } finally {
     rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('GitHub CLI discovery follows Windows PATH syntax and executable names', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-gh-path-'))
+  try {
+    const binary = join(root, 'gh.exe')
+    writeFileSync(binary, '')
+    assert.equal(findGitHubCli({
+      Path: `${root};C:\\Program Files\\GitHub CLI`,
+    }, 'win32'), win32.join(root, 'gh.exe'))
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
 })
 

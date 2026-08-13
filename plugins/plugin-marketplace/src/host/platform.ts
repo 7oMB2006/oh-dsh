@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, posix, win32 } from 'node:path'
 import type { MarketplaceAuthStatus } from '../protocol.ts'
 import {
   MARKETPLACE_CATALOG_REPOSITORY,
@@ -130,13 +130,21 @@ function executable(path: string): boolean {
 }
 
 /** Resolve gh without invoking a shell or changing the user's Git config. */
-export function findGitHubCli(environment: NodeJS.ProcessEnv = process.env): string | null {
+export function findGitHubCli(
+  environment: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
   const explicit = environment.DSH_DESKTOP_GH_PATH
   if (explicit !== undefined && executable(explicit)) return explicit
+  const paths = platform === 'win32' ? win32 : posix
+  const executableNames = platform === 'win32' ? ['gh.exe', 'gh.cmd', 'gh'] : ['gh']
   const candidates = [
-    ...(environment.PATH ?? '').split(':').filter(Boolean).map(directory => join(directory, 'gh')),
-    '/opt/homebrew/bin/gh',
-    '/usr/local/bin/gh',
+    ...(environment.PATH ?? (platform === 'win32' ? environment.Path : undefined) ?? '')
+      .split(paths.delimiter)
+      .filter(Boolean)
+      .flatMap(directory => executableNames.map(name => paths.join(directory, name))),
+    ...(platform === 'darwin' ? ['/opt/homebrew/bin/gh', '/usr/local/bin/gh'] : []),
+    ...(platform === 'linux' ? ['/usr/local/bin/gh', '/usr/bin/gh'] : []),
   ]
   return candidates.find((candidate, index) => candidates.indexOf(candidate) === index && executable(candidate)) ?? null
 }
@@ -285,7 +293,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       '--filter=blob:none',
       '--no-checkout',
     ], { env: this.#options.env, timeoutMs: 120_000 })
-    await runCommand('/usr/bin/git', ['-C', target, 'checkout', '--detach', commit], {
+    await runCommand('git', ['-C', target, 'checkout', '--detach', commit], {
       env: withGitHubCredentials(this.#options.env, gh),
       timeoutMs: 60_000,
     })
