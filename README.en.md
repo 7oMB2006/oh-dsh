@@ -4,13 +4,15 @@
 </p>
 
 <div align="center">
-  <img src="./assets/dsh-whale.png" width="160" alt="Oh-DSH-Desktop whale">
-  <h1>Oh-DSH-Desktop</h1>
-  <p><strong>DeepSeek Harness, packaged as an installable and extensible desktop workbench.</strong></p>
+  <img src="./assets/dsh-whale.png" width="160" alt="Oh-DSH whale">
+  <h1>Oh-DSH</h1>
+  <p><strong>DeepSeek Harness, packaged as installable and extensible interaction surfaces: desktop, web, and TUI.</strong></p>
   <p>
+    <a href="#surface-plan">Surface Plan</a> ·
     <a href="#installation">Installation</a> ·
     <a href="#architecture">Architecture</a> ·
     <a href="#bundled-plugins">Bundled Plugins</a> ·
+    <a href="#the-oh-dsh-web-distribution">Oh-DSH-Web</a> ·
     <a href="#local-build-and-release">Build and Release</a>
   </p>
 </div>
@@ -25,21 +27,47 @@
 </p>
 
 <p align="center">
-  <img src="./assets/oh-dsh-desktop-overview.png" alt="Oh-DSH-Desktop main interface and Side Panel" width="100%">
+  <img src="./assets/oh-dsh-desktop-overview.png" alt="Oh-DSH main interface and Side Panel" width="100%">
   <br>
   <sub>Main interface, Side Panel, and the Porcelain desktop skin</sub>
 </p>
 
-Oh-DSH-Desktop keeps the DSH React UI and packages a pinned DSH runtime,
-Node.js, Electron, and local capabilities into a desktop application for
-macOS and Linux. Models still run in the cloud. The desktop owns the
-terminal, workspaces, Git, browser, window integration, and plugin
-lifecycle.
+Oh-DSH is the installable distribution family of DeepSeek Harness: it keeps
+the DSH React UI and packages a pinned DSH runtime, Node.js, and local
+capabilities into several interaction surfaces. Models still run in the
+cloud; the distribution owns the terminal, workspaces, Git, browser, window
+integration, and plugin lifecycle.
 
 It is not a second DSH frontend and requires neither a separate Web Terminal
-nor a shell plugin. `@oh-dsh/desktop` is the unified desktop entry while
+nor a shell plugin. `@oh-dsh/desktop` is the desktop surface entry while
 feature modules retain the official DSH Profile, Loader, locale, settings,
 and ThemeService contracts.
+
+The repository also ships an **Oh-DSH-Web** browser distribution: the same
+DSH web runtime exposed as a standalone HTTP service, packaged separately for
+easy installation, with the Oh-DSH skins, Pinned Summary, Sidebar, and PTY
+terminal capabilities built in. See
+[the Oh-DSH-Web distribution](#the-oh-dsh-web-distribution).
+
+## Surface Plan
+
+The upstream repository has been renamed to **oh-dsh**, and this repository
+is its implementation. It provides three interaction surfaces over one pinned
+DSH runtime and one set of built-in plugins:
+
+| Surface | Package | Status | Notes |
+| --- | --- | --- | --- |
+| Desktop | `@oh-dsh/desktop` | ✅ released | Electron desktop surface, macOS / Linux |
+| Web | `@oh-dsh/web` | ✅ implemented here | Oh-DSH-Web browser surface, packaged separately |
+| TUI | `@oh-dsh/tui` | ⏳ planned | Terminal surface, reusing the same core |
+
+Built-in plugins (`skins`, `sidebar`, `panel-controls`, `pinned-summary`,
+`plugin-marketplace`, ...) adapt to all three surfaces **at the same time**:
+they recognize the active surface through the shared `ohDshSurface` service
+and branch explicitly (see
+[Three surfaces and surface adaptation](#three-surfaces-and-surface-adaptation)).
+Each surface can be packaged separately or together; target platforms are
+macOS and Linux (Windows is planned).
 
 ## Capabilities
 
@@ -64,7 +92,7 @@ in an isolated environment.
 persisted by the Host.
 
 <p align="center">
-  <img src="./assets/oh-dsh-desktop-skins.png" alt="Oh-DSH desktop skin settings" width="100%">
+  <img src="./assets/oh-dsh-skins.png" alt="Oh-DSH desktop skin settings" width="100%">
 </p>
 
 ## Installation
@@ -72,7 +100,7 @@ persisted by the Host.
 ### Install a test build
 
 Download from
-[GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases):
+[GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases):
 
 - `Oh-DSH-Desktop-0.1.2-arm64.dmg`
 - `Oh-DSH-Desktop-0.1.2-arm64.zip`
@@ -104,6 +132,35 @@ Or install the deb package with apt:
 ```sh
 sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
 ```
+
+### Install the Oh-DSH-Web distribution
+
+Download `Oh-DSH-Web-<version>-<platform>-<arch>.tar.gz` (or `.zip`) from the
+Release, extract, and run:
+
+```sh
+tar -xzf Oh-DSH-Web-0.1.2-linux-x64.tar.gz
+cd oh-dsh-web-0.1.2-linux-x64
+./bin/oh-dsh-web
+```
+
+The launcher prints the URL (default `http://127.0.0.1:3080`) and opens the
+browser on an interactive terminal. The first run creates the `~/.oh-dsh-web`
+data root. Common options:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--host` / `DSH_OH_WEB_HOST` | `127.0.0.1` | Bind host; `0.0.0.0` exposes the UI on the LAN |
+| `--port` / `DSH_OH_WEB_PORT` | `3080` | Listen port; `0` picks a random port |
+| `--data` / `DSH_OH_WEB_HOME` | `~/.oh-dsh-web` | Writable data root |
+| `--no-open` / `DSH_OH_WEB_OPEN=0` | auto-open | Do not open the browser |
+| `--trusted-host <auth>` | — | Extra authority for the browser-trust fence (repeatable) |
+
+`Ctrl+C` stops the runtime gracefully. Oh-DSH-Web reuses the same pinned DSH
+runtime and bundles the Oh-DSH skins, Pinned Summary, Sidebar
+(Files/Git/Review), and PTY terminal capabilities; only Electron-bound
+capabilities (desktop window chrome, the plugin marketplace bridge) stay with
+the desktop distribution.
 
 ### Run from source
 
@@ -172,10 +229,10 @@ flowchart TB
   UI["DSH React UI"]
   Host["better-sidebar-runtime<br/>PTY · files · Git · commit diff"]
   Panels["panel-controls<br/>Terminal dock"]
-  Sidebar["desktop-sidebar<br/>review UI · comments · tools"]
+  Sidebar["sidebar<br/>review UI · comments · tools"]
   Summary["pinned-summary<br/>session summary"]
   Market["plugin-marketplace<br/>preview · apply · recover"]
-  Skins["desktop-skins<br/>theme · persist"]
+  Skins["skins<br/>theme · persist"]
 
   App --> Desktop
   App --> Runtime --> UI
@@ -201,17 +258,87 @@ Third-party plugins remain managed by the DSH Profile and Loader.
 | `@oh-dsh/better-sidebar-runtime` | Pinned [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) submodule | Compiles the upstream Host only for PTY, Files, Git, history, and commit diff; the upstream UI is not loaded |
 | `@oh-dsh/panel-controls` | Downstream adaptation of [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) | Keeps the Oh-DSH Terminal dock, themes, localization, and Session state on the shared PTY Host; no separate Web Terminal installation |
 | `@oh-dsh/pinned-summary` | Original Oh-DSH component | Active Session summary, half-height card, and conversation gutter |
-| `@oh-dsh/desktop-sidebar` | Oh-DSH UI downstream of [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) | Uses the shared Host for Session tabs, viewers, Files, Git Review, line comments, and Agent composer references while retaining the current layout, icons, and themes |
+| `@oh-dsh/sidebar` | Oh-DSH UI downstream of [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) | Uses the shared Host for Session tabs, viewers, Files, Git Review, line comments, and Agent composer references while retaining the current layout, icons, and themes |
 | `@oh-dsh/plugin-marketplace` | Distills [`plugin-registry`](https://github.com/dsh-external/plugin-registry) and [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | Unifies isolated preview, risk review, TOFU source locks, apply, and recovery with desktop navigation and bilingual UI |
-| `@oh-dsh/desktop-skins` | Downstream adaptation of [`dsh-skins`](https://github.com/dsh-external/dsh-skins) | Retains the ThemeService extension model but redesigns skins, Settings UI, and Host persistence |
+| `@oh-dsh/skins` | Downstream adaptation of [`dsh-skins`](https://github.com/dsh-external/dsh-skins) | Retains the ThemeService extension model but redesigns skins, Settings UI, and Host persistence |
 
 Plugins marked as downstream adaptations or distilled designs are reviewed
 against upstream releases and features regularly. Compatible features are
 ported through the current DSH contracts; syncing does not overwrite Oh-DSH
 UI, themes, or desktop interactions.
 
+`@oh-dsh/skins` and `@oh-dsh/pinned-summary` do not depend on
+Electron and are enabled in the Oh-DSH-Web browser distribution as well; the
+remaining plugins need the desktop Host (PTY, Electron bridge, marketplace
+transactions) or the desktop interaction surface.
+
+## Three surfaces and surface adaptation
+
+Built-in Oh-DSH plugins recognize the active interaction form through one
+shared `ohDshSurface` service (see `plugins/shared/surface.ts`) and adapt
+explicitly per surface. Each shell bundle provides the service:
+
+| Surface | Shell | `kind` | Notes |
+| --- | --- | --- | --- |
+| Desktop | `@oh-dsh/desktop` (Electron) | `desktop` | Native windows, menus, Electron bridge, full local capability set |
+| Web | `@oh-dsh/web` (browser) | `web` | DSH Web UI over HTTP; the browser client graph matches Desktop wherever host services exist |
+| TUI | `@oh-dsh/tui` (planned) | `tui` | No browser client graph; host rows that need `webServer` never activate |
+
+Plugin adaptations are written as explicit three-way branches:
+
+- `skins` host: `desktop` / `web` mount the preferences server (data root from
+  the surface service); `tui` does not activate.
+- `sidebar` host: pure Node (workspace/Git/preferences), mounted on `desktop`
+  and `web`; `tui` does not activate.
+- `plugin-marketplace` client: `desktop` uses the Electron bridge; `web`
+  skips with a notice (an HTTP transport is roadmap work); `tui` has no
+  browser graph.
+- `panel-controls` / `pinned-summary`: browser-only clients; surface
+  differences are expressed by profile composition (TUI mounts no browser
+  rows).
+- `better-sidebar-runtime`: pure Node host (PTY/Files/Git), mounted on both
+  `desktop` and `web`; the PTY terminal works in the browser too.
+
+On the client plane, the shell clients reflect the same `ohDshSurface`
+service (`desktop` / `web`) for browser-side plugins to read.
+
 See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for source and license
 details.
+
+## The Oh-DSH-Web distribution
+
+Oh-DSH-Web is the browser distribution of this repository: it reuses
+`dsh-base` + `dsh-web-app`, exposes the DSH Web UI through the `web` profile
+as a standalone HTTP service, and mounts the web-capable Oh-DSH plugins. The
+browser client graph matches the desktop distribution: skins, Pinned Summary,
+the Sidebar (Files/Git/Review/preferences), and the PTY terminal dock are all
+available. Only Electron-bound pieces (desktop window chrome, the plugin
+marketplace bridge) are not included.
+
+```mermaid
+flowchart TB
+  Web["oh-dsh-web<br/>bundled Node.js + DSH runtime + launcher"]
+  Runtime["web profile: dsh-base + dsh-web-app + @oh-dsh/web"]
+  Skins["@oh-dsh/skins<br/>themes · preferences"]
+  Summary["@oh-dsh/pinned-summary<br/>session summary"]
+  Sidebar["@oh-dsh/sidebar<br/>workspace · Git · review"]
+  Terminal["better-sidebar-runtime<br/>PTY · files · Git"]
+  Panels["@oh-dsh/panel-controls<br/>terminal dock"]
+  Browser["regular browser"]
+
+  Web --> Runtime --> Browser
+  Runtime --> Skins
+  Runtime --> Summary
+  Runtime --> Sidebar
+  Runtime --> Terminal
+  Runtime --> Panels
+```
+
+`@oh-dsh/web` is the third bundle of the `web` profile: it provides the
+Oh-DSH-Web surface identity (the `ohDshSurface` service, prompt, bash
+environment variables) and the plugin rows. The launcher (`bin/oh-dsh-web`)
+initializes the `web` profile, boots the pinned DSH runtime, prints the URL,
+optionally opens the browser, and stops gracefully on `Ctrl+C`.
 
 ## Plugin marketplace
 
@@ -268,6 +395,25 @@ release/
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
+The Oh-DSH-Web distribution shares the same stage; the Node platform/arch is
+picked automatically from the current process (override with
+`DSH_DESKTOP_NODE_PLATFORM`/`DSH_DESKTOP_NODE_ARCH` for cross-packaging):
+
+```sh
+pnpm run dist:web
+# or
+pnpm run dist:web:quick
+```
+
+Web artifacts are written to `release/`:
+
+```text
+release/
+├── oh-dsh-web-0.1.2-darwin-arm64/
+├── oh-dsh-web-0.1.2-darwin-arm64.tar.gz
+└── oh-dsh-web-0.1.2-darwin-arm64.zip
+```
+
 Linux artifacts are written to the same directory:
 
 ```text
@@ -292,6 +438,8 @@ pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
 hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
+pnpm run dist:web
+pnpm run smoke:web:package
 ```
 
 On Linux, verify with:
