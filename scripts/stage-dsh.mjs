@@ -26,7 +26,16 @@ const runtime = join(stage, 'dsh-runtime')
 const nodeRuntime = join(stage, 'node-runtime')
 const cache = join(root, '.cache')
 const nodeVersion = process.env.DSH_DESKTOP_NODE_VERSION ?? '26.0.0'
-const nodeFolder = `node-v${nodeVersion}-darwin-arm64`
+// Node.js distribution triples use `linux`/`darwin`/`win` and `x64`/`arm64`.
+// Stage a Node runtime for the current host unless an override asks for a
+// specific platform (used for cross-packaging).
+const nodePlatform = process.env.DSH_DESKTOP_NODE_PLATFORM
+  ?? { darwin: 'darwin', linux: 'linux', win32: 'win' }[process.platform]
+  ?? process.platform
+const nodeArch = process.env.DSH_DESKTOP_NODE_ARCH
+  ?? { arm64: 'arm64', x64: 'x64' }[process.arch]
+  ?? process.arch
+const nodeFolder = `node-v${nodeVersion}-${nodePlatform}-${nodeArch}`
 const nodeArchiveName = `${nodeFolder}.tar.gz`
 const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
@@ -461,6 +470,48 @@ function restoreExecutableHelpers() {
   visit(runtime)
 }
 
+/**
+ * node-pty publishes darwin/win32 prebuilds but no Linux ones, and the
+ * `pnpm deploy` step reinstalls packages from the store, which drops the
+ * `build/` output produced during `pnpm install`. Rebuild the native module
+ * inside the staged runtime against the staged Node so the PTY host works on
+ * Linux; macOS keeps using its published prebuild.
+ */
+function ensureLinuxPtyBuild() {
+  if (process.platform !== 'linux') return
+  const storeRoot = join(runtime, 'node_modules', '.pnpm')
+  const ptyEntry = readdirSync(storeRoot, { withFileTypes: true })
+    .find(entry => entry.isDirectory() && entry.name.startsWith('node-pty@'))
+  if (ptyEntry === undefined) return
+  const packageDir = join(storeRoot, ptyEntry.name, 'node_modules', 'node-pty')
+  const prebuild = join(packageDir, 'prebuilds', `linux-${nodeArch}`)
+  if (existsSync(join(packageDir, 'build', 'Release', 'pty.node')) || existsSync(join(prebuild, 'pty.node'))) return
+  const addonEntry = readdirSync(storeRoot, { withFileTypes: true })
+    .find(entry => entry.isDirectory() && entry.name.startsWith('node-addon-api@'))
+  if (addonEntry === undefined) {
+    throw new Error('staged runtime is missing node-addon-api; cannot compile node-pty')
+  }
+  const addonTarget = join(storeRoot, addonEntry.name, 'node_modules', 'node-addon-api')
+  const dependencyDir = join(packageDir, 'node_modules')
+  mkdirSync(dependencyDir, { recursive: true })
+  const addonLink = join(dependencyDir, 'node-addon-api')
+  rmSync(addonLink, { recursive: true, force: true })
+  symlinkSync(relative(dependencyDir, addonTarget), addonLink)
+  const nodeGyp = join(nodeRuntime, 'lib', 'node_modules', 'npm', 'node_modules', 'node-gyp', 'bin', 'node-gyp.js')
+  if (!existsSync(nodeGyp)) {
+    throw new Error('staged Node runtime is missing node-gyp; cannot compile node-pty')
+  }
+  try {
+    run(join(nodeRuntime, 'bin', 'node'), [nodeGyp, 'rebuild'], { cwd: packageDir, env: process.env })
+  } finally {
+    rmSync(addonLink, { force: true })
+    rmSync(dependencyDir, { recursive: true, force: true })
+  }
+  if (!existsSync(join(packageDir, 'build', 'Release', 'pty.node'))) {
+    throw new Error('node-pty build did not produce build/Release/pty.node')
+  }
+}
+
 if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
   throw new Error(`DSH source checkout not found: ${dshSource}`)
 }
@@ -502,6 +553,7 @@ restoreExecutableHelpers()
 assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()
 assertSelfContained(nodeRuntime, 'Node runtime')
+ensureLinuxPtyBuild()
 
 run(join(nodeRuntime, 'bin', 'node'), [join(runtime, 'lib', 'bin.js'), '--version'], {
   cwd: runtime,

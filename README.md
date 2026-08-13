@@ -17,8 +17,9 @@
 
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
+  <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
-  <img alt="DSH 0.0.1-rc.2" src="https://img.shields.io/badge/DSH-0.0.1--rc.2-2f81f7">
+  <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
 </p>
@@ -39,7 +40,7 @@ Loader、locale、settings 和 ThemeService 契约。
 
 ## 主要能力
 
-- 自包含的 Apple Silicon macOS 应用与安装包。
+- 自包含的 Apple Silicon macOS 应用与安装包,以及 Linux x64 AppImage / deb。
 - 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
 - Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
@@ -83,10 +84,35 @@ Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并�
 xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
+#### Linux
+
+从 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases)
+下载：
+
+- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
+- `Oh-DSH-Desktop-0.1.2-amd64.deb`
+
+AppImage 只需赋予执行权限后直接运行：
+
+```sh
+chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+```
+
+也可以安装 deb 包（需要 apt）：
+
+```sh
+sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
+```
+
+Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可以
+在 DSH 设置页配置，也可以写入该目录下的 `.env`。
+
 ### 从源码运行
 
-要求 macOS 12+、Apple Silicon、Node.js 24+、pnpm 11+ 和 Xcode Command
-Line Tools。
+macOS 要求 macOS 12+、Apple Silicon、Node.js 24+、pnpm 11+ 和 Xcode
+Command Line Tools。Linux 要求 x64、Node.js 24+、pnpm 11+ 与基础构建
+工具链（make、g++、python3），发行版之间无额外依赖。
 
 ```sh
 git submodule update --init --recursive
@@ -97,12 +123,14 @@ pnpm start
 
 Better Sidebar Host 以固定 Git submodule 跟踪，并通过公开 HTTPS 仓库获取；
 初始化该 submodule 不需要 SSH 或 GitHub CLI 认证。固定的 DSH 源码单独获取，
-也可以通过下述 `DSH_SOURCE` 指向已有 checkout。
+也可以通过下述 `DSH_SOURCE` 指向已有 checkout。已发布的 DMG、ZIP、AppImage
+和 deb 已包含编译产物，不需要仓库权限。
 
-发行构建固定使用 DSH `0.0.1-rc.2`：
+发行构建固定使用 DSH `0.1.0-rc.5`（npm 上的 `0.1.0-rc.6` 即同一份代码的
+公开发布版本号）：
 
 ```text
-7b9644f2b664e46c9518506035aa6c8d5af4d8e8
+47f943859bef60e4160492346772ded9b24f765a
 ```
 
 首次构建会把源码放进 `.cache/dsh-source/`。如需使用另一个 checkout，可设置
@@ -111,7 +139,8 @@ Better Sidebar Host 以固定 Git submodule 跟踪，并通过公开 HTTPS 仓�
 运行数据位于：
 
 ```text
-~/Library/Application Support/Oh-DSH-Desktop/dsh
+macOS  ~/Library/Application Support/Oh-DSH-Desktop/dsh
+Linux  ~/.config/Oh-DSH-Desktop/dsh
 ```
 
 DeepSeek API key 可以在 DSH 设置页配置，也可以写入该目录下的 `.env`。
@@ -218,11 +247,13 @@ gh auth login
 
 ```sh
 pnpm run dist:mac
+pnpm run dist:linux
 # 或
 pnpm run dist:mac:quick
+pnpm run dist:linux:quick
 ```
 
-产物位于 `release/`：
+macOS 产物位于 `release/`：
 
 ```text
 release/
@@ -230,6 +261,19 @@ release/
 ├── Oh-DSH-Desktop-0.1.2-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
+
+Linux 产物同样位于 `release/`：
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.2-amd64.deb
+└── linux-unpacked/oh-dsh-desktop
+```
+
+打包内置的 Node runtime 默认匹配构建机平台；跨平台打包可显式指定
+`DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`）与 `DSH_DESKTOP_NODE_ARCH`
+（`x64`/`arm64`）。
 
 仓库当前不依赖 GitHub Actions 生成发行包。上传前在本机验证：
 
@@ -243,6 +287,15 @@ codesign --verify --deep --strict \
 hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
+Linux 上对应验证：
+
+```sh
+pnpm run typecheck
+pnpm test
+pnpm run dist:linux
+pnpm run smoke:app:linux
+```
+
 验证通过后手动创建 Release，已有 Release 则使用 `gh release upload
 --clobber` 更新产物：
 
@@ -250,6 +303,8 @@ hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
 gh release create v0.1.2 \
   release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
   release/Oh-DSH-Desktop-0.1.2-arm64.zip \
+  release/Oh-DSH-Desktop-0.1.2-x86_64.AppImage \
+  release/Oh-DSH-Desktop-0.1.2-amd64.deb \
   --title "Oh-DSH-Desktop 0.1.2" \
   --generate-notes
 ```

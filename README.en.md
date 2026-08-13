@@ -17,8 +17,9 @@
 
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
+  <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
-  <img alt="DSH 0.0.1-rc.2" src="https://img.shields.io/badge/DSH-0.0.1--rc.2-2f81f7">
+  <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
 </p>
@@ -30,9 +31,10 @@
 </p>
 
 Oh-DSH-Desktop keeps the DSH React UI and packages a pinned DSH runtime,
-Node.js, Electron, and local capabilities into a macOS application. Models
-still run in the cloud. The desktop owns the terminal, workspaces, Git,
-browser, window integration, and plugin lifecycle.
+Node.js, Electron, and local capabilities into a desktop application for
+macOS and Linux. Models still run in the cloud. The desktop owns the
+terminal, workspaces, Git, browser, window integration, and plugin
+lifecycle.
 
 It is not a second DSH frontend and requires neither a separate Web Terminal
 nor a shell plugin. `@oh-dsh/desktop` is the unified desktop entry while
@@ -41,7 +43,7 @@ and ThemeService contracts.
 
 ## Capabilities
 
-- Self-contained Apple Silicon macOS application and installers.
+- Self-contained Apple Silicon macOS and Linux x64 applications and installers.
 - Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
 - Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
@@ -74,6 +76,8 @@ Download from
 
 - `Oh-DSH-Desktop-0.1.2-arm64.dmg`
 - `Oh-DSH-Desktop-0.1.2-arm64.zip`
+- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
+- `Oh-DSH-Desktop-0.1.2-amd64.deb`
 
 Open the DMG and drag `Oh-DSH-Desktop.app` into `Applications`. The current
 test build has no Developer ID signature or notarization. On first launch,
@@ -88,10 +92,24 @@ path:
 xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
+On Linux, make the AppImage executable and run it:
+
+```sh
+chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+```
+
+Or install the deb package with apt:
+
+```sh
+sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
+```
+
 ### Run from source
 
-Requirements: macOS 12+, Apple Silicon, Node.js 24+, pnpm 11+, and Xcode
-Command Line Tools.
+Requirements: macOS 12+ with Apple Silicon, or Linux x64, plus Node.js 24+,
+pnpm 11+. macOS additionally needs Xcode Command Line Tools; Linux needs a
+basic build toolchain (make, g++, python3).
 
 ```sh
 git submodule update --init --recursive
@@ -103,12 +121,15 @@ pnpm start
 The Better Sidebar Host is pinned as a Git submodule and fetched from a public
 HTTPS repository; initializing it requires neither SSH nor GitHub CLI
 authentication. The pinned DSH source is acquired separately and can also be
-provided through the `DSH_SOURCE` override described below.
+provided through the `DSH_SOURCE` override described below. Published DMG,
+ZIP, AppImage, and deb artifacts already contain the compiled output and
+require no repository access.
 
-Release builds pin DSH `0.0.1-rc.2` at:
+Release builds pin DSH `0.1.0-rc.5` (the npm `0.1.0-rc.6` package is the
+publicly published version number of this same code) at:
 
 ```text
-7b9644f2b664e46c9518506035aa6c8d5af4d8e8
+47f943859bef60e4160492346772ded9b24f765a
 ```
 
 The first build stores the source under `.cache/dsh-source/`. Set
@@ -118,7 +139,8 @@ still match the pinned version.
 Writable runtime state lives at:
 
 ```text
-~/Library/Application Support/Oh-DSH-Desktop/dsh
+macOS  ~/Library/Application Support/Oh-DSH-Desktop/dsh
+Linux  ~/.config/Oh-DSH-Desktop/dsh
 ```
 
 Configure the DeepSeek API key in DSH Settings or in the `.env` file under
@@ -231,11 +253,13 @@ cache is already current:
 
 ```sh
 pnpm run dist:mac
+pnpm run dist:linux
 # or
 pnpm run dist:mac:quick
+pnpm run dist:linux:quick
 ```
 
-Artifacts are written to `release/`:
+macOS artifacts are written to `release/`:
 
 ```text
 release/
@@ -243,6 +267,19 @@ release/
 ├── Oh-DSH-Desktop-0.1.2-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
+
+Linux artifacts are written to the same directory:
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.2-amd64.deb
+└── linux-unpacked/oh-dsh-desktop
+```
+
+The bundled Node runtime defaults to the build machine's platform. Set
+`DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`) and `DSH_DESKTOP_NODE_ARCH`
+(`x64`/`arm64`) to stage a different target for cross-packaging.
 
 The repository does not currently rely on GitHub Actions for release builds.
 Verify locally before upload:
@@ -257,6 +294,15 @@ codesign --verify --deep --strict \
 hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
+On Linux, verify with:
+
+```sh
+pnpm run typecheck
+pnpm test
+pnpm run dist:linux
+pnpm run smoke:app:linux
+```
+
 After verification, create the Release manually. For an existing Release,
 use `gh release upload --clobber` to replace the artifacts.
 
@@ -264,6 +310,8 @@ use `gh release upload --clobber` to replace the artifacts.
 gh release create v0.1.2 \
   release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
   release/Oh-DSH-Desktop-0.1.2-arm64.zip \
+  release/Oh-DSH-Desktop-0.1.2-x86_64.AppImage \
+  release/Oh-DSH-Desktop-0.1.2-amd64.deb \
   --title "Oh-DSH-Desktop 0.1.2" \
   --generate-notes
 ```
