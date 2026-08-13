@@ -15,7 +15,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveDshSource } from './dsh-source.mjs'
 
@@ -299,6 +299,60 @@ function stageWorkspaceTarget(source) {
   return target
 }
 
+const stagedVendorTargets = new Map()
+
+/**
+ * Copy one full vendored source directory once, mirroring how POSIX pnpm
+ * deploy dereferences link: dependencies into real directories. The staged
+ * layout must keep `src/` because vendored packages expose `./src/*` exports.
+ */
+function stageVendorTarget(source) {
+  const existing = stagedVendorTargets.get(source)
+  if (existing !== undefined) return existing
+  const rel = relative(dshSource, source)
+  if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`)) {
+    throw new Error(`cannot stage external vendor target: ${source}`)
+  }
+  const target = join(runtime, 'workspace', rel)
+  rmSync(target, { recursive: true, force: true })
+  mkdirSync(dirname(target), { recursive: true })
+  cpSync(source, target, {
+    recursive: true,
+    dereference: true,
+    preserveTimestamps: true,
+    filter: candidate => {
+      const candidateRel = relative(source, candidate)
+      return candidateRel === '' || candidateRel.split(sep)[0] !== 'node_modules'
+    },
+  })
+  stagedVendorTargets.set(source, target)
+  return target
+}
+
+/**
+ * Recover a deployed link whose target is outside the source checkout.
+ * pnpm's legacy deploy can leave link: overrides as junctions with stale
+ * absolute targets on Windows; the source checkout keeps the same relative
+ * entry, and vendored packages also exist under `vendor/<basename>`.
+ */
+function stageSourceCounterpart(link) {
+  const sourceLink = join(dshSource, relative(runtime, link))
+  let source = sourceLink
+  if (existsSync(sourceLink)) {
+    const stat = lstatSync(sourceLink)
+    if (stat.isSymbolicLink()) {
+      source = resolve(dirname(sourceLink), readlinkSync(sourceLink))
+    }
+  }
+  if (!existsSync(source)) {
+    source = join(dshSource, 'vendor', basename(link))
+  }
+  if (!existsSync(source)) {
+    throw new Error(`staged runtime link has no usable source: ${link}`)
+  }
+  return stageVendorTarget(source)
+}
+
 function walk(rootPath, visit) {
   for (const entry of readdirSync(rootPath, { withFileTypes: true })) {
     const path = join(rootPath, entry.name)
@@ -313,8 +367,9 @@ function rewriteWorkspaceLinks() {
   for (const link of links) {
     const raw = readlinkSync(link)
     const logicalTarget = resolve(dirname(link), raw)
-    if (logicalTarget !== dshSource && !logicalTarget.startsWith(dshSource + sep)) continue
-    const stagedTarget = stageWorkspaceTarget(logicalTarget)
+    const stagedTarget = logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)
+      ? stageWorkspaceTarget(logicalTarget)
+      : stageSourceCounterpart(link)
     portableSymlink(relative(dirname(link), stagedTarget), link)
   }
 }

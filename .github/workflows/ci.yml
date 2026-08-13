@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,9 +17,25 @@ concurrency:
 
 jobs:
   core:
-    name: Core checks
-    runs-on: macos-15
+    name: Core checks (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-15
+            node_architecture: arm64
+          - name: macOS x64
+            os: macos-15
+            node_architecture: x64
+          - name: Linux x64
+            os: ubuntu-24.04
+            node_architecture: x64
+          - name: Windows x64
+            os: windows-2025
+            node_architecture: x64
 
     steps:
       - name: Check out repository
@@ -37,6 +52,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          architecture: ${{ matrix.node_architecture }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 

@@ -436,6 +436,11 @@ The bundled Node runtime defaults to the build machine's platform. Set
 
 ## GitHub Actions release flow
 
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs install, type
+check, tests, and the build in parallel on macOS arm64, macOS x64, Linux x64,
+and Windows x64 for every PR and main push, covering the compile path of
+every surface on every target platform.
+
 Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
 packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.

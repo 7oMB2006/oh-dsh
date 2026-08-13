@@ -67,12 +67,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: pnpm run typecheck
-
-      - name: Run tests
-        run: pnpm test
-
       - name: Package desktop distribution
         run: pnpm run ${{ matrix.dist_script }}
 

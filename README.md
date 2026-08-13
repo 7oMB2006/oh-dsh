@@ -408,6 +408,11 @@ release/
 
 ## GitHub Actions 发行流程
 
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) 在每次 PR 与 main
+push 时,于 macOS arm64、macOS x64、Linux x64、Windows x64 四个平台并行跑
+安装、typecheck、测试与构建,保证任一形态的编译链路在所有目标平台上都被
+覆盖。
+
 推送 `v*` tag 后，[`.github/workflows/release.yml`](.github/workflows/release.yml)
 会在四台 runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows
 x64，每个平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、NSIS/ZIP）与

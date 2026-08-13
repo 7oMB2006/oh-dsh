@@ -22,7 +22,9 @@ if (!existsSync(electronBinary)) {
 }
 
 const builder = join(root, 'node_modules', '.bin', 'electron-builder')
-const result = spawnSync(builder, ['--win', `--${arch}`], {
+// Packaging runs on tag commits; never let electron-builder infer a publish
+// step from the tag. Releases are attached by the workflow instead.
+const result = spawnSync(builder, ['--win', `--${arch}`, '--publish', 'never'], {
   cwd: root,
   env: {
     ...process.env,
