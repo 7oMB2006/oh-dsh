@@ -443,10 +443,7 @@ function relinkInstallationWorkspacePackages() {
     const link = join(runtime, 'node_modules', ...packageName.split('/'))
     const stat = existsSync(link) ? lstatSync(link) : undefined
     if (stat !== undefined && !stat.isSymbolicLink()) continue
-    if (stat === undefined
-      && !existsSync(join(dshSource, 'node_modules', ...packageName.split('/')))) {
-      continue
-    }
+    if (stat === undefined && findDeployedPackage(source) === undefined) continue
     const stagedTarget = stageWorkspaceTarget(source)
     mkdirSync(dirname(link), { recursive: true })
     portableSymlink(relative(dirname(link), stagedTarget), link)
