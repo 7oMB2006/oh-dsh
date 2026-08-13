@@ -138,8 +138,7 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        "nsis"
       ],
       "icon": "assets/icons/512x512.png"
     },

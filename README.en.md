@@ -426,7 +426,6 @@ Windows artifacts are written to the same directory:
 ```text
 release/
 ├── Oh-DSH-Desktop-0.1.1-x64.exe
-├── Oh-DSH-Desktop-0.1.1-x64.zip
 └── win-unpacked/
 ```
 
@@ -444,7 +443,7 @@ every surface on every target platform.
 Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
 packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.
-Each platform produces the desktop package (DMG/ZIP, AppImage/deb, NSIS/ZIP)
+Each platform produces the desktop package (DMG/ZIP, AppImage/deb, NSIS)
 and the Oh-DSH-Web package (tar.gz/ZIP). After every job passes, a publish
 job attaches all artifacts to a same-named GitHub Release via `gh release
 create`; any failure blocks the release.
