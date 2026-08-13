@@ -436,13 +436,13 @@ The bundled Node runtime defaults to the build machine's platform. Set
 
 ## GitHub Actions release flow
 
-Pushing a `v*` tag (or triggering `workflow_dispatch` manually) runs
+Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
 packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.
 Each platform produces the desktop package (DMG/ZIP, AppImage/deb, NSIS/ZIP)
-and the Oh-DSH-Web package (tar.gz/ZIP). On tag pushes, a publish job
-attaches every artifact to a same-named GitHub Release via `gh release
-create`; manual runs only build and upload workflow artifacts.
+and the Oh-DSH-Web package (tar.gz/ZIP). After every job passes, a publish
+job attaches all artifacts to a same-named GitHub Release via `gh release
+create`; any failure blocks the release.
 
 You can still verify locally before upload:
 

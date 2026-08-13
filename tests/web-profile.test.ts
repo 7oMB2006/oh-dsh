@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -131,10 +138,14 @@ test('web launcher --help short-circuits', () => {
 
 test('web launcher resolves a relative data root before spawning the runtime', async () => {
   const temp = mkdtempSync(join(tmpdir(), 'dsh-web-main-'))
-  const packaged = join(temp, 'package')
-  mkdirSync(join(packaged, 'node-runtime', 'bin'), { recursive: true })
+  const dataRoot = realpathSync(temp)
+  const packaged = join(dataRoot, 'package')
+  const nodeBinary = process.platform === 'win32'
+    ? join(packaged, 'node-runtime', 'node.exe')
+    : join(packaged, 'node-runtime', 'bin', 'node')
+  mkdirSync(dirname(nodeBinary), { recursive: true })
   mkdirSync(join(packaged, 'dsh-runtime', 'lib'), { recursive: true })
-  writeFileSync(join(packaged, 'node-runtime', 'bin', 'node'), '')
+  writeFileSync(nodeBinary, '')
   writeFileSync(join(packaged, 'dsh-runtime', 'lib', 'bin.js'), '')
 
   class FailingRuntime extends DshRuntimeSupervisor {
@@ -152,7 +163,7 @@ test('web launcher resolves a relative data root before spawning the runtime', a
 
   const previous = process.cwd()
   let runtime: FailingRuntime | undefined
-  process.chdir(temp)
+  process.chdir(dataRoot)
   try {
     const code = await main(
       ['--data', './state'],
@@ -165,9 +176,9 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     )
     assert.equal(code, 1)
     assert.ok(runtime)
-    assert.equal(runtime.plan.cwd, join(temp, 'state'))
-    assert.equal(runtime.plan.env.DSH_HOME, join(temp, 'state', 'dsh'))
-    assert.equal(runtime.plan.env.DSH_OH_WEB_DATA, join(temp, 'state'))
+    assert.equal(runtime.plan.cwd, join(dataRoot, 'state'))
+    assert.equal(runtime.plan.env.DSH_HOME, join(dataRoot, 'state', 'dsh'))
+    assert.equal(runtime.plan.env.DSH_OH_WEB_DATA, join(dataRoot, 'state'))
   } finally {
     process.chdir(previous)
     rmSync(temp, { recursive: true, force: true })

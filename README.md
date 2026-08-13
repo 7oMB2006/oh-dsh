@@ -408,13 +408,11 @@ release/
 
 ## GitHub Actions 发行流程
 
-推送 `v*` tag（或手动触发 `workflow_dispatch`）后，
-[`.github/workflows/release.yml`](.github/workflows/release.yml) 会在四台
-runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows x64，每个
-平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、NSIS/ZIP）与 Oh-DSH-Web
-发行包（tar.gz/ZIP）。tag 触发时，publish job 会用 `gh release create`
-把全部产物挂到同名 GitHub Release；手动触发只构建并上传 workflow
-artifact，不创建 Release。
+推送 `v*` tag 后，[`.github/workflows/release.yml`](.github/workflows/release.yml)
+会在四台 runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows
+x64，每个平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、NSIS/ZIP）与
+Oh-DSH-Web 发行包（tar.gz/ZIP）。全部 job 通过后，publish job 会用
+`gh release create` 把产物挂到同名 GitHub Release；任何失败都会阻止发布。
 
 上传前也可以在本机验证：
 
