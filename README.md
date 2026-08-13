@@ -50,7 +50,7 @@ Loader、locale、settings 和 ThemeService 契约。
 
 ## 界面预览
 
-**插件市场**：浏览 `dsh-external` 目录，并在隔离环境中预览变更。
+**插件市场**：浏览公共 DSH 社区目录，并在隔离环境中预览变更。
 
 <p align="center">
   <img src="./assets/oh-dsh-plugin-marketplace.png" alt="Oh-DSH 插件市场" width="100%">
@@ -66,11 +66,11 @@ Loader、locale、settings 和 ThemeService 契约。
 
 ### 安装测试包
 
-从 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases)
+从 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh-desktop/releases)
 下载：
 
-- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.2-arm64.zip`
+- `Oh-DSH-Desktop-0.1.1-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.1-arm64.zip`
 
 打开 DMG，把 `Oh-DSH-Desktop.app` 拖入 `Applications`。当前测试包没有
 Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并选择
@@ -81,30 +81,13 @@ Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并�
 文件的实际下载路径：
 
 ```sh
-xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.1-arm64.dmg
 ```
 
 #### Linux
 
-从 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases)
-下载：
-
-- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
-- `Oh-DSH-Desktop-0.1.2-amd64.deb`
-
-AppImage 只需赋予执行权限后直接运行：
-
-```sh
-chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-```
-
-也可以安装 deb 包（需要 apt）：
-
-```sh
-sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
-```
-
+Linux x64 已支持从源码构建；首个 AppImage / deb 尚未发布。发布后会出现在
+[GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh-desktop/releases)。
 Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可以
 在 DSH 设置页配置，也可以写入该目录下的 `.env`。
 
@@ -127,7 +110,7 @@ Better Sidebar Host 以固定 Git submodule 跟踪，并通过公开 HTTPS 仓�
 和 deb 已包含编译产物，不需要仓库权限。
 
 发行构建固定使用 DSH `0.1.0-rc.5`（npm 上的 `0.1.0-rc.6` 即同一份代码的
-公开发布版本号）：
+公开发布版本号），源码来自官方公共仓库：
 
 ```text
 47f943859bef60e4160492346772ded9b24f765a
@@ -198,11 +181,11 @@ Profile 和 Loader 管理。
 | --- | --- | --- |
 | `@oh-dsh/desktop` | Oh-DSH 自研 | 统一桌面入口、Electron bridge、原生菜单、窗口、Agent 能力与内置 plugin 注册顺序 |
 | `@oh-dsh/better-sidebar-runtime` | 固定跟踪 [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) submodule | 仅编译上游 Host，提供 PTY、Files、Git、history 和 commit diff；不加载上游 UI |
-| `@oh-dsh/panel-controls` | 基于 [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) 的下游改造 | 保留 Oh-DSH Terminal dock、主题、双语和 Session 状态，复用统一 PTY Host；不再安装独立 Web Terminal |
+| `@oh-dsh/panel-controls` | 对早期 dsh-web-panel 交互模型的下游重实现 | 保留 Oh-DSH Terminal dock、主题、双语和 Session 状态，复用统一 PTY Host；不再安装独立 Web Terminal |
 | `@oh-dsh/pinned-summary` | Oh-DSH 自研 | 当前 Session 摘要、半高卡片和正文 gutter 管理 |
 | `@oh-dsh/desktop-sidebar` | [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) 的 Oh-DSH UI 下游 | 复用统一 Host，提供 Session tabs、viewer、Files、Git Review、逐行评论和 Agent composer 引用，保留现有布局、图标与主题 |
-| `@oh-dsh/plugin-marketplace` | 炼化 [`plugin-registry`](https://github.com/dsh-external/plugin-registry) 与 [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | 统一隔离预览、风险确认、TOFU 来源锁、应用与恢复流程，并适配桌面导航和双语 UI |
-| `@oh-dsh/desktop-skins` | 基于 [`dsh-skins`](https://github.com/dsh-external/dsh-skins) 的下游改造 | 沿用 ThemeService 扩展思路，重做皮肤、设置 UI 和 Host 持久化 |
+| `@oh-dsh/plugin-marketplace` | 兼容 [`plugin-registry`](https://github.com/vlln/plugin-registry)、[`dsh-hub`](https://github.com/omdsh-dev/dsh-hub) 与公共 [`dsh-suite`](https://github.com/whyihaveyou/dsh-suite) 目录 | 统一隔离预览、风险确认、TOFU 来源锁、应用与恢复流程，并适配桌面导航和双语 UI |
+| `@oh-dsh/desktop-skins` | 对早期 dsh-skins ThemeService 扩展模型的下游重实现 | 沿用 ThemeService 扩展思路，重做皮肤、设置 UI 和 Host 持久化 |
 
 标记为“下游改造”或“炼化”的 plugin 会定期检查上游 release 和 feature，选择
 与当前 DSH 契约兼容的能力同步。同步以 feature 为单位重新适配，不直接覆盖
@@ -213,7 +196,8 @@ Oh-DSH 的 UI、主题和桌面交互。
 
 ## 插件市场
 
-左侧 **Plugins** 页面浏览 `dsh-external` 目录。安装、更新、启用、停用和卸载
+左侧 **Plugins** 页面默认读取公开的 `whyihaveyou/dsh-suite/data/plugins.json`
+目录，并保留条目中的规范 `owner/repo` 身份。安装、更新、启用、停用和卸载
 都会先生成隔离 candidate Profile：
 
 ```text
@@ -232,6 +216,10 @@ Agent 也可以通过对话进入同一流程。应用和恢复仍需要人类�
 ```sh
 gh auth login
 ```
+
+可通过 `OH_DSH_MARKETPLACE_CATALOG=owner/repository/path/to/catalog.json`
+切换到兼容的 `dsh-external-hub/v0.1`、`omdsh-registry/v1` 或
+`dsh-suite` 1.0 目录。
 
 ## 安全边界
 
@@ -257,8 +245,8 @@ macOS 产物位于 `release/`：
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-arm64.dmg
-├── Oh-DSH-Desktop-0.1.2-arm64.zip
+├── Oh-DSH-Desktop-0.1.1-arm64.dmg
+├── Oh-DSH-Desktop-0.1.1-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -266,8 +254,8 @@ Linux 产物同样位于 `release/`：
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-├── Oh-DSH-Desktop-0.1.2-amd64.deb
+├── Oh-DSH-Desktop-0.1.1-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.1-amd64.deb
 └── linux-unpacked/oh-dsh-desktop
 ```
 
@@ -284,7 +272,7 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.1-arm64.dmg
 ```
 
 Linux 上对应验证：
@@ -296,16 +284,16 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-验证通过后手动创建 Release，已有 Release 则使用 `gh release upload
---clobber` 更新产物：
+当前 package、下载说明和公开 Release 均为 `v0.1.1`。准备下一个版本时，
+先统一更新 workspace package 版本，再使用同一版本创建 tag 与 Release：
 
 ```sh
-gh release create v0.1.2 \
-  release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
-  release/Oh-DSH-Desktop-0.1.2-arm64.zip \
-  release/Oh-DSH-Desktop-0.1.2-x86_64.AppImage \
-  release/Oh-DSH-Desktop-0.1.2-amd64.deb \
-  --title "Oh-DSH-Desktop 0.1.2" \
+gh release create vNEXT \
+  release/Oh-DSH-Desktop-NEXT-arm64.dmg \
+  release/Oh-DSH-Desktop-NEXT-arm64.zip \
+  release/Oh-DSH-Desktop-NEXT-x86_64.AppImage \
+  release/Oh-DSH-Desktop-NEXT-amd64.deb \
+  --title "Oh-DSH-Desktop NEXT" \
   --generate-notes
 ```
 

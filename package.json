@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH-Desktop",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "An extensible DeepSeek Harness plugin collection and Electron desktop distribution",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
