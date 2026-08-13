@@ -61,7 +61,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          architecture: ${{ matrix.node_architecture }}
+          architecture: ${{ matrix.node_arch }}
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
