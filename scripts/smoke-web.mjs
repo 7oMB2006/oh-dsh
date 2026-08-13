@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -251,7 +252,7 @@ try {
   const workspaceFacts = await workspaceFactsResponse.json()
   assert.equal(workspaceFactsResponse.status, 200)
   assert.equal(workspaceFacts.kind, 'repository')
-  assert.equal(resolve(workspaceFacts.root), resolve(smokeRoot))
+  assert.equal(realpathSync(workspaceFacts.root), realpathSync(smokeRoot))
 
   // The better-sidebar host serves session, Files, and Git through the same
   // /sidebar API the desktop distribution uses.
