@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
+import { loadSidebarPreferences } from '../plugins/sidebar/src/preferences-server.ts'
 import {
   DesktopSidebarService,
   type DesktopSidebarTabDescriptor,
@@ -182,4 +186,25 @@ test('desktop sidebar persists bounded per-session state outside Web storage', a
   assert.equal(storage.value.viewersEnabled.text, false)
   assert.equal(storage.value.sessions['conversation-1']?.tabs.length, 1)
   assert.equal(storage.writes.length, 1)
+})
+
+test('desktop sidebar preferences migrate from the pre-rename durable file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'oh-dsh-sidebar-legacy-'))
+  const path = join(directory, 'sidebar.json')
+  const legacy = join(directory, 'desktop-sidebar.json')
+  const preferences: DesktopSidebarPreferences = {
+    ...DEFAULT_SIDEBAR_PREFERENCES,
+    defaultWidth: 400,
+    openByDefault: true,
+  }
+  try {
+    await writeFile(legacy, `${JSON.stringify(preferences, undefined, 2)}\n`)
+    assert.deepEqual(await loadSidebarPreferences(path), preferences)
+    assert.deepEqual(
+      JSON.parse(await readFile(path, 'utf8')) as DesktopSidebarPreferences,
+      preferences,
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })

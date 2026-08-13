@@ -3,10 +3,14 @@
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
-import { DshRuntimeSupervisor, type RuntimeExit } from './runtime.ts'
+import {
+  DshRuntimeSupervisor,
+  type DshRuntimeOptions,
+  type RuntimeExit,
+} from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
@@ -172,6 +176,8 @@ export async function main(
   argv: readonly string[],
   env: NodeJS.ProcessEnv = process.env,
   stdout: NodeJS.WriteStream = process.stdout,
+  runtimeFactory: (options: DshRuntimeOptions) => DshRuntimeSupervisor = options =>
+    new DshRuntimeSupervisor(options),
 ): Promise<number> {
   const options = parseLaunchArgs(
     argv,
@@ -184,6 +190,10 @@ export async function main(
     return 0
   }
 
+  // The runtime child runs with cwd set to the data root, so a relative
+  // --data/DSH_OH_WEB_HOME would resolve DSH_HOME from a nested directory.
+  // Normalize once and derive every runtime path from the absolute root.
+  const dataRoot = resolve(options.dataRoot)
   const root = resolveWebRoot(env)
   const version = versionOf(root)
   // Packaged layout: <root>/node-runtime + <root>/dsh-runtime. Development
@@ -201,12 +211,12 @@ export async function main(
     throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
   }
 
-  const dshHome = join(options.dataRoot, 'dsh')
-  mkdirSync(options.dataRoot, { recursive: true, mode: 0o700 })
+  const dshHome = join(dataRoot, 'dsh')
+  mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
   ensureWebProfile(dshHome)
 
   const logTail: string[] = []
-  const runtime = new DshRuntimeSupervisor({
+  const runtime = runtimeFactory({
     args: [
       '--profile', WEB_PROFILE,
       '--host', options.host,
@@ -214,12 +224,12 @@ export async function main(
       ...options.trustedHosts.flatMap(host => ['--trusted-host', host]),
     ],
     cliEntry: paths.cliEntry,
-    cwd: options.dataRoot,
+    cwd: dataRoot,
     env: {
       ...env,
       DSH_HOME: dshHome,
       DSH_OH_WEB: '1',
-      DSH_OH_WEB_DATA: options.dataRoot,
+      DSH_OH_WEB_DATA: dataRoot,
       DSH_OH_WEB_PROFILE: WEB_PROFILE,
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',

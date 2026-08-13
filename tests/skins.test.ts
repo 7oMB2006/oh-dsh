@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -214,6 +214,26 @@ test('desktop skin preferences survive outside the changing Web origin', async (
     await saveSkinPreferences(path, preferences)
     assert.deepEqual(await loadSkinPreferences(path), preferences)
     assert.equal((await readFile(path, 'utf8')).endsWith('\n'), true)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('desktop skin preferences migrate from the pre-rename durable file', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'oh-dsh-skins-legacy-'))
+  const path = join(directory, 'skins.json')
+  const legacy = join(directory, 'desktop-skins.json')
+  const preferences: DesktopSkinPreferences = {
+    activeId: 'oh-dsh-skin-porcelain',
+    fallbackTheme: 'dark',
+  }
+  try {
+    await writeFile(legacy, `${JSON.stringify(preferences, undefined, 2)}\n`)
+    assert.deepEqual(await loadSkinPreferences(path), preferences)
+    assert.deepEqual(
+      JSON.parse(await readFile(path, 'utf8')) as DesktopSkinPreferences,
+      preferences,
+    )
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
