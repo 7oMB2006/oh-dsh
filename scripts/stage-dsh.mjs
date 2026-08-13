@@ -62,7 +62,7 @@ function portableSymlink(target, link) {
     symlinkSync(target, link)
     return
   }
-  const resolved = resolve(target)
+  const resolved = resolve(dirname(link), target)
   if (existsSync(resolved) && !lstatSync(resolved).isDirectory()) {
     copyFileSync(resolved, link)
     return
