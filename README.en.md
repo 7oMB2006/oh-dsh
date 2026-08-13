@@ -81,7 +81,7 @@ macOS and Linux (Windows is planned).
 
 ## Interface preview
 
-**Plugin marketplace**: browse the `dsh-external` catalog and preview changes
+**Plugin marketplace**: browse a public DSH community catalog and preview changes
 in an isolated environment.
 
 <p align="center">
@@ -102,10 +102,8 @@ persisted by the Host.
 Download from
 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases):
 
-- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.2-arm64.zip`
-- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
-- `Oh-DSH-Desktop-0.1.2-amd64.deb`
+- `Oh-DSH-Desktop-0.1.1-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.1-arm64.zip`
 
 Open the DMG and drag `Oh-DSH-Desktop.app` into `Applications`. The current
 test build has no Developer ID signature or notarization. On first launch,
@@ -117,21 +115,11 @@ open it again. Replace the example DMG path with the file's actual download
 path:
 
 ```sh
-xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.1-arm64.dmg
 ```
 
-On Linux, make the AppImage executable and run it:
-
-```sh
-chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-```
-
-Or install the deb package with apt:
-
-```sh
-sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
-```
+Linux x64 source builds are supported, but the first AppImage / deb release
+has not been published yet. It will appear on the same Releases page.
 
 ### Install the Oh-DSH-Web distribution
 
@@ -139,8 +127,8 @@ Download `Oh-DSH-Web-<version>-<platform>-<arch>.tar.gz` (or `.zip`) from the
 Release, extract, and run:
 
 ```sh
-tar -xzf Oh-DSH-Web-0.1.2-linux-x64.tar.gz
-cd oh-dsh-web-0.1.2-linux-x64
+tar -xzf Oh-DSH-Web-0.1.1-linux-x64.tar.gz
+cd oh-dsh-web-0.1.1-linux-x64
 ./bin/oh-dsh-web
 ```
 
@@ -183,7 +171,8 @@ ZIP, AppImage, and deb artifacts already contain the compiled output and
 require no repository access.
 
 Release builds pin DSH `0.1.0-rc.5` (the npm `0.1.0-rc.6` package is the
-publicly published version number of this same code) at:
+publicly published version number of this same code) from the official public
+repository at:
 
 ```text
 47f943859bef60e4160492346772ded9b24f765a
@@ -256,11 +245,11 @@ Third-party plugins remain managed by the DSH Profile and Loader.
 | --- | --- | --- |
 | `@oh-dsh/desktop` | Original Oh-DSH component | Unified desktop entry, Electron bridge, native menus, windows, Agent capabilities, and bundled plugin order |
 | `@oh-dsh/better-sidebar-runtime` | Pinned [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) submodule | Compiles the upstream Host only for PTY, Files, Git, history, and commit diff; the upstream UI is not loaded |
-| `@oh-dsh/panel-controls` | Downstream adaptation of [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) | Keeps the Oh-DSH Terminal dock, themes, localization, and Session state on the shared PTY Host; no separate Web Terminal installation |
+| `@oh-dsh/panel-controls` | Downstream reimplementation of the early dsh-web-panel interaction model | Keeps the Oh-DSH Terminal dock, themes, localization, and Session state on the shared PTY Host; no separate Web Terminal installation |
 | `@oh-dsh/pinned-summary` | Original Oh-DSH component | Active Session summary, half-height card, and conversation gutter |
 | `@oh-dsh/sidebar` | Oh-DSH UI downstream of [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) | Uses the shared Host for Session tabs, viewers, Files, Git Review, line comments, and Agent composer references while retaining the current layout, icons, and themes |
-| `@oh-dsh/plugin-marketplace` | Distills [`plugin-registry`](https://github.com/dsh-external/plugin-registry) and [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | Unifies isolated preview, risk review, TOFU source locks, apply, and recovery with desktop navigation and bilingual UI |
-| `@oh-dsh/skins` | Downstream adaptation of [`dsh-skins`](https://github.com/dsh-external/dsh-skins) | Retains the ThemeService extension model but redesigns skins, Settings UI, and Host persistence |
+| `@oh-dsh/plugin-marketplace` | Supports [`plugin-registry`](https://github.com/vlln/plugin-registry), [`dsh-hub`](https://github.com/omdsh-dev/dsh-hub), and the public [`dsh-suite`](https://github.com/whyihaveyou/dsh-suite) catalog | Unifies isolated preview, risk review, TOFU source locks, apply, and recovery with desktop navigation and bilingual UI |
+| `@oh-dsh/skins` | Downstream reimplementation of the early dsh-skins ThemeService extension model | Retains the ThemeService extension model but redesigns skins, Settings UI, and Host persistence |
 
 Plugins marked as downstream adaptations or distilled designs are reviewed
 against upstream releases and features regularly. Compatible features are
@@ -342,9 +331,10 @@ optionally opens the browser, and stops gracefully on `Ctrl+C`.
 
 ## Plugin marketplace
 
-The **Plugins** page browses the `dsh-external` catalog. Install, update,
-enable, disable, and uninstall operations first create an isolated candidate
-Profile:
+The **Plugins** page defaults to the public
+`whyihaveyou/dsh-suite/data/plugins.json` catalog and preserves each entry's
+canonical `owner/repo` identity. Install, update, enable, disable, and
+uninstall operations first create an isolated candidate Profile:
 
 ```text
 verify the source and exact commit
@@ -363,6 +353,10 @@ DSH Loader. Private repositories authenticate through GitHub CLI:
 ```sh
 gh auth login
 ```
+
+Set `OH_DSH_MARKETPLACE_CATALOG=owner/repository/path/to/catalog.json` to use
+a compatible `dsh-external-hub/v0.1`, `omdsh-registry/v1`, or `dsh-suite` 1.0
+catalog.
 
 ## Security boundaries
 
@@ -390,8 +384,8 @@ macOS artifacts are written to `release/`:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-arm64.dmg
-├── Oh-DSH-Desktop-0.1.2-arm64.zip
+├── Oh-DSH-Desktop-0.1.1-arm64.dmg
+├── Oh-DSH-Desktop-0.1.1-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -409,17 +403,17 @@ Web artifacts are written to `release/`:
 
 ```text
 release/
-├── oh-dsh-web-0.1.2-darwin-arm64/
-├── oh-dsh-web-0.1.2-darwin-arm64.tar.gz
-└── oh-dsh-web-0.1.2-darwin-arm64.zip
+├── oh-dsh-web-0.1.1-darwin-arm64/
+├── oh-dsh-web-0.1.1-darwin-arm64.tar.gz
+└── oh-dsh-web-0.1.1-darwin-arm64.zip
 ```
 
 Linux artifacts are written to the same directory:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-├── Oh-DSH-Desktop-0.1.2-amd64.deb
+├── Oh-DSH-Desktop-0.1.1-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.1-amd64.deb
 └── linux-unpacked/oh-dsh-desktop
 ```
 
@@ -437,7 +431,7 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.1-arm64.dmg
 pnpm run dist:web
 pnpm run smoke:web:package
 ```
@@ -451,16 +445,17 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-After verification, create the Release manually. For an existing Release,
-use `gh release upload --clobber` to replace the artifacts.
+The package metadata, download instructions, and public release now all use
+`v0.1.1`. For the next release, update every workspace package first, then use
+that same version for the tag and Release.
 
 ```sh
-gh release create v0.1.2 \
-  release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
-  release/Oh-DSH-Desktop-0.1.2-arm64.zip \
-  release/Oh-DSH-Desktop-0.1.2-x86_64.AppImage \
-  release/Oh-DSH-Desktop-0.1.2-amd64.deb \
-  --title "Oh-DSH-Desktop 0.1.2" \
+gh release create vNEXT \
+  release/Oh-DSH-Desktop-NEXT-arm64.dmg \
+  release/Oh-DSH-Desktop-NEXT-arm64.zip \
+  release/Oh-DSH-Desktop-NEXT-x86_64.AppImage \
+  release/Oh-DSH-Desktop-NEXT-amd64.deb \
+  --title "Oh-DSH-Desktop NEXT" \
   --generate-notes
 ```
 

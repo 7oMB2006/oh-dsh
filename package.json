@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH-Desktop",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "Oh-DSH: installable DeepSeek Harness surfaces — the Electron desktop distribution with web and TUI surfaces planned",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",

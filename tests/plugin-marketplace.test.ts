@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { test } from 'node:test'
@@ -27,6 +27,7 @@ function catalogDocument(): unknown {
     repos: [
       {
         name: 'bundle-demo',
+        repo: 'dsh-external/bundle-demo',
         category: 'plugin',
         description: 'Bundle demo',
         bundle: true,
@@ -36,6 +37,7 @@ function catalogDocument(): unknown {
       },
       {
         name: 'safe-demo',
+        repo: 'omdsh-dev/safe-demo',
         category: 'plugin',
         description: 'Safe bundle demo',
         bundle: true,
@@ -44,6 +46,7 @@ function catalogDocument(): unknown {
       },
       {
         name: 'repository-demo',
+        repo: 'vlln/repository-demo',
         category: 'skill',
         note: 'Repository demo',
         bundle: false,
@@ -73,7 +76,7 @@ class FakePlatform implements MarketplacePlatform {
     return { detail: 'test auth', status: 'ready' }
   }
 
-  async cloneRepository(_pluginId: string, _commit: string, target: string): Promise<void> {
+  async cloneRepository(_repository: string, _commit: string, target: string): Promise<void> {
     mkdirSync(target, { recursive: true })
   }
 
@@ -81,7 +84,8 @@ class FakePlatform implements MarketplacePlatform {
     return catalogDocument()
   }
 
-  async readRepositoryFile(pluginId: string, path: string): Promise<string | null> {
+  async readRepositoryFile(repository: string, path: string): Promise<string | null> {
+    const pluginId = repository.split('/').at(-1) ?? repository
     if (pluginId === 'bundle-demo' && path === 'package.json') {
       return JSON.stringify({
         name: this.bundleName,
@@ -108,7 +112,7 @@ class FakePlatform implements MarketplacePlatform {
     return null
   }
 
-  async resolveCommit(): Promise<string> {
+  async resolveCommit(_repository: string): Promise<string> {
     return this.latestCommit
   }
 
@@ -203,7 +207,40 @@ test('catalog parser keeps safe entries and labels unsupported managers', () => 
     catalog.plugins.find(plugin => plugin.id === 'repository-demo')?.description,
     'Repository demo',
   )
+  assert.equal(
+    catalog.plugins.find(plugin => plugin.id === 'repository-demo')?.repository,
+    'vlln/repository-demo',
+  )
   assert.equal(catalog.plugins[0]?.url, 'https://github.com/dsh-external/bundle-demo')
+})
+
+test('community and registry catalogs preserve repositories across owners', () => {
+  const community = parseMarketplaceCatalog({
+    _meta: { schema_version: '1.0', generated_at: '2026-08-14T00:00:00Z' },
+    plugins: [
+      { id: 'alpha-plugin', name: 'Alpha', repo: 'omdsh-dev/alpha-plugin', category: 'plugin', description: { en: 'Alpha plugin' } },
+      { id: 'beta-plugin', name: 'Beta', repo: 'vlln/beta-plugin', category: 'skill', description: { en: 'Beta plugin' } },
+    ],
+  })
+  assert.deepEqual(community.plugins.map(plugin => [plugin.id, plugin.repository, plugin.mechanism]), [
+    ['alpha-plugin', 'omdsh-dev/alpha-plugin', 'discover'],
+    ['beta-plugin', 'vlln/beta-plugin', 'discover'],
+  ])
+
+  const registry = parseMarketplaceCatalog({
+    schema: 'omdsh-registry/v1',
+    entries: [{
+      id: 'registry-plugin',
+      displayName: 'Registry plugin',
+      description: 'Registry plugin',
+      kind: 'plugin',
+      source: { repository: 'whyihaveyou/registry-plugin' },
+      install: { mode: 'repository-plugin' },
+      listing: { state: 'reviewed' },
+    }],
+  })
+  assert.equal(registry.plugins[0]?.repository, 'whyihaveyou/registry-plugin')
+  assert.equal(registry.plugins[0]?.mechanism, 'repository')
 })
 
 test('GitHub credentials use an app-owned config without command-line pairs', () => {
@@ -231,17 +268,14 @@ test('GitHub credentials use an app-owned config without command-line pairs', ()
   }
 })
 
-test('GitHub CLI discovery follows Windows PATH syntax and executable names', { skip: process.platform !== 'win32' }, () => {
+test('GitHub CLI discovery follows Windows PATH syntax and executable names', () => {
   const root = mkdtempSync(join(tmpdir(), 'oh-dsh-gh-path-'))
-  const binary = win32.join(root, 'gh.exe')
   try {
-    writeFileSync(binary, '')
-    chmodSync(binary, 0o755)
+    const expected = win32.join(root, 'gh.exe')
     assert.equal(findGitHubCli({
       Path: `${root};C:\\Program Files\\GitHub CLI`,
-    }, 'win32'), win32.join(root, 'gh.exe'))
+    }, 'win32', candidate => candidate === expected), expected)
   } finally {
-    rmSync(binary, { force: true })
     rmSync(root, { recursive: true, force: true })
   }
 })
@@ -704,7 +738,7 @@ test('repository plugins can be disabled without losing their install receipt', 
     assert.equal(plugin?.enabled, false)
     assert.doesNotMatch(
       readFileSync(join(setup.profileDir, 'cordis.patch.yml'), 'utf8'),
-      /github:dsh-external\/repository-demo/,
+      /github:vlln\/repository-demo/,
     )
 
     await setup.manager.dispatch({
@@ -721,8 +755,51 @@ test('repository plugins can be disabled without losing their install receipt', 
     assert.equal(plugin?.enabled, true)
     assert.match(
       readFileSync(join(setup.profileDir, 'cordis.patch.yml'), 'utf8'),
-      /github:dsh-external\/repository-demo/,
+      /github:vlln\/repository-demo/,
     )
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('legacy dsh-external repository receipts remain manageable', async () => {
+  const setup = fixture()
+  try {
+    const source = `github:dsh-external/legacy-plugin#${COMMIT}&path:/.dsh-plugin`
+    mkdirSync(join(setup.profileDir, '.oh-dsh'), { recursive: true })
+    writeFileSync(join(setup.profileDir, '.oh-dsh', 'marketplace.json'), JSON.stringify({
+      version: 1,
+      entries: [{
+        installedAt: '2026-08-12T00:00:00Z',
+        mechanism: 'repository',
+        packageName: '@legacy/plugin',
+        pluginId: 'legacy-plugin',
+        resolvedCommit: COMMIT,
+        source,
+      }],
+    }))
+    writeFileSync(join(setup.profileDir, 'cordis.patch.yml'), [
+      '# >>> Oh-DSH-Desktop plugin marketplace',
+      '- id: repository-plugins',
+      '  config:',
+      '    repositories:',
+      `      - '${source}'`,
+      '# <<< Oh-DSH-Desktop plugin marketplace',
+      '',
+    ].join('\n'))
+
+    let snapshot = setup.manager.getSnapshot()
+    assert.equal(snapshot.installed[0]?.pluginId, 'legacy-plugin')
+    assert.equal(snapshot.installed[0]?.source, source)
+    snapshot = await setup.manager.dispatch({ type: 'prepare', action: 'disable', pluginId: 'legacy-plugin' })
+    assert.equal(snapshot.preview?.pluginId, 'legacy-plugin')
+    snapshot = await setup.manager.dispatch({ type: 'apply' })
+    assert.doesNotMatch(readFileSync(join(setup.profileDir, 'cordis.patch.yml'), 'utf8'), /legacy-plugin/)
+    snapshot = await setup.manager.dispatch({ type: 'prepare', action: 'enable', pluginId: 'legacy-plugin' })
+    assert.equal(snapshot.preview, null)
+    assert.ok(snapshot.plan?.requirements.includes('accept-high-risk'))
+    snapshot = await setup.manager.dispatch({ type: 'preview', confirmations: ['accept-high-risk'] })
+    assert.equal(snapshot.preview?.pluginId, 'legacy-plugin')
   } finally {
     setup.cleanup()
   }
