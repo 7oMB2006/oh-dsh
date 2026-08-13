@@ -16,15 +16,17 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const stage = join(root, '.stage')
 const release = join(root, 'release')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
-const platform = process.platform
-const arch = process.arch
+const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
+const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
+const isWindowsHost = process.platform === 'win32'
+const stagedNode = join(stage, 'node-runtime', isWindowsHost ? 'node.exe' : join('bin', 'node'))
 const dirName = `oh-dsh-web-${version}-${platform}-${arch}`
 const packageDir = join(release, dirName)
 
 for (const required of [
   join(root, 'dist', 'web.js'),
   join(stage, 'dsh-runtime', 'lib', 'bin.js'),
-  join(stage, 'node-runtime', 'bin', 'node'),
+  stagedNode,
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'web', 'dist', 'index.js'),
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'web', 'dist', 'cordis.patch.yml'),
 ]) {
@@ -61,6 +63,16 @@ export DSH_OH_WEB_ROOT="$ROOT"
 exec "$ROOT/node-runtime/bin/node" "$ROOT/lib/oh-dsh-web/main.js" "$@"
 `)
 chmodSync(launcher, 0o755)
+if (isWindowsHost) {
+  writeFileSync(join(packageDir, 'bin', 'oh-dsh-web.cmd'), [
+    '@ECHO off',
+    'SETLOCAL',
+    'SET "ROOT=%~dp0.."',
+    'SET "DSH_OH_WEB_ROOT=%ROOT%"',
+    '"%ROOT%\\node-runtime\\node.exe" "%ROOT%\\lib\\oh-dsh-web\\main.js" %*',
+    '',
+  ].join('\r\n'))
+}
 
 writeFileSync(join(packageDir, 'README.md'), `# Oh-DSH-Web ${version}
 
@@ -123,7 +135,12 @@ const zip = join(release, `${dirName}.zip`)
 rmSync(tarball, { force: true })
 rmSync(zip, { force: true })
 run('tar', ['-czf', tarball, dirName], { cwd: release })
-run('zip', ['-qry', zip, dirName], { cwd: release })
+if (isWindowsHost) {
+  // bsdtar builds zip archives from the .zip suffix.
+  run('tar', ['-a', '-cf', zip, dirName], { cwd: release })
+} else {
+  run('zip', ['-qry', zip, dirName], { cwd: release })
+}
 
 console.log(`Packaged Oh-DSH-Web ${version}: ${packageDir}`)
 console.log(`  ${tarball}`)

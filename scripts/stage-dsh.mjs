@@ -35,10 +35,12 @@ const nodePlatform = process.env.DSH_DESKTOP_NODE_PLATFORM
 const nodeArch = process.env.DSH_DESKTOP_NODE_ARCH
   ?? { arm64: 'arm64', x64: 'x64' }[process.arch]
   ?? process.arch
+const isWindowsNode = nodePlatform === 'win'
 const nodeFolder = `node-v${nodeVersion}-${nodePlatform}-${nodeArch}`
-const nodeArchiveName = `${nodeFolder}.tar.gz`
+const nodeArchiveName = `${nodeFolder}.${isWindowsNode ? 'zip' : 'tar.gz'}`
 const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
+const nodeExecutable = join(nodeCache, isWindowsNode ? 'node.exe' : join('bin', 'node'))
 
 if (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
   || !existsSync(join(dshSource, 'apps', 'cli', 'lib', 'bin.js'))) {
@@ -51,6 +53,23 @@ function run(command, args, options = {}) {
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} failed with status ${String(result.status)}`)
   }
+}
+
+/** Create a portable link: POSIX symlinks, junctions on Windows, copies for files. */
+function portableSymlink(target, link) {
+  rmSync(link, { recursive: true, force: true })
+  if (process.platform !== 'win32') {
+    symlinkSync(target, link)
+    return
+  }
+  const resolved = resolve(target)
+  if (existsSync(resolved) && !lstatSync(resolved).isDirectory()) {
+    copyFileSync(resolved, link)
+    return
+  }
+  // Junction targets must be absolute; the staged tree stays portable because
+  // pnpm deploy dereferences the rest of the forest into real copies.
+  symlinkSync(resolved, link, 'junction')
 }
 
 function download(url, target) {
@@ -80,11 +99,16 @@ function ensureNodeRuntime() {
   if (actual !== expected) {
     throw new Error(`Node archive checksum mismatch: expected ${expected}, received ${actual}`)
   }
-  if (!existsSync(join(nodeCache, 'bin', 'node'))) {
+  if (!existsSync(nodeExecutable)) {
     const extraction = join(cache, `.node-extract-${String(process.pid)}`)
     rmSync(extraction, { recursive: true, force: true })
     mkdirSync(extraction, { recursive: true })
-    run('tar', ['-xzf', nodeArchive, '-C', extraction])
+    if (isWindowsNode) {
+      // bsdtar on the Windows runner unpacks zip archives.
+      run('tar', ['-xf', nodeArchive, '-C', extraction])
+    } else {
+      run('tar', ['-xzf', nodeArchive, '-C', extraction])
+    }
     rmSync(nodeCache, { recursive: true, force: true })
     cpSync(join(extraction, nodeFolder), nodeCache, {
       recursive: true,
@@ -93,13 +117,15 @@ function ensureNodeRuntime() {
     })
     rmSync(extraction, { recursive: true, force: true })
   }
-  for (const [name, target] of [
-    ['npm', '../lib/node_modules/npm/bin/npm-cli.js'],
-    ['npx', '../lib/node_modules/npm/bin/npx-cli.js'],
-  ]) {
-    const launcher = join(nodeCache, 'bin', name)
-    rmSync(launcher, { force: true })
-    symlinkSync(target, launcher)
+  if (!isWindowsNode) {
+    for (const [name, target] of [
+      ['npm', '../lib/node_modules/npm/bin/npm-cli.js'],
+      ['npx', '../lib/node_modules/npm/bin/npx-cli.js'],
+    ]) {
+      const launcher = join(nodeCache, 'bin', name)
+      rmSync(launcher, { force: true })
+      symlinkSync(target, launcher)
+    }
   }
   rmSync(nodeRuntime, { recursive: true, force: true })
   cpSync(nodeCache, nodeRuntime, {
@@ -107,13 +133,16 @@ function ensureNodeRuntime() {
     preserveTimestamps: true,
     verbatimSymlinks: true,
   })
-  chmodSync(join(nodeRuntime, 'bin', 'node'), 0o755)
+  if (!isWindowsNode) chmodSync(join(nodeRuntime, 'bin', 'node'), 0o755)
 
   const pnpmSource = join(root, 'node_modules', 'pnpm')
   if (!existsSync(join(pnpmSource, 'dist', 'pnpm.mjs'))) {
     throw new Error('pnpm package is missing; run pnpm install before staging')
   }
-  const pnpmTarget = join(nodeRuntime, 'lib', 'node_modules', 'pnpm')
+  const pnpmTarget = join(
+    nodeRuntime,
+    isWindowsNode ? join('node_modules', 'pnpm') : join('lib', 'node_modules', 'pnpm'),
+  )
   rmSync(pnpmTarget, { recursive: true, force: true })
   mkdirSync(pnpmTarget, { recursive: true })
   for (const name of ['bin', 'dist']) {
@@ -125,10 +154,17 @@ function ensureNodeRuntime() {
   for (const name of ['LICENSE', 'package.json']) {
     copyFileSync(join(pnpmSource, name), join(pnpmTarget, name))
   }
-  const pnpmBinary = join(nodeRuntime, 'bin', 'pnpm')
-  rmSync(pnpmBinary, { force: true })
-  symlinkSync('../lib/node_modules/pnpm/bin/pnpm.mjs', pnpmBinary)
-  chmodSync(join(pnpmTarget, 'bin', 'pnpm.mjs'), 0o755)
+  if (isWindowsNode) {
+    writeFileSync(
+      join(nodeRuntime, 'pnpm.cmd'),
+      '@ECHO off\r\n"%~dp0node.exe" "%~dp0node_modules\\pnpm\\bin\\pnpm.mjs" %*\r\n',
+    )
+  } else {
+    const pnpmBinary = join(nodeRuntime, 'bin', 'pnpm')
+    rmSync(pnpmBinary, { force: true })
+    symlinkSync('../lib/node_modules/pnpm/bin/pnpm.mjs', pnpmBinary)
+    chmodSync(join(pnpmTarget, 'bin', 'pnpm.mjs'), 0o755)
+  }
 }
 
 function shouldCopyWorkspaceEntry(sourceRoot, source) {
@@ -235,8 +271,7 @@ function mirrorPackageDependencies(sourcePackage, targetPackage) {
     const target = stageDependencyTarget(sourceTarget)
     const targetLink = join(targetPackage, 'node_modules', ...dependency.split('/'))
     mkdirSync(dirname(targetLink), { recursive: true })
-    rmSync(targetLink, { recursive: true, force: true })
-    symlinkSync(relative(dirname(targetLink), target), targetLink)
+    portableSymlink(relative(dirname(targetLink), target), targetLink)
   }
 }
 
@@ -280,8 +315,7 @@ function rewriteWorkspaceLinks() {
     const logicalTarget = resolve(dirname(link), raw)
     if (logicalTarget !== dshSource && !logicalTarget.startsWith(dshSource + sep)) continue
     const stagedTarget = stageWorkspaceTarget(logicalTarget)
-    rmSync(link)
-    symlinkSync(relative(dirname(link), stagedTarget), link)
+    portableSymlink(relative(dirname(link), stagedTarget), link)
   }
 }
 
@@ -290,8 +324,7 @@ function relinkInstallationWorkspacePackages() {
     const link = join(runtime, 'node_modules', ...packageName.split('/'))
     if (!existsSync(link)) continue
     const stagedTarget = stageWorkspaceTarget(source)
-    rmSync(link, { recursive: true, force: true })
-    symlinkSync(relative(dirname(link), stagedTarget), link)
+    portableSymlink(relative(dirname(link), stagedTarget), link)
   }
 }
 
@@ -389,8 +422,7 @@ function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) 
     const target = stageWorkspaceTarget(source)
     const link = join(packageDir, 'node_modules', ...dependency.split('/'))
     mkdirSync(dirname(link), { recursive: true })
-    rmSync(link, { recursive: true, force: true })
-    symlinkSync(relative(dirname(link), target), link)
+    portableSymlink(relative(dirname(link), target), link)
   }
 }
 
@@ -469,6 +501,7 @@ function installDesktopPackages() {
 }
 
 function restoreExecutableHelpers() {
+  if (process.platform === 'win32') return
   const visit = directory => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name)
@@ -552,7 +585,9 @@ for (const required of [
 
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
-run('pnpm', [
+const pnpmCli = join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
+run(process.execPath, [
+  pnpmCli,
   '--ignore-scripts',
   '--filter', '@deepseek-ai/dsh',
   'deploy', '--prod', '--legacy', runtime,
@@ -568,11 +603,19 @@ ensureNodeRuntime()
 assertSelfContained(nodeRuntime, 'Node runtime')
 ensureLinuxPtyBuild()
 
-run(join(nodeRuntime, 'bin', 'node'), [join(runtime, 'lib', 'bin.js'), '--version'], {
+const stagedNode = join(nodeRuntime, isWindowsNode ? 'node.exe' : join('bin', 'node'))
+run(stagedNode, [join(runtime, 'lib', 'bin.js'), '--version'], {
   cwd: runtime,
   env: { ...process.env, DSH_HOME: join(stage, 'smoke-home') },
 })
-run(join(nodeRuntime, 'bin', 'pnpm'), ['--version'], { cwd: runtime, env: process.env })
+if (isWindowsNode) {
+  run(stagedNode, [join(nodeRuntime, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'), '--version'], {
+    cwd: runtime,
+    env: process.env,
+  })
+} else {
+  run(join(nodeRuntime, 'bin', 'pnpm'), ['--version'], { cwd: runtime, env: process.env })
+}
 
 console.log(`Staged DSH runtime: ${runtime}`)
 console.log(`Staged Node ${nodeVersion}: ${nodeRuntime}`)

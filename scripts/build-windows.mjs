@@ -6,11 +6,12 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const requestedArch = process.argv[2]
 const arch = requestedArch ?? { arm64: 'arm64', x64: 'x64' }[process.arch] ?? process.arch
-if (arch !== 'arm64' && arch !== 'x64') {
-  throw new Error(`unsupported Linux architecture: ${arch}`)
+if (arch !== 'x64') {
+  throw new Error(`unsupported Windows architecture: ${arch}; only x64 is packaged`)
 }
+
 const electronPackage = join(root, 'node_modules', 'electron')
-const electronBinary = join(electronPackage, 'dist', 'electron')
+const electronBinary = join(electronPackage, 'dist', 'electron.exe')
 if (!existsSync(electronBinary)) {
   const installResult = spawnSync(process.execPath, [join(electronPackage, 'install.js')], {
     cwd: root,
@@ -20,18 +21,8 @@ if (!existsSync(electronBinary)) {
   if (installResult.status !== 0) process.exit(installResult.status ?? 1)
 }
 
-const iconSet = join(root, 'assets', 'icons', '512x512.png')
-if (!existsSync(iconSet)) {
-  const iconResult = spawnSync('sh', [join(root, 'scripts', 'generate-icon-linux.sh')], {
-    cwd: root,
-    stdio: 'inherit',
-  })
-  if (iconResult.error !== undefined) throw iconResult.error
-  if (iconResult.status !== 0) process.exit(iconResult.status ?? 1)
-}
-
 const builder = join(root, 'node_modules', '.bin', 'electron-builder')
-const result = spawnSync(builder, ['--linux', `--${arch}`], {
+const result = spawnSync(builder, ['--win', `--${arch}`], {
   cwd: root,
   env: {
     ...process.env,

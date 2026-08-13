@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078D6?logo=windows&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
   <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
@@ -51,7 +52,7 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 
 | 形态 | 包 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| Desktop | `@oh-dsh/desktop` | ✅ 已发布 | Electron 桌面形态，macOS / Linux |
+| Desktop | `@oh-dsh/desktop` | ✅ 已发布 | Electron 桌面形态，macOS / Linux / Windows |
 | Web | `@oh-dsh/web` | ✅ 本仓库实现 | Oh-DSH-Web 浏览器形态，可独立打包安装 |
 | TUI | `@oh-dsh/tui` | ⏳ 计划中 | 终端形态，复用同一份 core |
 
@@ -59,11 +60,11 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 `plugin-marketplace` 等）将针对这三种形态**同时适配**：通过统一的
 `ohDshSurface` 服务自动识别当前形态并显式分支（见下文
 「三种形态与表面适配」）。三种形态可以分开打包，也可以合并分发；每个形态
-的目标平台为 macOS、Linux（Windows 在规划中）。
+的目标平台为 macOS、Linux 与 Windows。
 
 ## 主要能力
 
-- 自包含的 Apple Silicon macOS 应用与安装包,以及 Linux x64 AppImage / deb。
+- 自包含的 Apple Silicon / Intel macOS 应用与安装包、Linux x64 AppImage / deb，以及 Windows x64 NSIS 安装包。
 - 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
 - Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
@@ -345,11 +346,14 @@ URL、可选地打开浏览器，并优雅处理 `Ctrl+C`。
 完整构建会重建固定 DSH；缓存已经就绪时可使用 quick 构建：
 
 ```sh
-pnpm run dist:mac
+pnpm run dist:mac          # Apple Silicon
+pnpm run dist:mac:x64      # Intel
 pnpm run dist:linux
+pnpm run dist:win
 # 或
 pnpm run dist:mac:quick
 pnpm run dist:linux:quick
+pnpm run dist:win:quick
 ```
 
 macOS 产物位于 `release/`：
@@ -389,11 +393,30 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
+Windows 产物同样位于 `release/`：
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.1-x64.exe
+├── Oh-DSH-Desktop-0.1.1-x64.zip
+└── win-unpacked/
+```
+
 打包内置的 Node runtime 默认匹配构建机平台；跨平台打包可显式指定
-`DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`）与 `DSH_DESKTOP_NODE_ARCH`
+`DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`/`win`）与 `DSH_DESKTOP_NODE_ARCH`
 （`x64`/`arm64`）。
 
-仓库当前不依赖 GitHub Actions 生成发行包。上传前在本机验证：
+## GitHub Actions 发行流程
+
+推送 `v*` tag（或手动触发 `workflow_dispatch`）后，
+[`.github/workflows/release.yml`](.github/workflows/release.yml) 会在四台
+runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows x64，每个
+平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、NSIS/ZIP）与 Oh-DSH-Web
+发行包（tar.gz/ZIP）。tag 触发时，publish job 会用 `gh release create`
+把全部产物挂到同名 GitHub Release；手动触发只构建并上传 workflow
+artifact，不创建 Release。
+
+上传前也可以在本机验证：
 
 ```sh
 pnpm run typecheck
@@ -417,17 +440,8 @@ pnpm run smoke:app:linux
 ```
 
 当前 package、下载说明和公开 Release 均为 `v0.1.1`。准备下一个版本时，
-先统一更新 workspace package 版本，再使用同一版本创建 tag 与 Release：
-
-```sh
-gh release create vNEXT \
-  release/Oh-DSH-Desktop-NEXT-arm64.dmg \
-  release/Oh-DSH-Desktop-NEXT-arm64.zip \
-  release/Oh-DSH-Desktop-NEXT-x86_64.AppImage \
-  release/Oh-DSH-Desktop-NEXT-amd64.deb \
-  --title "Oh-DSH-Desktop NEXT" \
-  --generate-notes
-```
+先统一更新 workspace package 版本，再推送同一版本号的 `v*` tag；release
+workflow 会按该版本打包全部形态并创建对应 Release。
 
 ## License
 

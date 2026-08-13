@@ -4,6 +4,11 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const requestedArch = process.argv[2]
+const arch = requestedArch ?? { arm64: 'arm64', x64: 'x64' }[process.arch] ?? process.arch
+if (arch !== 'arm64' && arch !== 'x64') {
+  throw new Error(`unsupported macOS architecture: ${arch}`)
+}
 const electronPackage = join(root, 'node_modules', 'electron')
 const electronBinary = join(electronPackage, 'dist', 'Electron.app', 'Contents', 'MacOS', 'Electron')
 if (!existsSync(electronBinary)) {
@@ -26,7 +31,7 @@ if (!existsSync(icon)) {
 }
 
 const builder = join(root, 'node_modules', '.bin', 'electron-builder')
-const result = spawnSync(builder, ['--mac'], {
+const result = spawnSync(builder, ['--mac', `--${arch}`], {
   cwd: root,
   env: {
     ...process.env,

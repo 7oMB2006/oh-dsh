@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Linux x64" src="https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-0078D6?logo=windows&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
   <img alt="DSH 0.1.0-rc.5" src="https://img.shields.io/badge/DSH-0.1.0--rc.5-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
@@ -57,7 +58,7 @@ DSH runtime and one set of built-in plugins:
 
 | Surface | Package | Status | Notes |
 | --- | --- | --- | --- |
-| Desktop | `@oh-dsh/desktop` | ✅ released | Electron desktop surface, macOS / Linux |
+| Desktop | `@oh-dsh/desktop` | ✅ released | Electron desktop surface, macOS / Linux / Windows |
 | Web | `@oh-dsh/web` | ✅ implemented here | Oh-DSH-Web browser surface, packaged separately |
 | TUI | `@oh-dsh/tui` | ⏳ planned | Terminal surface, reusing the same core |
 
@@ -67,11 +68,11 @@ they recognize the active surface through the shared `ohDshSurface` service
 and branch explicitly (see
 [Three surfaces and surface adaptation](#three-surfaces-and-surface-adaptation)).
 Each surface can be packaged separately or together; target platforms are
-macOS and Linux (Windows is planned).
+macOS, Linux, and Windows.
 
 ## Capabilities
 
-- Self-contained Apple Silicon macOS and Linux x64 applications and installers.
+- Self-contained Apple Silicon / Intel macOS and Linux x64 applications and installers, plus a Windows x64 NSIS installer.
 - Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
 - Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
@@ -373,11 +374,14 @@ A complete build rebuilds the pinned DSH source. Use the quick build when the
 cache is already current:
 
 ```sh
-pnpm run dist:mac
+pnpm run dist:mac          # Apple Silicon
+pnpm run dist:mac:x64      # Intel
 pnpm run dist:linux
+pnpm run dist:win
 # or
 pnpm run dist:mac:quick
 pnpm run dist:linux:quick
+pnpm run dist:win:quick
 ```
 
 macOS artifacts are written to `release/`:
@@ -417,12 +421,30 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
+Windows artifacts are written to the same directory:
+
+```text
+release/
+├── Oh-DSH-Desktop-0.1.1-x64.exe
+├── Oh-DSH-Desktop-0.1.1-x64.zip
+└── win-unpacked/
+```
+
 The bundled Node runtime defaults to the build machine's platform. Set
-`DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`) and `DSH_DESKTOP_NODE_ARCH`
+`DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`/`win`) and `DSH_DESKTOP_NODE_ARCH`
 (`x64`/`arm64`) to stage a different target for cross-packaging.
 
-The repository does not currently rely on GitHub Actions for release builds.
-Verify locally before upload:
+## GitHub Actions release flow
+
+Pushing a `v*` tag (or triggering `workflow_dispatch` manually) runs
+[`.github/workflows/release.yml`](.github/workflows/release.yml), which
+packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.
+Each platform produces the desktop package (DMG/ZIP, AppImage/deb, NSIS/ZIP)
+and the Oh-DSH-Web package (tar.gz/ZIP). On tag pushes, a publish job
+attaches every artifact to a same-named GitHub Release via `gh release
+create`; manual runs only build and upload workflow artifacts.
+
+You can still verify locally before upload:
 
 ```sh
 pnpm run typecheck
@@ -446,18 +468,9 @@ pnpm run smoke:app:linux
 ```
 
 The package metadata, download instructions, and public release now all use
-`v0.1.1`. For the next release, update every workspace package first, then use
-that same version for the tag and Release.
-
-```sh
-gh release create vNEXT \
-  release/Oh-DSH-Desktop-NEXT-arm64.dmg \
-  release/Oh-DSH-Desktop-NEXT-arm64.zip \
-  release/Oh-DSH-Desktop-NEXT-x86_64.AppImage \
-  release/Oh-DSH-Desktop-NEXT-amd64.deb \
-  --title "Oh-DSH-Desktop NEXT" \
-  --generate-notes
-```
+`v0.1.1`. For the next release, update every workspace package first, then
+push a `v*` tag at that version; the release workflow packages every surface
+and creates the matching GitHub Release.
 
 ## License
 

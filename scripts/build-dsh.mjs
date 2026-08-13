@@ -1,10 +1,14 @@
 import { spawnSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { resolveDshSource } from './dsh-source.mjs'
 
+const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dshSource = resolveDshSource()
+const pnpmCli = join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs')
 
 function run(args) {
-  const result = spawnSync('pnpm', args, {
+  const result = spawnSync(process.execPath, [pnpmCli, ...args], {
     cwd: dshSource,
     env: process.env,
     stdio: 'inherit',
