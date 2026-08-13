@@ -7,8 +7,10 @@ import { DSH_SOURCE_SPEC, resolveDshSource } from '../scripts/dsh-source.mjs'
 
 test('desktop release source pins a full DSH commit', () => {
   assert.equal(DSH_SOURCE_SPEC.version, '0.1.0-rc.5')
-  assert.equal(DSH_SOURCE_SPEC.ref, 'master')
+  assert.equal(DSH_SOURCE_SPEC.repository, 'https://github.com/deepseek-ai/deepseek-harness.git')
+  assert.match(DSH_SOURCE_SPEC.ref, /^[0-9a-f]{40}$/)
   assert.match(DSH_SOURCE_SPEC.revision, /^[0-9a-f]{40}$/)
+  assert.equal(DSH_SOURCE_SPEC.ref, DSH_SOURCE_SPEC.revision)
 })
 
 test('DSH source override must match the pinned package version', () => {
