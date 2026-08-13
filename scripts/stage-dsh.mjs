@@ -19,7 +19,6 @@ import {
 import {
   basename,
   dirname,
-  isAbsolute,
   join,
   relative,
   resolve,
@@ -393,7 +392,11 @@ function normalizeRuntimeLinks() {
     const raw = readlinkSync(link)
     const logical = resolve(dirname(link), raw)
     if (logical === runtime || logical.startsWith(runtime + sep)) {
-      if (isAbsolute(raw)) portableSymlink(relative(dirname(link), logical), link)
+      // Canonicalize every internal link, not only absolute ones: relative
+      // targets that over-walk past the runtime root resolve back into this
+      // build's `.stage` once the tree is copied into a package.
+      const canonical = relative(dirname(link), logical)
+      if (raw !== canonical) portableSymlink(canonical, link)
       continue
     }
     if (!existsSync(logical)) continue
@@ -418,7 +421,8 @@ function rewriteWorkspaceLinks() {
     const raw = readlinkSync(link)
     const logicalTarget = resolve(dirname(link), raw)
     if (logicalTarget === runtime || logicalTarget.startsWith(runtime + sep)) {
-      if (isAbsolute(raw)) portableSymlink(relative(dirname(link), logicalTarget), link)
+      const canonical = relative(dirname(link), logicalTarget)
+      if (raw !== canonical) portableSymlink(canonical, link)
       continue
     }
     if (logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)) {
@@ -435,9 +439,16 @@ function rewriteWorkspaceLinks() {
 
 function relinkInstallationWorkspacePackages() {
   for (const [packageName, source] of discoverSourcePackages()) {
+    if (source === dshSource) continue
     const link = join(runtime, 'node_modules', ...packageName.split('/'))
-    if (!existsSync(link)) continue
+    const stat = existsSync(link) ? lstatSync(link) : undefined
+    if (stat !== undefined && !stat.isSymbolicLink()) continue
+    if (stat === undefined
+      && !existsSync(join(dshSource, 'node_modules', ...packageName.split('/')))) {
+      continue
+    }
     const stagedTarget = stageWorkspaceTarget(source)
+    mkdirSync(dirname(link), { recursive: true })
     portableSymlink(relative(dirname(link), stagedTarget), link)
   }
 }

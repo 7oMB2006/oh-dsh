@@ -21,10 +21,12 @@ if (!existsSync(electronBinary)) {
   if (installResult.status !== 0) process.exit(installResult.status ?? 1)
 }
 
-const builder = join(root, 'node_modules', '.bin', 'electron-builder')
+// The `.bin` shim is a POSIX script; on Windows the package has no usable
+// wrapper in PATH, so run the CLI entry with Node directly.
+const builder = join(root, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js')
 // Packaging runs on tag commits; never let electron-builder infer a publish
 // step from the tag. Releases are attached by the workflow instead.
-const result = spawnSync(builder, ['--win', `--${arch}`, '--publish', 'never'], {
+const result = spawnSync(process.execPath, [builder, '--win', `--${arch}`, '--publish', 'never'], {
   cwd: root,
   env: {
     ...process.env,
