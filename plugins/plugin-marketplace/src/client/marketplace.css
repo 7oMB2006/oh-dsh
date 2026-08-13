@@ -78,7 +78,7 @@
 }
 
 html[data-oh-dsh-marketplace-open='true'] [data-oh-dsh-pinned-summary],
-html[data-oh-dsh-marketplace-open='true'] #oh-dsh-desktop-sidebar-root {
+html[data-oh-dsh-marketplace-open='true'] #oh-dsh-sidebar-root {
   display: none !important;
 }
 

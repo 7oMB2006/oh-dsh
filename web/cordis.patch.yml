@@ -1,0 +1,34 @@
+# Oh-DSH-Web is a bundle layer over dsh-base + dsh-web-app. The browser
+# distribution keeps DSH's web UI and mounts each web-capable Oh-DSH behavior
+# as an independently registered Host/Client plugin.
+#
+# The dsh-web-app bundle already binds the webserver (default
+# 127.0.0.1:3080) and prints the readiness URL; the oh-dsh-web launcher
+# passes --host/--port over the same webStartup seam. This layer adds the
+# Oh-DSH surface: the web identity plugin and the web-capable Oh-DSH plugins.
+#
+# Web keeps the same browser client graph as the desktop distribution
+# wherever the host services exist: skins, pinned summary, the sidebar
+# (workspace, Git, review, preferences — its host is pure Node), the PTY
+# terminal dock (better-sidebar-runtime is also pure Node), and the
+# browser-side panel layout. Only the Electron-bound surfaces stay out: the
+# desktop shell chrome and the marketplace bridge.
+
+- insert:
+    - id: oh-web
+      name: '@oh-dsh/web'
+
+    - id: oh-better-sidebar-runtime
+      name: '@oh-dsh/better-sidebar-runtime'
+
+    - id: oh-skins
+      name: '@oh-dsh/skins'
+
+    - id: oh-pinned-summary
+      name: '@oh-dsh/pinned-summary'
+
+    - id: oh-sidebar
+      name: '@oh-dsh/sidebar'
+
+    - id: oh-panel-controls
+      name: '@oh-dsh/panel-controls'

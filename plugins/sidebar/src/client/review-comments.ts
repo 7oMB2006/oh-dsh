@@ -96,7 +96,7 @@ interface ComposerBridge {
   setScope(branch: string | null): void
 }
 
-const STORAGE_KEY = 'oh-dsh.desktop-sidebar.review-comments.v1'
+const STORAGE_KEY = 'oh-dsh.sidebar.review-comments.v1'
 const REVIEW_SOURCE = 'oh-dsh-review'
 const REVIEW_REF = 'review-comments'
 const MAX_PERSISTED_COMMENTS = 200

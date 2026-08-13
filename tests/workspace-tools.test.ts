@@ -7,12 +7,12 @@ import { test } from 'node:test'
 import {
   mutateWorkspace,
   readWorkspaceFacts,
-} from '../plugins/desktop-sidebar/src/git-workspace.ts'
+} from '../plugins/sidebar/src/git-workspace.ts'
 import {
   mapBetterSidebarFile,
   mapBetterSidebarTree,
   workspaceChangesFromBetterSidebar,
-} from '../plugins/desktop-sidebar/src/client/better-sidebar-api.ts'
+} from '../plugins/sidebar/src/client/better-sidebar-api.ts'
 
 function git(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' })

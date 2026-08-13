@@ -226,7 +226,7 @@ export class DesktopSidebarService implements DesktopSidebar {
 
   registerTab(descriptor: DesktopSidebarTabDescriptor): () => void {
     if (this.tabDescriptors.has(descriptor.id)) {
-      throw new Error(`desktop-sidebar: duplicate tab "${descriptor.id}"`)
+      throw new Error(`sidebar: duplicate tab "${descriptor.id}"`)
     }
     this.tabDescriptors.set(descriptor.id, descriptor)
     this.touch()
@@ -240,7 +240,7 @@ export class DesktopSidebarService implements DesktopSidebar {
 
   registerViewer(descriptor: DesktopSidebarViewerDescriptor): () => void {
     if (this.viewerDescriptors.has(descriptor.id)) {
-      throw new Error(`desktop-sidebar: duplicate viewer "${descriptor.id}"`)
+      throw new Error(`sidebar: duplicate viewer "${descriptor.id}"`)
     }
     this.viewerDescriptors.set(descriptor.id, descriptor)
     this.touch()

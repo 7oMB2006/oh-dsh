@@ -4,11 +4,14 @@ import { dirname, join } from 'node:path'
 /** Profile name reserved for the packaged desktop surface. */
 export const DESKTOP_PROFILE = 'desktop'
 
+/** Profile name reserved for the packaged Oh-DSH-Web browser surface. */
+export const WEB_PROFILE = 'web'
+
 /** Plugins that enroll a browser-side entry in the desktop client graph. */
 export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/desktop',
-  '@oh-dsh/desktop-skins',
-  '@oh-dsh/desktop-sidebar',
+  '@oh-dsh/skins',
+  '@oh-dsh/sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
@@ -30,6 +33,13 @@ export const DESKTOP_BUNDLES = [
   '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-web-app',
   '@oh-dsh/desktop',
+] as const
+
+/** Bundle order owned by the Oh-DSH-Web browser distribution. */
+export const WEB_BUNDLES = [
+  '@deepseek-ai/dsh-base',
+  '@deepseek-ai/dsh-web-app',
+  '@oh-dsh/web',
 ] as const
 
 interface ProfileManifest {
@@ -64,35 +74,57 @@ function writeJsonAtomic(path: string, value: unknown): void {
   renameSync(temporary, path)
 }
 
-function requiredBundles(existing: readonly string[]): string[] {
-  const required = new Set<string>(DESKTOP_BUNDLES)
-  return [...DESKTOP_BUNDLES, ...existing.filter(bundle => !required.has(bundle))]
+function requiredBundles(existing: readonly string[], owned: readonly string[]): string[] {
+  const required = new Set<string>(owned)
+  return [...owned, ...existing.filter(bundle => !required.has(bundle))]
 }
 
+/** One packaged distribution surface: its profile name, bundles, and manifest identity. */
+export interface ProfileSpec {
+  bundles: readonly string[]
+  manifestName: string
+  name: string
+}
+
+/** Profile facts for the packaged desktop surface. */
+export const DESKTOP_PROFILE_SPEC: ProfileSpec = Object.freeze({
+  bundles: DESKTOP_BUNDLES,
+  manifestName: 'dsh-profile-desktop',
+  name: DESKTOP_PROFILE,
+})
+
+/** Profile facts for the packaged Oh-DSH-Web browser surface. */
+export const WEB_PROFILE_SPEC: ProfileSpec = Object.freeze({
+  bundles: WEB_BUNDLES,
+  manifestName: 'dsh-profile-web',
+  name: WEB_PROFILE,
+})
+
 /**
- * Initialize or upgrade the writable desktop profile without replacing user
- * patches or third-party bundle entries.
+ * Initialize or upgrade a writable distribution profile without replacing
+ * user patches or third-party bundle entries.
+ * @param spec - the surface's profile facts.
  * @param dshHome - application-owned DSH home directory.
  * @returns resolved profile paths.
  */
-export function ensureDesktopProfile(dshHome: string): DesktopProfilePaths {
-  const profileDir = join(dshHome, 'profiles', DESKTOP_PROFILE)
+export function ensureProfile(spec: ProfileSpec, dshHome: string): DesktopProfilePaths {
+  const profileDir = join(dshHome, 'profiles', spec.name)
   mkdirSync(profileDir, { recursive: true, mode: 0o700 })
   const manifestPath = join(profileDir, 'package.json')
   const manifest = existsSync(manifestPath)
     ? readManifest(manifestPath)
-    : { name: 'dsh-profile-desktop', private: true, dependencies: {} }
+    : { name: spec.manifestName, private: true, dependencies: {} }
   const currentBundles = manifest.dsh?.profile?.bundles ?? []
   const next: ProfileManifest = {
     ...manifest,
-    name: manifest.name ?? 'dsh-profile-desktop',
+    name: manifest.name ?? spec.manifestName,
     private: true,
     dependencies: manifest.dependencies ?? {},
     dsh: {
       ...manifest.dsh,
       profile: {
         ...manifest.dsh?.profile,
-        bundles: requiredBundles(currentBundles),
+        bundles: requiredBundles(currentBundles, spec.bundles),
       },
     },
   }
@@ -111,4 +143,24 @@ export function ensureDesktopProfile(dshHome: string): DesktopProfilePaths {
   }
   mkdirSync(dirname(join(dshHome, 'sessions', '.keep')), { recursive: true, mode: 0o700 })
   return { dshHome, profileDir }
+}
+
+/**
+ * Initialize or upgrade the writable desktop profile without replacing user
+ * patches or third-party bundle entries.
+ * @param dshHome - application-owned DSH home directory.
+ * @returns resolved profile paths.
+ */
+export function ensureDesktopProfile(dshHome: string): DesktopProfilePaths {
+  return ensureProfile(DESKTOP_PROFILE_SPEC, dshHome)
+}
+
+/**
+ * Initialize or upgrade the writable Oh-DSH-Web profile without replacing
+ * user patches or third-party bundle entries.
+ * @param dshHome - application-owned DSH home directory.
+ * @returns resolved profile paths.
+ */
+export function ensureWebProfile(dshHome: string): DesktopProfilePaths {
+  return ensureProfile(WEB_PROFILE_SPEC, dshHome)
 }

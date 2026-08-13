@@ -13,9 +13,9 @@ export interface DesktopSkinPreferences {
   fallbackTheme: DesktopFallbackTheme
 }
 
-export const ACTIVE_SKIN_KEY = 'oh-dsh-desktop.skins.active'
-export const FALLBACK_THEME_KEY = 'oh-dsh-desktop.skins.fallback'
-export const PREFERENCES_API_PATH = '/oh-dsh-desktop/skins/preferences'
+export const ACTIVE_SKIN_KEY = 'oh-dsh.skins.active'
+export const FALLBACK_THEME_KEY = 'oh-dsh.skins.fallback'
+export const PREFERENCES_API_PATH = '/oh-dsh/skins/preferences'
 export const DEFAULT_SKIN_PREFERENCES: DesktopSkinPreferences = Object.freeze({
   activeId: null,
   fallbackTheme: 'system',

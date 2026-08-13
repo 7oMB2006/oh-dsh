@@ -4,7 +4,7 @@ import {
   DEFAULT_SIDEBAR_RUNTIME_PREFERENCES,
   parseSidebarRuntimePreferences,
   SidebarRuntimeSettingsService,
-} from '../plugins/desktop-sidebar/src/client/runtime-settings.ts'
+} from '../plugins/sidebar/src/client/runtime-settings.ts'
 
 test('sidebar runtime settings default missing upstream fields safely', () => {
   assert.deepEqual(parseSidebarRuntimePreferences({

@@ -1,0 +1,38 @@
+{
+  "name": "@oh-dsh/web",
+  "version": "0.1.2",
+  "description": "The Oh-DSH-Web browser distribution: a packaged DeepSeek Harness web runtime with Oh-DSH plugin capabilities",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./dist/index.js"
+    },
+    "./client": "./dist/client.js",
+    "./cordis.patch.yml": "./dist/cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/client.js",
+    "dist/client.js.map",
+    "dist/cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./dist/cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@oh-dsh/skins",
+        "@oh-dsh/pinned-summary",
+        "@oh-dsh/sidebar",
+        "@oh-dsh/panel-controls"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

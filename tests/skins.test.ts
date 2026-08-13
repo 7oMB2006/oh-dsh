@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import {
   DesktopSkinPreferencesStorage,
   type PreferencesFetch,
-} from '../plugins/desktop-skins/src/client/preferences-storage.ts'
+} from '../plugins/skins/src/client/preferences-storage.ts'
 import {
   ACTIVE_SKIN_KEY,
   DesktopSkinsController,
@@ -14,20 +14,20 @@ import {
   type StorageLike,
   type ThemeService,
   type ThemeSnapshot,
-} from '../plugins/desktop-skins/src/client/skin-controller.ts'
-import type { SkinDomPort } from '../plugins/desktop-skins/src/client/skin-dom.ts'
+} from '../plugins/skins/src/client/skin-controller.ts'
+import type { SkinDomPort } from '../plugins/skins/src/client/skin-dom.ts'
 import {
   DESKTOP_SKINS,
   type DesktopSkin,
-} from '../plugins/desktop-skins/src/client/skins.ts'
+} from '../plugins/skins/src/client/skins.ts'
 import {
   parseSkinPreferences,
   type DesktopSkinPreferences,
-} from '../plugins/desktop-skins/src/preferences.ts'
+} from '../plugins/skins/src/preferences.ts'
 import {
   loadSkinPreferences,
   saveSkinPreferences,
-} from '../plugins/desktop-skins/src/preferences-server.ts'
+} from '../plugins/skins/src/preferences-server.ts'
 
 class MemoryStorage implements StorageLike {
   readonly values = new Map<string, string>()
@@ -204,8 +204,8 @@ test('runtime teardown preserves the selected skin for the next launch', () => {
 })
 
 test('desktop skin preferences survive outside the changing Web origin', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'oh-dsh-desktop-skins-'))
-  const path = join(directory, 'desktop-skins.json')
+  const directory = await mkdtemp(join(tmpdir(), 'oh-dsh-skins-'))
+  const path = join(directory, 'skins.json')
   const preferences: DesktopSkinPreferences = {
     activeId: 'oh-dsh-skin-porcelain',
     fallbackTheme: 'dark',

@@ -4,6 +4,10 @@ import {
   mountMarketplaceAgentTools,
   type MarketplaceToolContext,
 } from './marketplace-tools.ts'
+import {
+  OH_DSH_SURFACE_SERVICE,
+  type OhDshSurface,
+} from '../plugins/shared/surface.ts'
 
 interface SystemPromptService {
   section(entry: {
@@ -70,6 +74,16 @@ function desktopPrompt(capability: DesktopHostCapability): string {
 export function apply(ctx: HostContext): void {
   const capability = environmentCapability()
   ctx.provide('desktop', capability)
+  // The unified three-surface contract: desktop shell (see
+  // plugins/shared/surface.ts). The `desktop` service above stays for
+  // third-party plugins written against the desktop distribution.
+  ctx.provide(OH_DSH_SURFACE_SERVICE, Object.freeze({
+    dataRoot: capability.appDataPath,
+    kind: 'desktop',
+    platform: capability.platform,
+    profile: capability.profile,
+    version: capability.version,
+  } satisfies OhDshSurface))
   mountMarketplaceAgentTools(ctx)
 
   ctx.inject(['systemPrompt'], (promptCtx) => {

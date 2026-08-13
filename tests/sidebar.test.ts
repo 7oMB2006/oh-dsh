@@ -3,13 +3,13 @@ import { test } from 'node:test'
 import {
   DesktopSidebarService,
   type DesktopSidebarTabDescriptor,
-} from '../plugins/desktop-sidebar/src/client/sidebar-service.ts'
-import type { SidebarPreferencesStorage } from '../plugins/desktop-sidebar/src/client/sidebar-storage.ts'
+} from '../plugins/sidebar/src/client/sidebar-service.ts'
+import type { SidebarPreferencesStorage } from '../plugins/sidebar/src/client/sidebar-storage.ts'
 import {
   DEFAULT_SIDEBAR_PREFERENCES,
   parseSidebarPreferences,
   type DesktopSidebarPreferences,
-} from '../plugins/desktop-sidebar/src/sidebar-preferences.ts'
+} from '../plugins/sidebar/src/sidebar-preferences.ts'
 
 class MemorySidebarStorage implements SidebarPreferencesStorage {
   writes: DesktopSidebarPreferences[] = []

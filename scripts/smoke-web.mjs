@@ -2,32 +2,43 @@ import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import {
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import electronBinary from 'electron'
+import { ensureWebProfile, WEB_PROFILE } from '../src/profile.ts'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
-import {
-  BUNDLED_DESKTOP_CLIENT_PLUGINS,
-  BUNDLED_DESKTOP_HOST_PLUGINS,
-  ensureDesktopProfile,
-} from '../src/profile.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const resources = resolve(process.argv[2] ?? join(root, '.stage'))
+
+/** Resolve the smoke resources root: `.stage`, an explicit dir, or the packaged release. */
+function resolveResources(candidate) {
+  if (candidate === 'release') {
+    const releases = readdirSync(join(root, 'release'))
+      .filter(name => name.startsWith('oh-dsh-web-'))
+      .filter(name => existsSync(join(root, 'release', name, 'dsh-runtime')))
+    assert.ok(releases.length > 0, 'no packaged oh-dsh-web release found in release/')
+    assert.equal(releases.length, 1, `multiple packaged releases found: ${releases.join(', ')}`)
+    return join(root, 'release', releases[0])
+  }
+  return resolve(candidate)
+}
+
+const resources = resolveResources(process.argv[2] ?? join(root, '.stage'))
 const paths = bundledRuntimePaths(resources)
 const { cliEntry, nodeBinary } = paths
-const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-desktop-smoke-'))
+const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-web-smoke-'))
 const dshHome = join(smokeRoot, 'dsh-home')
+const webData = join(smokeRoot, 'web-data')
 const lines = []
 
+/** One boot entry of the DSH client graph. */
 function parseBootEntries(index) {
   const marker = 'window.__DSH_BOOT__ = '
   const start = index.indexOf(marker)
@@ -40,65 +51,62 @@ function parseBootEntries(index) {
   return graph.entries
 }
 
-ensureDesktopProfile(dshHome)
+/** Find a free loopback port for the smoke runtime. */
+async function freePort() {
+  const server = createServer()
+  await new Promise((resolveListen, rejectListen) => {
+    server.once('error', rejectListen)
+    server.listen(0, '127.0.0.1', resolveListen)
+  })
+  const address = server.address()
+  assert.ok(address !== null && typeof address === 'object')
+  const port = address.port
+  await new Promise(resolveClose => { server.close(resolveClose) })
+  return port
+}
+
+ensureWebProfile(dshHome)
 
 const runtimeEnvironment = {
   ...process.env,
-  DSH_DESKTOP: '1',
-  DSH_DESKTOP_APP_DATA: smokeRoot,
-  DSH_DESKTOP_PROFILE: 'desktop',
-  DSH_DESKTOP_VERSION: 'smoke',
   DSH_HOME: dshHome,
+  DSH_OH_WEB: '1',
+  DSH_OH_WEB_DATA: webData,
+  DSH_OH_WEB_PROFILE: WEB_PROFILE,
+  DSH_OH_WEB_VERSION: 'smoke',
   PATH: runtimeSearchPath(paths),
 }
 
-const pluginRoot = join(smokeRoot, 'smoke-plugin')
-mkdirSync(pluginRoot)
-writeFileSync(join(pluginRoot, 'package.json'), JSON.stringify({
-  name: 'dsh-desktop-smoke-plugin',
-  version: '1.0.0',
-  type: 'module',
-  exports: { '.': './index.js' },
-  dsh: { bundle: { patch: './cordis.patch.yml' } },
-}, undefined, 2))
-writeFileSync(join(pluginRoot, 'index.js'), 'export function apply() {}\n')
-writeFileSync(join(pluginRoot, 'cordis.patch.yml'), '[]\n')
-const install = spawnSync(nodeBinary, [
-  cliEntry, 'plugin', '--profile', 'desktop', 'add', pluginRoot,
-], {
+// 1. The composed web profile tree mounts the web-capable Oh-DSH rows and
+// keeps the desktop-only rows out.
+const dump = spawnSync(nodeBinary, [cliEntry, '--profile', WEB_PROFILE, '--dump-config'], {
   cwd: smokeRoot,
   encoding: 'utf8',
   env: runtimeEnvironment,
 })
-assert.equal(install.status, 0, install.stderr || install.stdout)
-const profileManifest = JSON.parse(readFileSync(join(dshHome, 'profiles', 'desktop', 'package.json'), 'utf8'))
-assert.ok(profileManifest.dsh.profile.bundles.includes('dsh-desktop-smoke-plugin'))
-
-const versionResult = spawnSync(nodeBinary, [cliEntry, '--version'], {
-  cwd: smokeRoot,
-  encoding: 'utf8',
-  env: runtimeEnvironment,
-})
-assert.equal(versionResult.status, 0, versionResult.stderr || versionResult.stdout)
-const dshVersion = versionResult.stdout.trim()
-
-const git = (...args) => {
-  const result = spawnSync('git', args, {
-    cwd: smokeRoot,
-    encoding: 'utf8',
-  })
-  assert.equal(result.status, 0, result.stderr || result.stdout)
-  return result.stdout
+assert.equal(dump.status, 0, dump.stderr || dump.stdout)
+for (const row of [
+  'oh-web',
+  'oh-better-sidebar-runtime',
+  'oh-skins',
+  'oh-pinned-summary',
+  'oh-sidebar',
+  'oh-panel-controls',
+]) {
+  assert.match(dump.stdout, new RegExp(`\\b${row}\\b`), `composed web profile is missing row ${row}`)
 }
-git('init', '-b', 'main')
-git('config', 'user.name', 'Oh DSH Smoke')
-git('config', 'user.email', 'oh-dsh-smoke@example.test')
-writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'before\n')
-git('add', 'review-smoke.txt')
-git('commit', '-m', 'review smoke baseline')
-writeFileSync(join(smokeRoot, 'review-smoke.txt'), 'after\n')
+for (const row of ['oh-desktop', 'oh-plugin-marketplace']) {
+  assert.doesNotMatch(dump.stdout, new RegExp(`\\b${row}\\b`), `composed web profile must not mount desktop row ${row}`)
+}
 
-const child = spawn(nodeBinary, [cliEntry, '--profile', 'desktop'], {
+// 2. Boot the web profile and verify the served UI and client graph.
+const port = await freePort()
+const child = spawn(nodeBinary, [
+  cliEntry,
+  '--profile', WEB_PROFILE,
+  '--host', '127.0.0.1',
+  '--port', String(port),
+], {
   cwd: smokeRoot,
   env: runtimeEnvironment,
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -145,9 +153,16 @@ try {
   assert.equal(indexResponse.status, 200)
   assert.match(index, /<div id="root"><\/div>/)
 
+  // The Oh-DSH web plugins enroll their browser entries in the client graph.
   const bootEntries = parseBootEntries(index)
   const loaded = []
-  for (const pluginId of BUNDLED_DESKTOP_CLIENT_PLUGINS) {
+  for (const pluginId of [
+    '@oh-dsh/web',
+    '@oh-dsh/skins',
+    '@oh-dsh/pinned-summary',
+    '@oh-dsh/sidebar',
+    '@oh-dsh/panel-controls',
+  ]) {
     const row = bootEntries.find(entry => entry.id === pluginId)
     assert.ok(row, `${pluginId} Host entry did not activate in the DSH client graph`)
     const manifest = JSON.parse(readFileSync(join(
@@ -171,44 +186,75 @@ try {
     loaded.push({ bytes: bundle.length, id: pluginId })
   }
 
-  for (const pluginId of BUNDLED_DESKTOP_HOST_PLUGINS) {
-    assert.ok(existsSync(join(
-      resources,
-      'dsh-runtime',
-      'node_modules',
-      ...pluginId.split('/'),
-      'dist',
-      'index.js',
-    )), `${pluginId} Host bundle is missing`)
-  }
+  // The host-only PTY runtime ships inside the web distribution.
+  assert.ok(existsSync(join(
+    resources,
+    'dsh-runtime',
+    'node_modules',
+    '@oh-dsh',
+    'better-sidebar-runtime',
+    'dist',
+    'index.js',
+  )), '@oh-dsh/better-sidebar-runtime Host bundle is missing')
 
-  const client = spawnSync(electronBinary, [
-    join(root, 'scripts', 'smoke-client.cjs'),
-    base.href,
-  ], {
-    cwd: root,
-    encoding: 'utf8',
-    env: runtimeEnvironment,
-    timeout: 30_000,
-  })
-  assert.equal(
-    client.status,
-    0,
-    client.error?.message || client.stderr || client.stdout,
-  )
-
-  for (const legacyPackage of [
-    'dsh-web-terminal',
-    '@dsh-external/dsh-web-panel',
-    '@oh-dsh/desktop-shell',
-  ]) {
+  // Electron-bound surfaces must stay out of the web client graph.
+  for (const pluginId of ['@oh-dsh/desktop', '@oh-dsh/plugin-marketplace']) {
     assert.equal(
-      existsSync(join(resources, 'dsh-runtime', 'node_modules', ...legacyPackage.split('/'))),
+      bootEntries.some(entry => entry.id === pluginId),
       false,
-      `${legacyPackage} must not be installed in the desktop runtime`,
+      `${pluginId} must not enroll in the Oh-DSH-Web client graph`,
     )
   }
 
+  // The skins preferences server mounts on the web server.
+  const preferencesUrl = new URL('/oh-dsh/skins/preferences', base)
+  const initialResponse = await fetch(preferencesUrl)
+  const initial = await initialResponse.json()
+  assert.equal(initialResponse.status, 200)
+  assert.equal(initial.activeId, null)
+  assert.equal(initial.fallbackTheme, 'system')
+  const saveResponse = await fetch(preferencesUrl, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      origin: base.origin,
+    },
+    body: JSON.stringify({ activeId: 'oh-dsh-skin-porcelain', fallbackTheme: 'dark' }),
+  })
+  assert.equal(saveResponse.status, 200, await saveResponse.text())
+  const saved = await fetch(preferencesUrl)
+  const persisted = await saved.json()
+  assert.equal(persisted.activeId, 'oh-dsh-skin-porcelain')
+  assert.equal(persisted.fallbackTheme, 'dark')
+
+  // The sidebar host serves the workspace Git API on the web server.
+  const git = (...args) => {
+    const result = spawnSync('git', args, {
+      cwd: smokeRoot,
+      encoding: 'utf8',
+    })
+    assert.equal(result.status, 0, result.stderr || result.stdout)
+    return result.stdout
+  }
+  git('init', '-b', 'main')
+  git('config', 'user.name', 'Oh DSH Web Smoke')
+  git('config', 'user.email', 'oh-dsh-web-smoke@example.test')
+  writeFileSync(join(smokeRoot, 'web-smoke.txt'), 'before\n')
+  git('add', 'web-smoke.txt')
+  git('commit', '-m', 'web smoke baseline')
+  writeFileSync(join(smokeRoot, 'web-smoke.txt'), 'after\n')
+
+  const workspaceFactsResponse = await fetch(new URL(
+    `/oh-dsh/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
+    base,
+  ))
+  const workspaceFacts = await workspaceFactsResponse.json()
+  assert.equal(workspaceFactsResponse.status, 200)
+  assert.equal(workspaceFacts.kind, 'repository')
+  assert.equal(resolve(workspaceFacts.root), resolve(smokeRoot))
+
+  // The better-sidebar host serves session, Files, and Git through the same
+  // /sidebar API the desktop distribution uses.
   const sidebarCall = async (method, payload) => {
     const response = await fetch(new URL(`/sidebar/api/${method}`, base), {
       method: 'POST',
@@ -220,14 +266,14 @@ try {
     assert.equal(envelope.ok, true, JSON.stringify(envelope))
     return envelope.value
   }
-  const sidebarScope = { sessionId: 'desktop-smoke', cwd: smokeRoot }
+  const sidebarScope = { sessionId: 'web-smoke', cwd: smokeRoot }
   const sessionCwd = await sidebarCall('session.cwd', sidebarScope)
   assert.equal(sessionCwd.cwd, smokeRoot)
   const workspaceTree = await sidebarCall('fs.tree', sidebarScope)
   assert.equal(workspaceTree.path, smokeRoot)
   const gitStatus = await sidebarCall('git.status', sidebarScope)
   assert.equal(gitStatus.isRepo, true)
-  assert.ok(gitStatus.entries.some(entry => entry.path === 'review-smoke.txt'))
+  assert.ok(gitStatus.entries.some(entry => entry.path === 'web-smoke.txt'))
   const gitBranches = await sidebarCall('git.branch', sidebarScope)
   assert.equal(gitBranches.current, 'main')
   const gitLog = await sidebarCall('git.log', {
@@ -235,22 +281,9 @@ try {
     count: 5,
     skip: 0,
   })
-  assert.equal(gitLog[0]?.subject, 'review smoke baseline')
-  const commitDiff = await sidebarCall('git.commit-diff', {
-    ...sidebarScope,
-    hash: gitLog[0].hashFull,
-  })
-  assert.match(commitDiff.diff, /review-smoke\.txt/)
+  assert.equal(gitLog[0]?.subject, 'web smoke baseline')
 
-  const workspaceFactsResponse = await fetch(new URL(
-    `/oh-dsh/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
-    base,
-  ))
-  const workspaceFacts = await workspaceFactsResponse.json()
-  assert.equal(workspaceFactsResponse.status, 200)
-  assert.equal(workspaceFacts.kind, 'repository')
-  assert.equal(realpathSync(workspaceFacts.root), realpathSync(smokeRoot))
-
+  // The PTY terminal host answers over the same websocket on the web server.
   const terminalUrl = new URL('/sidebar/ws/terminal', base)
   terminalUrl.protocol = 'ws:'
   terminalUrl.searchParams.set('sessionId', sidebarScope.sessionId)
@@ -273,11 +306,11 @@ try {
     }
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'resize', cols: 80, rows: 24 }))
-      socket.send("printf 'OH_DSH_TERMINAL_SMOKE\\n'; exit\r")
+      socket.send("printf 'OH_DSH_WEB_TERMINAL_SMOKE\\n'; exit\r")
     })
     socket.addEventListener('message', (event) => {
       output += String(event.data)
-      if (output.includes('OH_DSH_TERMINAL_SMOKE')) {
+      if (output.includes('OH_DSH_WEB_TERMINAL_SMOKE')) {
         socket.send(JSON.stringify({ type: 'close' }))
         finish()
       }
@@ -288,17 +321,17 @@ try {
     })
   })
 
-  console.log(`Oh-DSH-Desktop profile ready on DSH ${dshVersion}: ${base.href}`)
-  process.stdout.write(client.stdout)
-  console.log('Plugin compatible: @oh-dsh/desktop (bundle profile active)')
+  console.log(`Oh-DSH-Web profile ready: ${base.href}`)
+  console.log(`Web composition verified: ${dump.stdout.split('\n').length} dump lines`)
   for (const plugin of loaded) {
     console.log(
       `Plugin compatible: ${plugin.id} (Host active, Client ${String(plugin.bytes)} bytes)`,
     )
   }
-  console.log('Better Sidebar Host API: ready, bounded workspace verified')
-  console.log('Better Sidebar Git API: ready, history and commit diff verified')
-  console.log('Better Sidebar terminal PTY: ready, command execution verified')
+  console.log('Skins preferences API: ready, persistence verified')
+  console.log('Sidebar workspace Git API: ready, repository facts verified')
+  console.log('Better Sidebar Host API: ready, session/files/Git verified on the web surface')
+  console.log('Better Sidebar terminal PTY: ready, command execution verified on the web surface')
 } finally {
   if (child.exitCode === null) child.kill('SIGTERM')
   await new Promise(resolve => {

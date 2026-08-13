@@ -97,9 +97,9 @@ export function mountSidebarPreferences(
   desktop: SidebarDesktopCapability,
 ): () => void {
   if (desktop.appDataPath.length === 0) {
-    throw new Error('desktop-sidebar: application data path is unavailable')
+    throw new Error('sidebar: application data path is unavailable')
   }
-  const path = join(desktop.appDataPath, 'desktop-sidebar.json')
+  const path = join(desktop.appDataPath, 'sidebar.json')
   return ctx.webServer.register({
     kind: 'exact',
     path: SIDEBAR_PREFERENCES_API_PATH,
@@ -127,7 +127,7 @@ export function mountSidebarPreferences(
         response.end()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[desktop-sidebar] ${message}`)
+        ctx.logger.warn(`[sidebar] ${message}`)
         sendJson(response, 500, { error: message })
       }
     },

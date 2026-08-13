@@ -1,5 +1,5 @@
 html {
-  --oh-dsh-desktop-sidebar-width: 300px;
+  --oh-dsh-sidebar-width: 300px;
 }
 
 #oh-dsh-embedded-layout {
@@ -20,7 +20,7 @@ html {
   overflow: hidden;
 }
 
-#oh-dsh-desktop-sidebar-root {
+#oh-dsh-sidebar-root {
   position: relative;
   width: 100%;
   height: 100%;
@@ -28,7 +28,7 @@ html {
   overflow: hidden;
 }
 
-html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-desktop-sidebar-root {
+html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-sidebar-root {
   overflow: visible;
 }
 

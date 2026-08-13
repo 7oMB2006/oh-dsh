@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 test('embedded tools keep the application root inside the window row', () => {
   const css = readFileSync(
-    join(root, 'plugins/desktop-sidebar/src/client/desktop-sidebar.css'),
+    join(root, 'plugins/sidebar/src/client/sidebar.css'),
     'utf8',
   )
 
@@ -24,14 +24,14 @@ test('embedded tools keep the application root inside the window row', () => {
 
 test('review, pinned summary, and embedded side tools keep distinct layouts', () => {
   const summary = readFileSync(join(root, 'plugins/pinned-summary/src/client.ts'), 'utf8')
-  const workspace = readFileSync(join(root, 'plugins/desktop-sidebar/src/client/plugin.tsx'), 'utf8')
-  const workspaceCss = readFileSync(join(root, 'plugins/desktop-sidebar/src/client/desktop-sidebar.css'), 'utf8')
-  const sideTools = readFileSync(join(root, 'plugins/desktop-sidebar/src/client/SideToolsPanel.tsx'), 'utf8')
-  const sideToolsCss = readFileSync(join(root, 'plugins/desktop-sidebar/src/client/side-tools.css'), 'utf8')
+  const workspace = readFileSync(join(root, 'plugins/sidebar/src/client/plugin.tsx'), 'utf8')
+  const workspaceCss = readFileSync(join(root, 'plugins/sidebar/src/client/sidebar.css'), 'utf8')
+  const sideTools = readFileSync(join(root, 'plugins/sidebar/src/client/SideToolsPanel.tsx'), 'utf8')
+  const sideToolsCss = readFileSync(join(root, 'plugins/sidebar/src/client/side-tools.css'), 'utf8')
 
   assert.match(workspace, /if \(open\) this\.pinnedSummary\.setOpen\(false\)/)
   assert.match(workspace, /if \(this\.state\.open\) this\.pinnedSummary\.setOpen\(false\)/)
-  assert.match(workspace, /ohDshRightPanelOwner = 'desktop-sidebar'/)
+  assert.match(workspace, /ohDshRightPanelOwner = 'sidebar'/)
   assert.match(summary, /ohDshRightPanelOwner = 'pinned-summary'/)
   assert.match(summary, /calc\(var\(--oh-dsh-pinned-summary-width\) \+ 24px\)/)
   assert.match(summary, /height: calc\(\(100vh - var\(--oh-dsh-titlebar-height, 40px\) - 24px\) \/ 2\);/)

@@ -1,7 +1,7 @@
 {
-  "name": "@oh-dsh/desktop-skins",
+  "name": "@oh-dsh/sidebar",
   "version": "0.1.2",
-  "description": "Built-in Oh-DSH-Desktop skin gallery and theme adapter",
+  "description": "Extensible Oh-DSH side panel with workspace and desktop tools",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -14,10 +14,12 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-ui-theme"
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@oh-dsh/panel-controls",
+        "@oh-dsh/pinned-summary"
       ],
       "platform": "web",
       "immediately": true
@@ -33,6 +35,5 @@
     "@types/react-dom": "^18.3.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
-  },
-  "license": "BSD-3-Clause"
+  }
 }

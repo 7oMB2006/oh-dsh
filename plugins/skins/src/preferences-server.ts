@@ -100,9 +100,9 @@ export function mountDesktopSkinPreferences(
   desktop: DesktopCapability,
 ): () => void {
   if (desktop.appDataPath.length === 0) {
-    throw new Error('desktop-skins: desktop application data path is unavailable')
+    throw new Error('skins: desktop application data path is unavailable')
   }
-  const path = join(desktop.appDataPath, 'desktop-skins.json')
+  const path = join(desktop.appDataPath, 'skins.json')
   return ctx.webServer.register({
     kind: 'exact',
     path: PREFERENCES_API_PATH,
@@ -130,7 +130,7 @@ export function mountDesktopSkinPreferences(
         response.end()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[desktop-skins] ${message}`)
+        ctx.logger.warn(`[skins] ${message}`)
         sendJson(response, 500, { error: message })
       }
     },
