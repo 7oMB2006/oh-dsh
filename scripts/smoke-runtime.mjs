@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronBinary from 'electron'
+import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
 import {
   BUNDLED_DESKTOP_CLIENT_PLUGINS,
   BUNDLED_DESKTOP_HOST_PLUGINS,
@@ -21,8 +22,8 @@ import {
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resources = resolve(process.argv[2] ?? join(root, '.stage'))
-const nodeBinary = join(resources, 'node-runtime', 'bin', 'node')
-const cliEntry = join(resources, 'dsh-runtime', 'lib', 'bin.js')
+const paths = bundledRuntimePaths(resources)
+const { cliEntry, nodeBinary } = paths
 const smokeRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-desktop-smoke-'))
 const dshHome = join(smokeRoot, 'dsh-home')
 const lines = []
@@ -48,7 +49,7 @@ const runtimeEnvironment = {
   DSH_DESKTOP_PROFILE: 'desktop',
   DSH_DESKTOP_VERSION: 'smoke',
   DSH_HOME: dshHome,
-  PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? '/usr/bin:/bin'}`,
+  PATH: runtimeSearchPath(paths),
 }
 
 const pluginRoot = join(smokeRoot, 'smoke-plugin')

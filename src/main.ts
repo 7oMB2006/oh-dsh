@@ -31,6 +31,7 @@ import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/proto
 import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
+import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
 
 const PRODUCT_NAME = 'Oh-DSH-Desktop'
 const DEFAULT_UI_ZOOM_FACTOR = 1.12
@@ -66,14 +67,8 @@ function resourcesRoot(): string {
   return app.isPackaged ? process.resourcesPath : join(currentDir, '..', '.stage')
 }
 
-function runtimePaths(): { cliEntry: string; nodeBinary: string; runtimeRoot: string } {
-  const root = resourcesRoot()
-  const runtimeRoot = join(root, 'dsh-runtime')
-  return {
-    cliEntry: join(runtimeRoot, 'lib', 'bin.js'),
-    nodeBinary: join(root, 'node-runtime', 'bin', 'node'),
-    runtimeRoot,
-  }
+function runtimePaths(): BundledRuntimePaths {
+  return bundledRuntimePaths(resourcesRoot())
 }
 
 function desktopInfo(preview: DesktopInfo['preview'] = null): DesktopInfo {
@@ -103,14 +98,6 @@ function runtimeEnvironment(
   overrides: { appDataPath?: string; dshHome?: string; preview?: { pluginId: string; transactionId: string } } = {},
 ): NodeJS.ProcessEnv {
   const info = desktopInfo(overrides.preview ?? null)
-  const inheritedPath = process.env.PATH ?? '/usr/bin:/bin:/usr/sbin:/sbin'
-  const path = [
-    dirname(paths.nodeBinary),
-    join(paths.runtimeRoot, 'node_modules', '.bin'),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-    inheritedPath,
-  ].join(':')
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
     DSH_DESKTOP: '1',
@@ -119,7 +106,7 @@ function runtimeEnvironment(
     DSH_DESKTOP_VERSION: info.version,
     DSH_HOME: overrides.dshHome ?? info.dshHome,
     NODE_USE_ENV_PROXY: '1',
-    PATH: path,
+    PATH: runtimeSearchPath(paths),
   }
   if (overrides.preview !== undefined) {
     environment.DSH_DESKTOP_PREVIEW = '1'

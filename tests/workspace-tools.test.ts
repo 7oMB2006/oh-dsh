@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { test } from 'node:test'
 import {
   mutateWorkspace,
@@ -31,7 +31,7 @@ test('workspace extension provides repository facts and branch creation', async 
     git(workspace, ['commit', '-m', 'initial'])
     const facts = await readWorkspaceFacts(workspace)
     assert.equal(facts.kind, 'repository')
-    assert.equal(facts.name, workspace.split('/').pop())
+    assert.equal(facts.name, basename(workspace))
     assert.equal(facts.hasRemote, false)
 
     const branched = await mutateWorkspace(workspace, { action: 'create-branch', branch: 'panel-test' })
