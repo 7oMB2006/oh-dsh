@@ -367,6 +367,10 @@ function rewriteWorkspaceLinks() {
   for (const link of links) {
     const raw = readlinkSync(link)
     const logicalTarget = resolve(dirname(link), raw)
+    if (logicalTarget === runtime || logicalTarget.startsWith(runtime + sep)) {
+      // Internal runtime links are already portable; leave them alone.
+      continue
+    }
     const stagedTarget = logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)
       ? stageWorkspaceTarget(logicalTarget)
       : stageSourceCounterpart(link)
