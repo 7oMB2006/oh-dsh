@@ -18,7 +18,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
-  <img alt="DSH 0.0.1-rc.1" src="https://img.shields.io/badge/DSH-0.0.1--rc.1-2f81f7">
+  <img alt="DSH 0.0.1-rc.2" src="https://img.shields.io/badge/DSH-0.0.1--rc.2-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
 </p>
@@ -72,8 +72,8 @@ persisted by the Host.
 Download from
 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases):
 
-- `Oh-DSH-Desktop-0.1.1-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.1-arm64.zip`
+- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.2-arm64.zip`
 
 Open the DMG and drag `Oh-DSH-Desktop.app` into `Applications`. The current
 test build has no Developer ID signature or notarization. On first launch,
@@ -95,10 +95,10 @@ The Better Sidebar Host is pinned as a Git submodule. Source builds need
 SSH/`gh` access to that private repository. Published DMG and ZIP artifacts
 already contain the compiled output and require no repository access.
 
-Release builds pin DSH `0.0.1-rc.1` at:
+Release builds pin DSH `0.0.1-rc.2` at:
 
 ```text
-e7f2790a2a863bfc23e5db483778fd12801cf9bf
+7b9644f2b664e46c9518506035aa6c8d5af4d8e8
 ```
 
 The first build stores the source under `.cache/dsh-source/`. Set
@@ -229,8 +229,8 @@ Artifacts are written to `release/`:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.1-arm64.dmg
-├── Oh-DSH-Desktop-0.1.1-arm64.zip
+├── Oh-DSH-Desktop-0.1.2-arm64.dmg
+├── Oh-DSH-Desktop-0.1.2-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -244,17 +244,17 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.1-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
 After verification, create the Release manually. For an existing Release,
 use `gh release upload --clobber` to replace the artifacts.
 
 ```sh
-gh release create v0.1.1 \
-  release/Oh-DSH-Desktop-0.1.1-arm64.dmg \
-  release/Oh-DSH-Desktop-0.1.1-arm64.zip \
-  --title "Oh-DSH-Desktop 0.1.1" \
+gh release create v0.1.2 \
+  release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.2-arm64.zip \
+  --title "Oh-DSH-Desktop 0.1.2" \
   --generate-notes
 ```
 

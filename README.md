@@ -18,7 +18,7 @@
 <p align="center">
   <img alt="macOS 12+" src="https://img.shields.io/badge/macOS-12%2B-111111?logo=apple&logoColor=white">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/arch-arm64-2f81f7">
-  <img alt="DSH 0.0.1-rc.1" src="https://img.shields.io/badge/DSH-0.0.1--rc.1-2f81f7">
+  <img alt="DSH 0.0.1-rc.2" src="https://img.shields.io/badge/DSH-0.0.1--rc.2-2f81f7">
   <img alt="Electron 42" src="https://img.shields.io/badge/Electron-42-47848f?logo=electron&logoColor=white">
   <img alt="BSD 3-Clause" src="https://img.shields.io/badge/license-BSD--3--Clause-34a853">
 </p>
@@ -68,8 +68,8 @@ Loader、locale、settings 和 ThemeService 契约。
 从 [GitHub Releases](https://github.com/dsh-external/oh-dsh-desktop/releases)
 下载：
 
-- `Oh-DSH-Desktop-0.1.1-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.1-arm64.zip`
+- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.2-arm64.zip`
 
 打开 DMG，把 `Oh-DSH-Desktop.app` 拖入 `Applications`。当前测试包没有
 Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并选择
@@ -90,10 +90,10 @@ pnpm start
 Better Sidebar Host 以固定 Git submodule 跟踪。源码构建需要该私有仓库的
 SSH/`gh` 访问权限；已发布的 DMG 和 ZIP 已包含编译产物，不需要仓库权限。
 
-发行构建固定使用 DSH `0.0.1-rc.1`：
+发行构建固定使用 DSH `0.0.1-rc.2`：
 
 ```text
-e7f2790a2a863bfc23e5db483778fd12801cf9bf
+7b9644f2b664e46c9518506035aa6c8d5af4d8e8
 ```
 
 首次构建会把源码放进 `.cache/dsh-source/`。如需使用另一个 checkout，可设置
@@ -217,8 +217,8 @@ pnpm run dist:mac:quick
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.1-arm64.dmg
-├── Oh-DSH-Desktop-0.1.1-arm64.zip
+├── Oh-DSH-Desktop-0.1.2-arm64.dmg
+├── Oh-DSH-Desktop-0.1.2-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -231,17 +231,17 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.1-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
 ```
 
 验证通过后手动创建 Release，已有 Release 则使用 `gh release upload
 --clobber` 更新产物：
 
 ```sh
-gh release create v0.1.1 \
-  release/Oh-DSH-Desktop-0.1.1-arm64.dmg \
-  release/Oh-DSH-Desktop-0.1.1-arm64.zip \
-  --title "Oh-DSH-Desktop 0.1.1" \
+gh release create v0.1.2 \
+  release/Oh-DSH-Desktop-0.1.2-arm64.dmg \
+  release/Oh-DSH-Desktop-0.1.2-arm64.zip \
+  --title "Oh-DSH-Desktop 0.1.2" \
   --generate-notes
 ```
 
