@@ -65,12 +65,30 @@ void app.whenReady().then(async () => {
             || !(settingsIcon instanceof SVGElement)) return null
           const pluginsRect = pluginsIcon.getBoundingClientRect()
           const settingsRect = settingsIcon.getBoundingClientRect()
+          const pluginsBox = pluginsIcon.getBBox()
+          const settingsBox = settingsIcon.getBBox()
+          const pluginsView = pluginsIcon.viewBox.baseVal
+          const settingsView = settingsIcon.viewBox.baseVal
+          const pluginsArtwork = {
+            height: pluginsBox.height / pluginsView.height * pluginsRect.height,
+            width: pluginsBox.width / pluginsView.width * pluginsRect.width,
+          }
+          const settingsArtwork = {
+            height: settingsBox.height / settingsView.height * settingsRect.height,
+            width: settingsBox.width / settingsView.width * settingsRect.width,
+          }
           return {
+            artworkDelta: Math.max(
+              Math.abs(pluginsArtwork.height - settingsArtwork.height),
+              Math.abs(pluginsArtwork.width - settingsArtwork.width),
+            ),
             delta: Math.abs(
               pluginsRect.left + pluginsRect.width / 2
               - settingsRect.left - settingsRect.width / 2
             ),
+            pluginsArtwork,
             pluginsCenter: pluginsRect.left + pluginsRect.width / 2,
+            settingsArtwork,
             settingsCenter: settingsRect.left + settingsRect.width / 2,
           }
         })(),
@@ -80,6 +98,13 @@ void app.whenReady().then(async () => {
         if (state.navigation.delta > 0.5) {
           settle(new Error(
             'Plugins and Settings icons are not aligned: '
+            + JSON.stringify(state.navigation),
+          ))
+          return
+        }
+        if (state.navigation.artworkDelta > 1) {
+          settle(new Error(
+            'Plugins and Settings icons are not optically sized: '
             + JSON.stringify(state.navigation),
           ))
           return
