@@ -77,9 +77,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.id }}
+          compression-level: 0
           path: |
             release/Oh-DSH-Desktop-*
-            release/oh-dsh-web-*
+            release/oh-dsh-web-*.tar.gz
+            release/oh-dsh-web-*.zip
           if-no-files-found: error
 
   publish:

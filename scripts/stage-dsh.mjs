@@ -11,11 +11,20 @@ import {
   readFileSync,
   readlinkSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveDshSource } from './dsh-source.mjs'
 
@@ -62,13 +71,13 @@ function portableSymlink(target, link) {
     symlinkSync(target, link)
     return
   }
-  const resolved = resolve(dirname(link), target)
-  if (existsSync(resolved) && !lstatSync(resolved).isDirectory()) {
+  const resolved = realpathSync(resolve(dirname(link), target))
+  if (!lstatSync(resolved).isDirectory()) {
     copyFileSync(resolved, link)
     return
   }
-  // Junction targets must be absolute; the staged tree stays portable because
-  // pnpm deploy dereferences the rest of the forest into real copies.
+  // Junction targets must be absolute; materializeExternalLinks already
+  // dereferenced the store-backed entries into the staged runtime.
   symlinkSync(resolved, link, 'junction')
 }
 
@@ -326,6 +335,9 @@ function stageVendorTarget(source) {
     },
   })
   stagedVendorTargets.set(source, target)
+  if (existsSync(join(source, 'node_modules'))) {
+    mirrorPackageDependencies(source, target)
+  }
   return target
 }
 
@@ -350,6 +362,13 @@ function stageSourceCounterpart(link) {
   if (!existsSync(source)) {
     throw new Error(`staged runtime link has no usable source: ${link}`)
   }
+  if (!isWithin(dshSource, source)) {
+    // Global-store content has no dependency links of its own; copy it
+    // straight into the link location.
+    rmSync(link, { recursive: true, force: true })
+    cpSync(source, link, { recursive: true, dereference: true, preserveTimestamps: true })
+    return undefined
+  }
   return stageVendorTarget(source)
 }
 
@@ -361,6 +380,37 @@ function walk(rootPath, visit) {
   }
 }
 
+/**
+ * Make the staged tree portable: re-create absolute internal links as
+ * relative ones and dereference any link still pointing outside the runtime
+ * (Windows junctions the `.pnpm` entries to the global store). Dangling
+ * links were already repaired against the source checkout above.
+ */
+function normalizeRuntimeLinks() {
+  const links = []
+  walk(runtime, path => { links.push(path) })
+  for (const link of links) {
+    const raw = readlinkSync(link)
+    const logical = resolve(dirname(link), raw)
+    if (logical === runtime || logical.startsWith(runtime + sep)) {
+      if (isAbsolute(raw)) portableSymlink(relative(dirname(link), logical), link)
+      continue
+    }
+    if (!existsSync(logical)) continue
+    const real = realpathSync(link)
+    rmSync(link, { recursive: true, force: true })
+    if (lstatSync(real).isDirectory()) {
+      cpSync(real, link, {
+        recursive: true,
+        dereference: true,
+        preserveTimestamps: true,
+      })
+    } else {
+      copyFileSync(real, link)
+    }
+  }
+}
+
 function rewriteWorkspaceLinks() {
   const links = []
   walk(runtime, path => { links.push(path) })
@@ -368,13 +418,18 @@ function rewriteWorkspaceLinks() {
     const raw = readlinkSync(link)
     const logicalTarget = resolve(dirname(link), raw)
     if (logicalTarget === runtime || logicalTarget.startsWith(runtime + sep)) {
-      // Internal runtime links are already portable; leave them alone.
+      if (isAbsolute(raw)) portableSymlink(relative(dirname(link), logicalTarget), link)
       continue
     }
-    const stagedTarget = logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)
-      ? stageWorkspaceTarget(logicalTarget)
-      : stageSourceCounterpart(link)
-    portableSymlink(relative(dirname(link), stagedTarget), link)
+    if (logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)) {
+      const stagedTarget = stageWorkspaceTarget(logicalTarget)
+      portableSymlink(relative(dirname(link), stagedTarget), link)
+      continue
+    }
+    const stagedTarget = stageSourceCounterpart(link)
+    if (stagedTarget !== undefined) {
+      portableSymlink(relative(dirname(link), stagedTarget), link)
+    }
   }
 }
 
@@ -657,6 +712,7 @@ relinkInstallationWorkspacePackages()
 installDesktopPackages()
 copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
 restoreExecutableHelpers()
+normalizeRuntimeLinks()
 assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()
 assertSelfContained(nodeRuntime, 'Node runtime')
