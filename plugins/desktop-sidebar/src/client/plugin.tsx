@@ -51,7 +51,7 @@ import {
   ReviewCommentsService,
   type ReviewCommentSide,
   type ReviewSessionsService,
-  type ReviewSlashService,
+  type ReviewInputTriggersService,
 } from './review-comments.ts'
 import { reviewCommitFromBetterSidebar } from './review-diff.ts'
 import type { GitReviewCommit } from './review-types.ts'
@@ -197,7 +197,7 @@ export const inject = [
   'locale',
   'pinnedSummary',
   'sessions',
-  'slash',
+  'inputTriggers',
   'slots',
   'workspaces',
 ]
@@ -1650,7 +1650,7 @@ export function apply(ctx: ClientContext): void {
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
   const sessions = ctx.get('sessions') as SessionsService
-  const slash = ctx.get('slash') as ReviewSlashService
+  const inputTriggers = ctx.get('inputTriggers') as ReviewInputTriggersService
   const workspaces = ctx.get('workspaces') as WorkspacesService
   const originalOpenPath = workspaces.openPath
   const openExternalPath = async (path: string): Promise<void> => {
@@ -1658,7 +1658,7 @@ export function apply(ctx: ClientContext): void {
   }
   const reviewComments = new ReviewCommentsService(
     sessions,
-    slash,
+    inputTriggers,
     window.localStorage,
   )
   const desktopSidebar = new DesktopSidebarService(

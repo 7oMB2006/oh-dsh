@@ -82,7 +82,7 @@ interface ReviewSlashSource {
   }
 }
 
-export interface ReviewSlashService {
+export interface ReviewInputTriggersService {
   registerSource(source: ReviewSlashSource): () => void
 }
 
@@ -180,7 +180,7 @@ export function formatReviewRequest(comments: readonly string[]): string {
 
 function createComposerBridge(
   sessions: ReviewSessionsService,
-  slash: ReviewSlashService,
+  inputTriggers: ReviewInputTriggersService,
   onDelivered: (ids: readonly string[]) => void,
 ): ComposerBridge {
   const commentsByScope = new Map<ScopeKey, Map<string, string>>()
@@ -365,7 +365,7 @@ function createComposerBridge(
     }
   }
 
-  const unregister = slash.registerSource(source)
+  const unregister = inputTriggers.registerSource(source)
   const stopSessions = sessions.list.subscribe(() => { reconcile() })
 
   return {
@@ -411,12 +411,16 @@ export class ReviewCommentsService {
 
   constructor(
     sessions: ReviewSessionsService,
-    slash: ReviewSlashService,
+    inputTriggers: ReviewInputTriggersService,
     storage: Storage,
   ) {
     this.storage = storage
     this.comments = readComments(storage)
-    this.bridge = createComposerBridge(sessions, slash, ids => { this.removeMany(ids, false) })
+    this.bridge = createComposerBridge(
+      sessions,
+      inputTriggers,
+      ids => { this.removeMany(ids, false) },
+    )
   }
 
   getSnapshot = (): readonly ReviewComment[] => this.comments
