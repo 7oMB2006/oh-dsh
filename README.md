@@ -87,8 +87,9 @@ pnpm run build:dsh
 pnpm start
 ```
 
-Better Sidebar Host 以固定 Git submodule 跟踪。源码构建需要该私有仓库的
-SSH/`gh` 访问权限；已发布的 DMG 和 ZIP 已包含编译产物，不需要仓库权限。
+Better Sidebar Host 以固定 Git submodule 跟踪，并通过公开 HTTPS 仓库获取；
+初始化该 submodule 不需要 SSH 或 GitHub CLI 认证。固定的 DSH 源码单独获取，
+也可以通过下述 `DSH_SOURCE` 指向已有 checkout。
 
 发行构建固定使用 DSH `0.0.1-rc.2`：
 
@@ -159,10 +160,10 @@ Profile 和 Loader 管理。
 | Plugin | 来源关系 | Oh-DSH 改造 |
 | --- | --- | --- |
 | `@oh-dsh/desktop` | Oh-DSH 自研 | 统一桌面入口、Electron bridge、原生菜单、窗口、Agent 能力与内置 plugin 注册顺序 |
-| `@oh-dsh/better-sidebar-runtime` | 固定跟踪 [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) submodule | 仅编译上游 Host，提供 PTY、Files、Git、history 和 commit diff；不加载上游 UI |
+| `@oh-dsh/better-sidebar-runtime` | 固定跟踪 [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) submodule | 仅编译上游 Host，提供 PTY、Files、Git、history 和 commit diff；不加载上游 UI |
 | `@oh-dsh/panel-controls` | 基于 [`dsh-web-panel`](https://github.com/dsh-external/dsh-web-panel) 的下游改造 | 保留 Oh-DSH Terminal dock、主题、双语和 Session 状态，复用统一 PTY Host；不再安装独立 Web Terminal |
 | `@oh-dsh/pinned-summary` | Oh-DSH 自研 | 当前 Session 摘要、半高卡片和正文 gutter 管理 |
-| `@oh-dsh/desktop-sidebar` | [`DSH-better-sidebar`](https://github.com/dsh-external/DSH-better-sidebar) 的 Oh-DSH UI 下游 | 复用统一 Host，提供 Session tabs、viewer、Files、Git Review、逐行评论和 Agent composer 引用，保留现有布局、图标与主题 |
+| `@oh-dsh/desktop-sidebar` | [`DSH-better-sidebar`](https://github.com/omdsh-dev/DSH-better-sidebar) 的 Oh-DSH UI 下游 | 复用统一 Host，提供 Session tabs、viewer、Files、Git Review、逐行评论和 Agent composer 引用，保留现有布局、图标与主题 |
 | `@oh-dsh/plugin-marketplace` | 炼化 [`plugin-registry`](https://github.com/dsh-external/plugin-registry) 与 [`dsh-hub`](https://github.com/dsh-external/dsh-hub) | 统一隔离预览、风险确认、TOFU 来源锁、应用与恢复流程，并适配桌面导航和双语 UI |
 | `@oh-dsh/desktop-skins` | 基于 [`dsh-skins`](https://github.com/dsh-external/dsh-skins) 的下游改造 | 沿用 ThemeService 扩展思路，重做皮肤、设置 UI 和 Host 持久化 |
 
