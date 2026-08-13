@@ -59,21 +59,36 @@ function persistOpen(open: boolean): void {
 }
 
 function settingsButton(): HTMLButtonElement | null {
-  const candidates = [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]')]
+  const visible = (button: HTMLButtonElement): boolean => {
+    const rect = button.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
+  }
+  const byBottom = (left: HTMLButtonElement, right: HTMLButtonElement): number =>
+    right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom
+  // rc.5 wraps the trigger content in a stable slot marker; the rail trigger
+  // is the one inside the sidebar (the open settings panel may render a copy).
+  const slotted = [...document.querySelectorAll<HTMLButtonElement>('button')]
+    .find(button => button.querySelector('[data-slot="settings.trigger"]') !== null
+      && button.closest('[data-slot="sidebar"]') !== null
+      && visible(button))
+  if (slotted !== undefined) return slotted
+  const labeled = [...document.querySelectorAll<HTMLButtonElement>('button')]
     .filter(button => {
       if (button.closest('#oh-dsh-plugin-marketplace-root') !== null) return false
+      if (!visible(button)) return false
       const label = [
         button.textContent,
         button.getAttribute('aria-label'),
         button.getAttribute('title'),
       ].filter(Boolean).join(' ').trim().toLowerCase()
-      const rect = button.getBoundingClientRect()
-      return (label.includes('settings') || label.includes('设置'))
-        && rect.width > 0 && rect.height > 0
+      return label.includes('settings') || label.includes('设置')
     })
-  return candidates.sort((left, right) => {
-    return right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom
-  })[0] ?? null
+  if (labeled.length > 0) return labeled.sort(byBottom)[0] ?? null
+  // rc.5's collapsed rail renders the settings trigger as an icon-only
+  // dialog-opener at the rail foot, with no accessible settings label.
+  const railTriggers = [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]')]
+    .filter(button => button.closest('[data-slot="sidebar"]') !== null && visible(button))
+  return railTriggers.sort(byBottom)[0] ?? null
 }
 
 function settingsDialogOpen(): boolean {
@@ -104,6 +119,25 @@ function sidebarFor(settings: HTMLElement): HTMLElement | null {
     candidate = candidate.parentElement
   }
   return best
+}
+
+/**
+ * First descendant of the sidebar slot with a real box. rc.5 renders the
+ * `[data-slot="sidebar"]` wrapper as `display: contents`, whose own rect is
+ * always empty; the rail state must be read from the boxed child instead.
+ */
+function sidebarBox(sidebar: HTMLElement): HTMLElement | null {
+  const stack: HTMLElement[] = [sidebar]
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (node === undefined) break
+    if (node !== sidebar) {
+      const rect = node.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) return node
+    }
+    for (const child of [...node.children].reverse()) stack.push(child as HTMLElement)
+  }
+  return null
 }
 
 function pluginIcon(label: string): string {
@@ -243,12 +277,14 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     if (this.#entry === null) {
       const entry = document.createElement('button')
       entry.type = 'button'
-      entry.className = `${settings.className} oh-marketplace-nav`.trim()
       entry.dataset.active = String(this.#state.open)
       entry.addEventListener('click', () => { this.toggle() })
       this.#entry = entry
       this.renderEntryLabel()
     }
+    // Mirror the settings trigger's classes so the entry tracks the rail's
+    // collapsed/expanded layout state (rc.5 restyles rail buttons in place).
+    this.#entry.className = `${settings.className} oh-marketplace-nav`.trim()
     if (this.#entry.parentElement !== parent || this.#entry.nextElementSibling !== settings) {
       parent.insertBefore(this.#entry, settings)
     }
@@ -270,7 +306,8 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     if (sidebar === null) return
     this.#resizeObserver?.disconnect()
     this.#resizeObserver?.observe(sidebar)
-    const rect = sidebar.getBoundingClientRect()
+    const box = sidebarBox(sidebar)
+    const rect = box === null ? { right: 0, width: 0 } : box.getBoundingClientRect()
     const left = rect.right > 0 && rect.right < window.innerWidth * 0.55 ? rect.right : 0
     document.documentElement.style.setProperty('--oh-marketplace-left', `${String(Math.round(left))}px`)
     this.#entry.dataset.collapsed = String(rect.width < 100)
