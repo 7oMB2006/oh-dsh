@@ -20,7 +20,7 @@ separate Web Terminal or shell plugin is required.
 
 ## DSH-better-sidebar
 
-- Project: <https://github.com/dsh-external/DSH-better-sidebar>
+- Project: <https://github.com/omdsh-dev/DSH-better-sidebar>
 - Pinned release: `v0.9.0`
 - Pinned revision: `2e9db44a71bb75c9fa1185330541dce2582deee3`
 - Declared license: MIT
