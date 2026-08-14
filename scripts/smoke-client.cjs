@@ -1,7 +1,7 @@
 const { app, BrowserWindow } = require('electron')
 const { join } = require('node:path')
 
-const runtimeUrl = process.argv[2]
+const runtimeUrl = process.env.DSH_SMOKE_RUNTIME_URL ?? process.argv[2]
 const timeoutMs = 20_000
 
 if (runtimeUrl === undefined) throw new Error('runtime URL is required')
@@ -53,6 +53,7 @@ void app.whenReady().then(async () => {
   })
   window.webContents.on('did-fail-load', (_event, code, description, validatedUrl, isMainFrame) => {
     if (isMainFrame === false) return
+    if (code === -3) return
     settle(new Error(`Chromium failed to load DSH (${code}): ${description} (${validatedUrl})`))
   })
 

@@ -185,11 +185,13 @@ try {
   const client = spawnSync(electronBinary, [
     '--no-sandbox',
     join(root, 'scripts', 'smoke-client.cjs'),
-    base.href,
   ], {
     cwd: root,
     encoding: 'utf8',
-    env: runtimeEnvironment,
+    env: {
+      ...runtimeEnvironment,
+      DSH_SMOKE_RUNTIME_URL: base.href,
+    },
     timeout: 30_000,
   })
   assert.equal(
