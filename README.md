@@ -93,8 +93,8 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 从 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases)
 下载：
 
-- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.2-arm64.zip`
+- `Oh-DSH-Desktop-0.1.3-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.3-arm64.zip`
 
 打开 DMG，把 `Oh-DSH-Desktop.app` 拖入 `Applications`。当前测试包没有
 Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并选择
@@ -105,7 +105,7 @@ Developer ID 和 notarization，首次启动时可在 Finder 中右键应用并�
 文件的实际下载路径：
 
 ```sh
-xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.3-arm64.dmg
 ```
 
 #### Linux
@@ -113,20 +113,20 @@ xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
 从 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases)
 下载：
 
-- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
-- `Oh-DSH-Desktop-0.1.2-amd64.deb`
+- `Oh-DSH-Desktop-0.1.3-x86_64.AppImage`
+- `Oh-DSH-Desktop-0.1.3-amd64.deb`
 
 AppImage 只需赋予执行权限后直接运行：
 
 ```sh
-chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+chmod +x Oh-DSH-Desktop-0.1.3-x86_64.AppImage
+./Oh-DSH-Desktop-0.1.3-x86_64.AppImage
 ```
 
 也可以安装 deb 包（需要 apt）：
 
 ```sh
-sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
+sudo apt install ./Oh-DSH-Desktop-0.1.3-amd64.deb
 ```
 
 Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可以
@@ -138,8 +138,8 @@ Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可�
 `.zip`），解压后直接运行：
 
 ```sh
-tar -xzf oh-dsh-web-0.1.2-linux-x64.tar.gz
-cd oh-dsh-web-0.1.2-linux-x64
+tar -xzf oh-dsh-web-0.1.3-linux-x64.tar.gz
+cd oh-dsh-web-0.1.3-linux-x64
 ./bin/oh-dsh-web
 ```
 
@@ -377,8 +377,8 @@ macOS 产物位于 `release/`：
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-arm64.dmg
-├── Oh-DSH-Desktop-0.1.2-arm64.zip
+├── Oh-DSH-Desktop-0.1.3-arm64.dmg
+├── Oh-DSH-Desktop-0.1.3-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -396,17 +396,17 @@ Web 产物位于 `release/`：
 
 ```text
 release/
-├── oh-dsh-web-0.1.2-darwin-arm64/
-├── oh-dsh-web-0.1.2-darwin-arm64.tar.gz
-└── oh-dsh-web-0.1.2-darwin-arm64.zip
+├── oh-dsh-web-0.1.3-darwin-arm64/
+├── oh-dsh-web-0.1.3-darwin-arm64.tar.gz
+└── oh-dsh-web-0.1.3-darwin-arm64.zip
 ```
 
 Linux 产物同样位于 `release/`：
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-├── Oh-DSH-Desktop-0.1.2-amd64.deb
+├── Oh-DSH-Desktop-0.1.3-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.3-amd64.deb
 └── linux-unpacked/oh-dsh-desktop
 ```
 
@@ -443,7 +443,7 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.3-arm64.dmg
 pnpm run dist:web
 pnpm run smoke:web:package
 ```
@@ -457,8 +457,8 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-当前 workspace package 与下载说明已升到 `v0.1.2`，公开 Release 最新为
-`v0.1.1`；推送 `v0.1.2` tag 后，release workflow 会按该版本打包全部形态
+当前 workspace package 与下载说明已升到 `v0.1.3`，公开 Release 最新为
+`v0.1.2`；推送 `v0.1.3` tag 后，release workflow 会按该版本打包全部形态
 并创建对应 Release。准备后续版本时，同样先统一更新 workspace package
 版本，再推送同一版本号的 `v*` tag。
 

@@ -103,8 +103,8 @@ persisted by the Host.
 Download from
 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases):
 
-- `Oh-DSH-Desktop-0.1.2-arm64.dmg`
-- `Oh-DSH-Desktop-0.1.2-arm64.zip`
+- `Oh-DSH-Desktop-0.1.3-arm64.dmg`
+- `Oh-DSH-Desktop-0.1.3-arm64.zip`
 
 Open the DMG and drag `Oh-DSH-Desktop.app` into `Applications`. The current
 test build has no Developer ID signature or notarization. On first launch,
@@ -116,26 +116,26 @@ open it again. Replace the example DMG path with the file's actual download
 path:
 
 ```sh
-xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.2-arm64.dmg
+xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-0.1.3-arm64.dmg
 ```
 
 Download from
 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases):
 
-- `Oh-DSH-Desktop-0.1.2-x86_64.AppImage`
-- `Oh-DSH-Desktop-0.1.2-amd64.deb`
+- `Oh-DSH-Desktop-0.1.3-x86_64.AppImage`
+- `Oh-DSH-Desktop-0.1.3-amd64.deb`
 
 Make the AppImage executable and run it:
 
 ```sh
-chmod +x Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-./Oh-DSH-Desktop-0.1.2-x86_64.AppImage
+chmod +x Oh-DSH-Desktop-0.1.3-x86_64.AppImage
+./Oh-DSH-Desktop-0.1.3-x86_64.AppImage
 ```
 
 Or install the deb package with apt:
 
 ```sh
-sudo apt install ./Oh-DSH-Desktop-0.1.2-amd64.deb
+sudo apt install ./Oh-DSH-Desktop-0.1.3-amd64.deb
 ```
 
 ### Install the Oh-DSH-Web distribution
@@ -144,8 +144,8 @@ Download `oh-dsh-web-<version>-<platform>-<arch>.tar.gz` (or `.zip`) from the
 Release, extract, and run:
 
 ```sh
-tar -xzf oh-dsh-web-0.1.2-linux-x64.tar.gz
-cd oh-dsh-web-0.1.2-linux-x64
+tar -xzf oh-dsh-web-0.1.3-linux-x64.tar.gz
+cd oh-dsh-web-0.1.3-linux-x64
 ./bin/oh-dsh-web
 ```
 
@@ -404,8 +404,8 @@ macOS artifacts are written to `release/`:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-arm64.dmg
-├── Oh-DSH-Desktop-0.1.2-arm64.zip
+├── Oh-DSH-Desktop-0.1.3-arm64.dmg
+├── Oh-DSH-Desktop-0.1.3-arm64.zip
 └── mac-arm64/Oh-DSH-Desktop.app
 ```
 
@@ -423,17 +423,17 @@ Web artifacts are written to `release/`:
 
 ```text
 release/
-├── oh-dsh-web-0.1.2-darwin-arm64/
-├── oh-dsh-web-0.1.2-darwin-arm64.tar.gz
-└── oh-dsh-web-0.1.2-darwin-arm64.zip
+├── oh-dsh-web-0.1.3-darwin-arm64/
+├── oh-dsh-web-0.1.3-darwin-arm64.tar.gz
+└── oh-dsh-web-0.1.3-darwin-arm64.zip
 ```
 
 Linux artifacts are written to the same directory:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.2-x86_64.AppImage
-├── Oh-DSH-Desktop-0.1.2-amd64.deb
+├── Oh-DSH-Desktop-0.1.3-x86_64.AppImage
+├── Oh-DSH-Desktop-0.1.3-amd64.deb
 └── linux-unpacked/oh-dsh-desktop
 ```
 
@@ -474,7 +474,7 @@ pnpm run dist:mac
 pnpm run smoke:app
 codesign --verify --deep --strict \
   release/mac-arm64/Oh-DSH-Desktop.app
-hdiutil verify release/Oh-DSH-Desktop-0.1.2-arm64.dmg
+hdiutil verify release/Oh-DSH-Desktop-0.1.3-arm64.dmg
 pnpm run dist:web
 pnpm run smoke:web:package
 ```
@@ -488,8 +488,8 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-The workspace package metadata and download instructions now target `v0.1.2`;
-the latest public Release is `v0.1.1`. Pushing a `v0.1.2` tag runs the release
+The workspace package metadata and download instructions now target `v0.1.3`;
+the latest public Release is `v0.1.2`. Pushing a `v0.1.3` tag runs the release
 workflow, packages every surface, and creates the matching GitHub Release.
 For later versions, update every workspace package first and push a `v*` tag
 at that same version.
