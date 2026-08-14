@@ -43,12 +43,6 @@
   display: none;
 }
 
-[data-oh-dsh-marketplace-sidebar-root='true'] {
-  min-height: 0 !important;
-  height: var(--oh-marketplace-sidebar-height, 100%) !important;
-  max-height: var(--oh-marketplace-sidebar-height, 100%) !important;
-}
-
 .oh-marketplace-surface {
   position: fixed;
   z-index: 8800;

@@ -63,7 +63,6 @@ declare global {
 export const inject = ['locale', 'sessions']
 
 const OPEN_KEY = 'oh-dsh-desktop.plugin-marketplace.open'
-const SIDEBAR_BOTTOM_INSET = 8
 
 function readOpen(): boolean {
   try { return localStorage.getItem(OPEN_KEY) === 'true' } catch { return false }
@@ -181,7 +180,6 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   #observer: MutationObserver | null = null
   #resizeObserver: ResizeObserver | null = null
   #placementFrame: number | null = null
-  #sidebarRoot: HTMLElement | null = null
   #unsubscribeLocale: (() => void) | null = null
   #unsubscribeSessions: (() => void) | null = null
   #sessionNavigationState: SessionNavigationState = initialSessionNavigationState()
@@ -282,9 +280,6 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#root?.unmount()
     this.#element?.remove()
     this.#style?.remove()
-    this.#sidebarRoot?.removeAttribute('data-oh-dsh-marketplace-sidebar-root')
-    this.#sidebarRoot?.style.removeProperty('--oh-marketplace-sidebar-top')
-    this.#sidebarRoot?.style.removeProperty('--oh-marketplace-sidebar-height')
     delete document.documentElement.dataset.ohDshMarketplaceOpen
     document.documentElement.style.removeProperty('--oh-marketplace-left')
   }
@@ -320,20 +315,6 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#entry.className = `${settings.className} oh-marketplace-nav`.trim()
     if (this.#entry.parentElement !== parent || this.#entry.nextElementSibling !== settings) {
       parent.insertBefore(this.#entry, settings)
-    }
-    const sidebarRoot = parent.parentElement
-    if (this.#sidebarRoot !== sidebarRoot) {
-      this.#sidebarRoot?.removeAttribute('data-oh-dsh-marketplace-sidebar-root')
-      this.#sidebarRoot?.style.removeProperty('--oh-marketplace-sidebar-top')
-      this.#sidebarRoot?.style.removeProperty('--oh-marketplace-sidebar-height')
-      this.#sidebarRoot = sidebarRoot
-    }
-    if (sidebarRoot !== null) {
-      const top = Math.max(0, Math.round(sidebarRoot.getBoundingClientRect().top))
-      const height = Math.max(0, window.innerHeight - top - SIDEBAR_BOTTOM_INSET)
-      sidebarRoot.dataset.ohDshMarketplaceSidebarRoot = 'true'
-      sidebarRoot.style.setProperty('--oh-marketplace-sidebar-top', `${String(top)}px`)
-      sidebarRoot.style.setProperty('--oh-marketplace-sidebar-height', `${String(height)}px`)
     }
     const sidebar = sidebarFor(settings)
     if (sidebar === null) return
