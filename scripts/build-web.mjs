@@ -92,64 +92,38 @@ if (isWindowsTarget) {
 
 writeFileSync(join(packageDir, 'README.md'), `# Oh-DSH Web
 
-DeepSeek Harness 的浏览器发行版：开箱即用的 DSH Web UI，附带 Oh-DSH 的
-皮肤、Pinned Summary、Sidebar（Files/Git/Review）与 PTY 终端能力。
-模型运行在云端，本发行版只负责把 Web runtime 跑起来，数据默认存放在
-\`~/.oh-dsh-web\`。
+Oh-DSH 的轻量浏览器发行版，不包含 Electron。它携带 Web runtime、Node.js
+和 Web 可用的内置插件，数据默认保存在 \`~/.oh-dsh-web\`。
 
-## 安装与运行
+## 启动
 
 \`\`\`sh
-tar -xzf ${dirName}.tar.gz
-cd ${dirName}
 ./bin/ohdsh web
 \`\`\`
 
-Windows 发行包使用 \`bin\\ohdsh.cmd\` 启动：
+Windows：
 
 \`\`\`bat
 bin\\ohdsh.cmd web
 \`\`\`
 
-启动后终端会打印地址（默认 \`http://127.0.0.1:3080\`），交互式终端下会
-自动打开浏览器；也可以手动访问打印的 URL。首次启动会创建
-\`~/.oh-dsh-web\` 数据目录（\`~/.oh-dsh-web/dsh\` 是 DSH_HOME）。
+默认地址是 \`http://127.0.0.1:3080\`。运行
+\`./bin/ohdsh web --help\` 查看监听地址、端口、数据目录和可信主机选项。
+按 \`Ctrl+C\` 优雅退出。
 
-## 配置
+默认只监听 loopback。向局域网开放前，请配置 \`--trusted-host\`、鉴权和 TLS。
 
-| 选项 | 默认 | 说明 |
-| --- | --- | --- |
-| \`--host\` / \`DSH_OH_WEB_HOST\` | \`127.0.0.1\` | 监听地址；\`0.0.0.0\` 暴露到局域网 |
-| \`--port\` / \`DSH_OH_WEB_PORT\` | \`3080\` | 监听端口；\`0\` 表示随机端口 |
-| \`--data\` / \`DSH_OH_WEB_HOME\` | \`~/.oh-dsh-web\` | 可写数据根目录 |
-| \`--no-open\` / \`DSH_OH_WEB_OPEN=0\` | 自动打开 | 不自动打开浏览器 |
-| \`--trusted-host <auth>\` | — | 浏览器信任围栏的额外 authority（可重复） |
+## English
 
-退出按 \`Ctrl+C\`，会优雅地停止 DSH runtime。
+This is the lightweight Oh-DSH browser distribution without Electron. It
+includes the Web runtime, Node.js, and Web-compatible bundled plugins.
 
-## 内置 Oh-DSH 能力
+Start it with \`./bin/ohdsh web\` (or \`bin\\ohdsh.cmd web\` on Windows).
+The default URL is \`http://127.0.0.1:3080\`. Run
+\`./bin/ohdsh web --help\` for host, port, data-directory, and trusted-host
+options. Press \`Ctrl+C\` for a graceful shutdown.
 
-- Oh-DSH 皮肤：四套主题，设置页即时切换，Host 持久化。
-- Pinned Summary：当前 Session 摘要。
-- Sidebar：Session tabs、Files、Git Review、逐行评论与 workspace Git API。
-- PTY 终端 dock（浏览器内 xterm）。
-- 插件市场暂为桌面发行版专属（Web 传输在规划中）。
-
-## 安全边界
-
-- 默认只监听 loopback；对外暴露时请自行评估信任边界。
-- 浏览器与 Agent 管理通道遵循 DSH Web runtime 的 origin 信任围栏。
-- Better Sidebar Host 对 Files 和 Git 请求执行 Session 与 Workspace 边界校验。
-
-## 从源码构建
-
-\`\`\`sh
-pnpm install
-pnpm run dist:web
-\`\`\`
-
-产物位于 \`release/\`（tar.gz 与 zip），构建完成后会对打包产物自动跑
-\`smoke:web\` 验证。
+Documentation: https://github.com/hust-open-atom-club/oh-dsh/tree/main/docs
 `)
 
 const tarball = join(release, `${dirName}.tar.gz`)
