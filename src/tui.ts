@@ -197,7 +197,7 @@ export function tuiLaunchSpec(
     DSH_OH_TUI_HOME: dataRoot,
     DSH_OH_TUI_PROFILE: TUI_PROFILE,
     DSH_OH_TUI_VERSION: version,
-    OH_DSH_TUI_CONFIG_HOME: join(dataRoot, '.dsh-cc'),
+    OH_DSH_TUI_CONFIG_HOME: join(dataRoot, 'tui'),
     OH_DSH_TUI_CWD: cwd,
     OH_DSH_TUI_FULLSCREEN: options.fullscreen ? '1' : '0',
     OH_DSH_TUI_LANG: options.lang,

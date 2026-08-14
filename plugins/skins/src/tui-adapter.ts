@@ -35,7 +35,7 @@ export interface TuiSkinActivation {
 /** Resolve the two stores joined by the TUI adapter. */
 export function tuiSkinPaths(
   dataRoot: string,
-  tuiConfigRoot: string = join(homedir(), '.dsh-cc'),
+  tuiConfigRoot: string = join(homedir(), '.ohdsh', 'tui'),
 ): TuiSkinPaths {
   return Object.freeze({
     preferences: join(dataRoot, 'skins.json'),

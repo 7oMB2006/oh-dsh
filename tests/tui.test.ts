@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -127,7 +128,7 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
     assert.equal(childEnv?.OH_DSH_TUI_FULLSCREEN, '0')
     assert.equal(childEnv?.OH_DSH_TUI_LANG, 'en')
     assert.equal(childEnv?.DSH_OH_TUI_VERSION, '1.2.3')
-    assert.equal(childEnv?.OH_DSH_TUI_CONFIG_HOME, join(dataRoot, '.dsh-cc'))
+    assert.equal(childEnv?.OH_DSH_TUI_CONFIG_HOME, join(dataRoot, 'tui'))
     assert.equal(childEnv?.OH_DSH_TUI_TITLE, 'Oh-DSH TUI')
 
     const manifest = JSON.parse(readFileSync(
@@ -151,19 +152,13 @@ test('TUI bundle mounts its surface and skins before the upstream renderer', () 
   assert.ok(surface >= 0 && surface < skins && skins < renderer)
 })
 
-test('TUI upstream adapter unifies product title and scopes theme storage', () => {
+test('TUI upstream adapter removes legacy terminal branding and scopes storage', () => {
   const root = mkdtempSync(join(tmpdir(), 'oh-dsh-tui-adapter-'))
+  const repository = join(dirname(fileURLToPath(import.meta.url)), '..')
   const lib = join(root, 'lib', 'types')
-  mkdirSync(join(lib, 'components'), { recursive: true })
-  mkdirSync(join(lib, 'screens'), { recursive: true })
-  writeFileSync(join(lib, 'components', 'LogoV2.js'),
-    "sweep('✦ dsh-cc', t, wordmarkRGB, wordmarkShimmerRGB, 60); '  v' + VERSION;\n")
-  writeFileSync(join(lib, 'screens', 'Chat.js'),
-    'useTerminalTitle(`${titlePrefix} 🐋 ${channel.sessionTitle}`);\n')
-  writeFileSync(join(lib, 'customTheme.js'),
-    "export const CUSTOM_THEME_DIR = join(homedir(), '.dsh-cc', 'themes');\n")
-  writeFileSync(join(lib, 'themePrefs.js'),
-    "const PREFS_DIR = join(homedir(), '.dsh-cc');\n")
+  cpSync(join(repository, 'upstream', 'dsh-TUI', 'lib', 'types'), lib, {
+    recursive: true,
+  })
   try {
     adaptTuiRendererPackage(root)
     assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /Oh-DSH TUI/)
@@ -171,6 +166,40 @@ test('TUI upstream adapter unifies product title and scopes theme storage', () =
     assert.match(readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8'), /Oh-DSH TUI/)
     assert.match(readFileSync(join(lib, 'customTheme.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
     assert.match(readFileSync(join(lib, 'themePrefs.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
+    const commands = readFileSync(join(lib, 'commands.js'), 'utf8')
+    assert.match(commands, /Exit Oh-DSH TUI/)
+    assert.doesNotMatch(commands, /description: .*dsh-cc/)
+    const plugin = readFileSync(join(lib, 'plugin.js'), 'utf8')
+    assert.match(plugin, /ohdsh tui --resume/)
+    assert.doesNotMatch(plugin, /dsh-cc --resume/)
+    const messages = readFileSync(join(lib, 'i18n.js'), 'utf8')
+    assert.match(messages, /Oh-DSH TUI session export/)
+    assert.doesNotMatch(messages, /dsh-cc|~\/\.dsh-cc/)
+    const channel = readFileSync(join(lib, 'channel.js'), 'utf8')
+    assert.match(channel, /oh-dsh-tui-export-/)
+    assert.doesNotMatch(channel, /dsh-cc-export-|join\(userHome, '\.dsh-cc\//)
+    const chat = readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8')
+    assert.doesNotMatch(chat, /userHome}\\\\\.dsh-cc/)
+    const themeProvider = readFileSync(
+      join(lib, 'components', 'design-system', 'ThemeProvider.js'),
+      'utf8',
+    )
+    assert.doesNotMatch(themeProvider, /\[dsh-cc-tui\]|~\/\.dsh-cc/)
+    const customTheme = readFileSync(join(lib, 'customTheme.js'), 'utf8')
+    assert.doesNotMatch(customTheme, /\[dsh-cc-tui\]|~\/\.dsh-cc/)
+    for (const name of [
+      'activityPrefs.js',
+      'effortPrefs.js',
+      'history.js',
+      'modelPrefs.js',
+      'presetPrefs.js',
+      'sessionHistory.js',
+      'themePrefs.js',
+    ]) {
+      const preferences = readFileSync(join(lib, name), 'utf8')
+      assert.match(preferences, /OH_DSH_TUI_CONFIG_HOME/)
+      assert.doesNotMatch(preferences, /join\(homedir\(\), '\.dsh-cc'\)/)
+    }
     assert.doesNotThrow(() => { adaptTuiRendererPackage(root) })
   } finally {
     rmSync(root, { recursive: true, force: true })
