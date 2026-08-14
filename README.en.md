@@ -488,11 +488,10 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-The workspace package metadata and download instructions now target `v0.1.3`;
-the latest public Release is `v0.1.2`. Pushing a `v0.1.3` tag runs the release
-workflow, packages every surface, and creates the matching GitHub Release.
-For later versions, update every workspace package first and push a `v*` tag
-at that same version.
+Workspace package metadata and download instructions must use the same
+version. Pushing the matching `v*` tag runs the release workflow, packages
+every surface, and creates the GitHub Release. For later versions, update
+every workspace package first and then push the tag at that same version.
 
 ## License
 

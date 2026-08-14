@@ -457,10 +457,9 @@ pnpm run dist:linux
 pnpm run smoke:app:linux
 ```
 
-当前 workspace package 与下载说明已升到 `v0.1.3`，公开 Release 最新为
-`v0.1.2`；推送 `v0.1.3` tag 后，release workflow 会按该版本打包全部形态
-并创建对应 Release。准备后续版本时，同样先统一更新 workspace package
-版本，再推送同一版本号的 `v*` tag。
+workspace package 与下载说明必须保持同一版本。推送对应的 `v*` tag 后，
+release workflow 会按该版本打包全部形态并创建 GitHub Release。准备后续
+版本时，先统一更新所有 workspace package，再推送同一版本号的 tag。
 
 ## License
 
