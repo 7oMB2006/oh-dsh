@@ -15,13 +15,14 @@ import { fileURLToPath } from 'node:url'
 import { ensureWebProfile, WEB_PROFILE } from '../src/profile.ts'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
 import { resolveProductVersion } from '../src/version.ts'
+import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Resolve the smoke resources root: `.stage`, an explicit dir, or the packaged release. */
 function resolveResources(candidate) {
   if (candidate === 'release') {
-    const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
+    const platform = resolveNodeDistributionPlatform()
     const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
     const release = join(
       root,

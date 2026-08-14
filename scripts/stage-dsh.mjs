@@ -27,6 +27,7 @@ import {
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
+import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -39,9 +40,7 @@ const nodeVersion = process.env.DSH_DESKTOP_NODE_VERSION ?? '26.0.0'
 // Node.js distribution triples use `linux`/`darwin`/`win` and `x64`/`arm64`.
 // Stage a Node runtime for the current host unless an override asks for a
 // specific platform (used for cross-packaging).
-const nodePlatform = process.env.DSH_DESKTOP_NODE_PLATFORM
-  ?? { darwin: 'darwin', linux: 'linux', win32: 'win' }[process.platform]
-  ?? process.platform
+const nodePlatform = resolveNodeDistributionPlatform()
 const nodeArch = process.env.DSH_DESKTOP_NODE_ARCH
   ?? { arm64: 'arm64', x64: 'x64' }[process.arch]
   ?? process.arch

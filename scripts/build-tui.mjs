@@ -11,12 +11,13 @@ import {
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveProductVersion } from '../src/version.ts'
+import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const stage = join(root, '.stage')
 const release = join(root, 'release')
 const version = resolveProductVersion(root)
-const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
+const platform = resolveNodeDistributionPlatform()
 const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
 const isWindowsHost = process.platform === 'win32'
 const isWindowsTarget = platform === 'win'
