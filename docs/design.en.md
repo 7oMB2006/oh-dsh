@@ -108,10 +108,12 @@ same transaction and risk approval and cannot bypass the Loader.
 - TUI starts only on a real TTY and retains the active DSH Profile's sandbox
   and approval policies.
 
-## Naming and data compatibility
+## Naming and data root
 
 User-facing names are **Oh-DSH Desktop**, **Oh-DSH Web**, and **Oh-DSH TUI**.
-Internal package ids, the bundle id, and existing data directories remain
-stable so upgrades preserve sessions, settings, and credentials.
+Internal package ids and the bundle id remain stable. All three surfaces use
+`~/.ohdsh`, keep their compositions in separate Profiles, and share sessions,
+credentials, skins, and plugin caches. `OH_DSH_HOME` is the common override;
+the Web and TUI `--data` flags override only the current process.
 
 See [installation, operations, and troubleshooting](./usage.en.md).

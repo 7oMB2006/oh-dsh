@@ -80,13 +80,14 @@ Common options:
 | --- | --- | --- |
 | `--host` | `127.0.0.1` | Bind address |
 | `--port` | `3080` | Listen port; `0` selects a random port |
-| `--data` | `~/.oh-dsh-web` | Writable Web data root |
+| `--data` | `~/.ohdsh` | Shared Oh-DSH data root for all surfaces |
 | `--no-open` | off | Do not open the browser automatically |
 | `--trusted-host` | none | Add a trusted authority; repeatable |
 
 Equivalent environment variables include `DSH_OH_WEB_HOST`,
-`DSH_OH_WEB_PORT`, `DSH_OH_WEB_HOME`, and `DSH_OH_WEB_OPEN`. Press `Ctrl+C`
-for a graceful shutdown.
+`DSH_OH_WEB_PORT`, `DSH_OH_WEB_HOME`, and `DSH_OH_WEB_OPEN`. `OH_DSH_HOME`
+overrides the data root for Desktop, Web, and TUI together. Press `Ctrl+C` for
+a graceful shutdown.
 
 Do not bind to `0.0.0.0` without an access boundary. For LAN exposure, add
 `--trusted-host` and put authentication and TLS in a trusted reverse proxy.
@@ -122,7 +123,7 @@ Common TUI options:
 | Option | Default | Description |
 | --- | --- | --- |
 | `--cwd` | Current directory | Workspace |
-| `--data` | `~/.ohdsh` | Oh-DSH TUI Profile, session, and configuration root |
+| `--data` | `~/.ohdsh` | Shared Oh-DSH data root for all surfaces |
 | `--resume` | New session | Resume a Session id |
 | `--lang` | Upstream preference | `zh` or `en` |
 | `--preset` | `standard` | Initial Agent preset |
@@ -190,11 +191,13 @@ pnpm run dist:tui       # TUI-only terminal distribution
 
 ## Data and troubleshooting
 
-Desktop retains the existing internal data directory to preserve state across
-the visible-name migration. Web stores data in `~/.oh-dsh-web` by default.
-TUI uses its own `~/.ohdsh` root and does not load global plugin configuration
-from `~/.dsh`. Configure the DeepSeek API key in Models settings or in `.env`
-under the matching DSH data directory.
+Desktop, Web, and TUI share `~/.ohdsh` by default and do not load global plugin
+configuration from `~/.dsh`. They keep separate `profiles/desktop`,
+`profiles/web`, and `profiles/tui` compositions while sharing sessions,
+credentials, skins, and plugin caches. Electron-specific data lives under
+`~/.ohdsh/desktop`. Override all surfaces with `OH_DSH_HOME`, or isolate one
+Web or TUI process with `--data`. Configure the DeepSeek API key in Models
+settings or in `~/.ohdsh/.env`.
 
 Troubleshooting order:
 

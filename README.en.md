@@ -144,8 +144,8 @@ or only TUI with `pnpm run dist:tui`.
 
 `dsh-TUI` is pinned as a Git submodule at `upstream/dsh-TUI`. Oh-DSH keeps
 the upstream implementation and attribution, while owning the `ohdsh tui`
-launcher, isolated `~/.ohdsh` data, unified title, cross-surface skins, and
-distribution packaging. See the design guide for the exact boundary.
+launcher, the shared `~/.ohdsh` data root, unified title, cross-surface skins,
+and distribution packaging. See the design guide for the exact boundary.
 
 ## License
 

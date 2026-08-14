@@ -29,6 +29,7 @@ import {
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/protocol.ts'
 import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
+import { desktopElectronDataRoot, resolveOhDshHome } from './data-root.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
@@ -41,7 +42,6 @@ import {
 import { resolveProductVersion } from './version.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
-const LEGACY_DATA_DIRECTORY = 'Oh-DSH-Desktop'
 const DEFAULT_UI_ZOOM_FACTOR = 1.12
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const PRODUCT_VERSION = resolveProductVersion(join(currentDir, '..'))
@@ -85,10 +85,10 @@ function runtimePaths(): BundledRuntimePaths {
 }
 
 function desktopInfo(preview: DesktopInfo['preview'] = null): DesktopInfo {
-  const appDataPath = app.getPath('userData')
+  const appDataPath = resolveOhDshHome(process.env)
   return {
     appDataPath,
-    dshHome: join(appDataPath, 'dsh'),
+    dshHome: appDataPath,
     platform: process.platform,
     preview,
     profile: DESKTOP_PROFILE,
@@ -118,6 +118,7 @@ function runtimeEnvironment(
     DSH_DESKTOP_PROFILE: info.profile,
     DSH_DESKTOP_VERSION: info.version,
     DSH_HOME: overrides.dshHome ?? info.dshHome,
+    OH_DSH_HOME: overrides.dshHome ?? info.dshHome,
     NODE_USE_ENV_PROXY: '1',
     PATH: runtimeSearchPath(paths),
   }
@@ -691,9 +692,10 @@ function installIpc(): void {
 
 async function bootstrap(): Promise<void> {
   app.setName(PRODUCT_NAME)
-  // The visible product name changed in 0.1.x. Keep the existing data path so
-  // an in-place upgrade retains sessions, profiles, skins, and credentials.
-  app.setPath('userData', join(app.getPath('appData'), LEGACY_DATA_DIRECTORY))
+  const ohDshHome = resolveOhDshHome(process.env)
+  const electronDataRoot = desktopElectronDataRoot(ohDshHome)
+  mkdirSync(electronDataRoot, { recursive: true, mode: 0o700 })
+  app.setPath('userData', electronDataRoot)
   app.setAboutPanelOptions({
     applicationName: PRODUCT_NAME,
     applicationVersion: PRODUCT_VERSION,

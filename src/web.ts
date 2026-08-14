@@ -2,9 +2,12 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  DEFAULT_OH_DSH_HOME_DIRECTORY,
+  resolveOhDshHome,
+} from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
 import {
@@ -20,7 +23,7 @@ export const DEFAULT_WEB_PORT = 3080
 /** Default bind host: loopback only. Use 0.0.0.0 to expose the UI on the LAN. */
 export const DEFAULT_WEB_HOST = '127.0.0.1'
 /** Default writable data root. */
-export const DEFAULT_DATA_DIR_NAME = '.oh-dsh-web'
+export const DEFAULT_DATA_DIR_NAME = DEFAULT_OH_DSH_HOME_DIRECTORY
 
 /** Launch options resolved from argv and environment. */
 export interface LaunchOptions {
@@ -45,7 +48,8 @@ Options:
   --help                  show this help
 
 Environment:
-  DSH_OH_WEB_HOST, DSH_OH_WEB_PORT, DSH_OH_WEB_HOME, DSH_OH_WEB_OPEN
+  OH_DSH_HOME, DSH_OH_WEB_HOST, DSH_OH_WEB_PORT, DSH_OH_WEB_HOME,
+  DSH_OH_WEB_OPEN
 `
 
 function parsePort(value: string): number {
@@ -181,7 +185,7 @@ export async function main(
     argv,
     env,
     stdout.isTTY === true,
-    join(homedir(), DEFAULT_DATA_DIR_NAME),
+    resolveOhDshHome(env),
   )
   if (options.help) {
     stdout.write(USAGE)
@@ -222,9 +226,8 @@ export async function main(
     throw new Error(`packaged DSH CLI is missing: ${paths.cliEntry}`)
   }
 
-  const dshHome = join(dataRoot, 'dsh')
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  ensureWebProfile(dshHome)
+  ensureWebProfile(dataRoot)
 
   const logTail: string[] = []
   const runtime = runtimeFactory({
@@ -238,12 +241,13 @@ export async function main(
     cwd: dataRoot,
     env: {
       ...env,
-      DSH_HOME: dshHome,
+      DSH_HOME: dataRoot,
       DSH_OH_WEB: '1',
       DSH_OH_WEB_DATA: dataRoot,
       DSH_OH_WEB_PROFILE: WEB_PROFILE,
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',
+      OH_DSH_HOME: dataRoot,
       PATH: runtimeSearchPath(paths, env),
     },
     nodeBinary: paths.nodeBinary,

@@ -2,10 +2,10 @@
 
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { existsSync, mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
+import { defaultOhDshHome } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureTuiProfile, TUI_PROFILE } from './profile.ts'
 import {
@@ -16,7 +16,7 @@ import {
 import { resolveProductVersion } from './version.ts'
 
 /** Default Oh-DSH-owned home, isolated from the upstream DSH CLI. */
-export const DEFAULT_TUI_HOME = join(homedir(), '.ohdsh')
+export const DEFAULT_TUI_HOME = defaultOhDshHome()
 
 /** TUI launch options resolved from command-line flags and environment. */
 export interface TuiLaunchOptions {
@@ -53,7 +53,7 @@ Options:
   --help                 show this help
 
 Environment:
-  DSH_OH_TUI_HOME, DSH_OH_TUI_CWD, DSH_OH_TUI_FULLSCREEN,
+  OH_DSH_HOME, DSH_OH_TUI_HOME, DSH_OH_TUI_CWD, DSH_OH_TUI_FULLSCREEN,
   DSH_OH_TUI_LANG, DSH_OH_TUI_PRESET, DSH_OH_TUI_SESSION_ID
 `
 
@@ -86,7 +86,9 @@ export function parseTuiArgs(
   const envSessionId = optionalEnv(env, 'DSH_OH_TUI_SESSION_ID')
   const options: TuiLaunchOptions = {
     cwd: optionalEnv(env, 'DSH_OH_TUI_CWD') ?? defaultCwd,
-    dataRoot: optionalEnv(env, 'DSH_OH_TUI_HOME') ?? defaultDataRoot,
+    dataRoot: optionalEnv(env, 'DSH_OH_TUI_HOME')
+      ?? optionalEnv(env, 'OH_DSH_HOME')
+      ?? defaultDataRoot,
     fullscreen: envFullscreen === undefined
       ? true
       : parseBoolean(envFullscreen, 'DSH_OH_TUI_FULLSCREEN'),
@@ -194,6 +196,7 @@ export function tuiLaunchSpec(
     OH_DSH_TUI_PRESET: options.preset,
     OH_DSH_TUI_SESSION_ID: options.sessionId,
     OH_DSH_TUI_TITLE: 'Oh-DSH TUI',
+    OH_DSH_HOME: dataRoot,
     PATH: runtimeSearchPath(paths, env),
   }
   return {

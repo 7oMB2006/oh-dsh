@@ -139,8 +139,8 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 | [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git Review、文件与 PTY Host 能力 |
 
 `dsh-TUI` 以固定提交的 Git submodule 存放在 `upstream/dsh-TUI`。
-Oh-DSH 保留其上游实现与署名，并负责 `ohdsh tui` 启动器、`~/.ohdsh`
-数据隔离、统一标题、跨端皮肤及发行打包。详细边界见设计文档。
+Oh-DSH 保留其上游实现与署名，并负责 `ohdsh tui` 启动器、三端共享的
+`~/.ohdsh` 数据根目录、统一标题、跨端皮肤及发行打包。详细边界见设计文档。
 
 ## License
 
