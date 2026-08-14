@@ -29,7 +29,6 @@ import {
 interface ClientContext {
   effect(effect: () => (() => void) | void, label?: string): void
   get(name: string): unknown
-  slots: SlotsService
   reflect: {
     provide(name: string, value: unknown, options?: unknown): (() => Promise<void> | void) | void
   }
@@ -919,13 +918,14 @@ export function apply(ctx: ClientContext): void {
   }
   const locale = ctx.get('locale') as LocaleService
   const sessions = ctx.get('sessions') as SessionsService
+  const slots = ctx.get('slots') as SlotsService
   const t: Translate<MarketplaceMessage> = locale.bind('oh-dsh.plugin-marketplace')
   const view = new PluginMarketplaceViewService(bridge, locale, t, sessions)
   ctx.effect(
     () => locale.register('oh-dsh.plugin-marketplace', MARKETPLACE_MESSAGES),
     'oh-dsh-desktop: marketplace dictionaries',
   )
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
+  slots.inject('sidebar.footer.action', () => slots.register({
     name: 'sidebar.footer.action',
     id: 'oh-dsh-plugin-marketplace',
     order: 80,
