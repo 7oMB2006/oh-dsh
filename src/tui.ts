@@ -1,7 +1,7 @@
 /** Oh-DSH TUI launcher over the pinned upstream dsh-TUI bundle. */
 
 import { spawn, type SpawnOptions } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import type { Readable } from 'node:stream'
@@ -13,6 +13,7 @@ import {
   runtimeSearchPath,
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
+import { resolveProductVersion } from './version.ts'
 
 /** Default Oh-DSH-owned home, isolated from the upstream DSH CLI. */
 export const DEFAULT_TUI_HOME = join(homedir(), '.ohdsh')
@@ -164,18 +165,7 @@ export function resolveTuiRoot(env: NodeJS.ProcessEnv = process.env): string {
 
 /** Read release metadata from a standalone package or Electron resources. */
 export function resolveTuiVersion(root: string): string {
-  for (const path of [
-    join(root, 'package.json'),
-    join(root, 'lib', 'oh-dsh', 'package.json'),
-  ]) {
-    try {
-      const manifest = JSON.parse(readFileSync(path, 'utf8')) as { version?: unknown }
-      if (typeof manifest.version === 'string') return manifest.version
-    } catch {
-      // Try the next supported distribution layout.
-    }
-  }
-  return '0.0.0'
+  return resolveProductVersion(root)
 }
 
 /** Build one attached process launch after the profile has been initialized. */

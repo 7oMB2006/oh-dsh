@@ -5,17 +5,17 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveProductVersion } from '../src/version.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const stage = join(root, '.stage')
 const release = join(root, 'release')
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
+const version = resolveProductVersion(root)
 const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
 const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
 const isWindowsHost = process.platform === 'win32'
@@ -51,7 +51,7 @@ mkdirSync(join(packageDir, 'bin'), { recursive: true })
 mkdirSync(join(packageDir, 'lib', 'oh-dsh'), { recursive: true })
 
 copyFileSync(join(root, 'dist', 'ohdsh.js'), join(packageDir, 'lib', 'oh-dsh', 'cli.js'))
-copyFileSync(join(root, 'package.json'), join(packageDir, 'package.json'))
+copyFileSync(join(root, 'dist', 'release-package.json'), join(packageDir, 'package.json'))
 copyFileSync(join(root, 'LICENSE'), join(packageDir, 'LICENSE'))
 copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(packageDir, 'THIRD_PARTY_NOTICES.md'))
 cpSync(join(stage, 'dsh-runtime'), join(packageDir, 'dsh-runtime'), {
