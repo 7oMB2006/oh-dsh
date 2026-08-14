@@ -13,7 +13,6 @@ jobs:
     name: Package ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
-    continue-on-error: ${{ matrix.os == 'windows-2025' }}
     strategy:
       fail-fast: false
       matrix:
@@ -36,12 +35,11 @@ jobs:
             dist_script: dist:linux
             node_platform: linux
             node_arch: x64
-          - name: Windows x64
-            id: windows-x64
-            os: windows-2025
-            dist_script: dist:win
-            node_platform: win
-            node_arch: x64
+          # Windows is build-verified in the CI matrix, but the pinned DSH
+          # runtime is not portable on Windows yet: pnpm's junction-based
+          # workspace layout contains cycles that packaging tools follow
+          # until Windows path limits fail. Re-add this job once staging
+          # produces a junction-free runtime on Windows.
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
@@ -70,19 +68,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Disable Windows Defender real-time scanning
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          try {
-            Set-MpPreference -DisableRealtimeMonitoring $true
-            Set-MpPreference -DisableIntrusionPreventionSystem $true
-          } catch {
-            Write-Host "Could not disable Defender; continuing"
-          }
-          Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1
-          git config --system core.longpaths true
-
       - name: Package desktop distribution
         run: pnpm run ${{ matrix.dist_script }}
 
@@ -105,6 +90,9 @@ jobs:
     needs: package
     runs-on: ubuntu-24.04
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:

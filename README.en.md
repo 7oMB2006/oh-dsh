@@ -72,7 +72,7 @@ macOS, Linux, and Windows.
 
 ## Capabilities
 
-- Self-contained Apple Silicon / Intel macOS and Linux x64 applications and installers, plus a Windows x64 portable zip.
+- Self-contained Apple Silicon / Intel macOS and Linux x64 applications and installers; the Windows x64 package is still in progress.
 - Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
 - Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
@@ -421,14 +421,6 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
-Windows artifacts are written to the same directory:
-
-```text
-release/
-├── Oh-DSH-Desktop-0.1.1-x64.zip
-└── win-unpacked/
-```
-
 The bundled Node runtime defaults to the build machine's platform. Set
 `DSH_DESKTOP_NODE_PLATFORM` (`linux`/`darwin`/`win`) and `DSH_DESKTOP_NODE_ARCH`
 (`x64`/`arm64`) to stage a different target for cross-packaging.
@@ -442,11 +434,17 @@ every surface on every target platform.
 
 Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
-packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.
-Each platform produces the desktop package (DMG/ZIP, AppImage/deb, ZIP)
-and the Oh-DSH-Web package (tar.gz/ZIP). After every job passes, a publish
-job attaches all artifacts to a same-named GitHub Release via `gh release
-create`; any failure blocks the release.
+packages macOS arm64, macOS x64, and Linux x64 in parallel. Each platform
+produces the desktop package (DMG/ZIP, AppImage/deb) and the Oh-DSH-Web
+package (tar.gz/ZIP). After every job passes, a publish job attaches all
+artifacts to a same-named GitHub Release via `gh release create`; any failure
+blocks the release.
+
+Windows x64 is covered in the CI matrix (install, type check, tests, and the
+build), but release packaging is deferred: the pinned DSH runtime still uses
+pnpm's junction layout on Windows, and the cycles between workspace packages
+are followed by packaging tools until Windows path limits fail. Enable
+`dist:win` once staging produces a junction-free runtime on Windows.
 
 You can still verify locally before upload:
 

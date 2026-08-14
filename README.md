@@ -64,7 +64,7 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 
 ## 主要能力
 
-- 自包含的 Apple Silicon / Intel macOS 应用与安装包、Linux x64 AppImage / deb，以及 Windows x64 便携包（zip）。
+- 自包含的 Apple Silicon / Intel macOS 应用与安装包、Linux x64 AppImage / deb（Windows x64 发行包在完善中）。
 - 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
 - Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
@@ -393,14 +393,6 @@ release/
 └── linux-unpacked/oh-dsh-desktop
 ```
 
-Windows 产物同样位于 `release/`：
-
-```text
-release/
-├── Oh-DSH-Desktop-0.1.1-x64.zip
-└── win-unpacked/
-```
-
 打包内置的 Node runtime 默认匹配构建机平台；跨平台打包可显式指定
 `DSH_DESKTOP_NODE_PLATFORM`（`linux`/`darwin`/`win`）与 `DSH_DESKTOP_NODE_ARCH`
 （`x64`/`arm64`）。
@@ -413,10 +405,15 @@ push 时,于 macOS arm64、macOS x64、Linux x64、Windows x64 四个平台并�
 覆盖。
 
 推送 `v*` tag 后，[`.github/workflows/release.yml`](.github/workflows/release.yml)
-会在四台 runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows
-x64，每个平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、ZIP）与
-Oh-DSH-Web 发行包（tar.gz/ZIP）。全部 job 通过后，publish job 会用
+会在 runner 上并行打包 macOS arm64、macOS x64 与 Linux x64，每个平台
+同时产出桌面发行包（DMG/ZIP、AppImage/deb）与 Oh-DSH-Web 发行包
+（tar.gz/ZIP）。全部 job 通过后，publish job 会用
 `gh release create` 把产物挂到同名 GitHub Release；任何失败都会阻止发布。
+
+Windows x64 在 CI 矩阵中覆盖了安装、typecheck、测试与构建，但发行包暂缓：
+固定版本的 DSH runtime 在 Windows 上仍以 pnpm junction 布局存在，其中
+workspace 之间的环会被打包工具跟随，直到超出 Windows 路径长度上限。待
+staging 在 Windows 上产出无 junction 的 runtime 后再启用 `dist:win`。
 
 上传前也可以在本机验证：
 
