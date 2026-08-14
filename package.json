@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH Desktop",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Oh-DSH Desktop: an installable DeepSeek Harness desktop and web distribution",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",

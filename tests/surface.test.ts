@@ -20,7 +20,7 @@ test('surface contract defines exactly the three Oh-DSH forms', () => {
     kind: 'desktop',
     platform: 'darwin',
     profile: 'desktop',
-    version: '0.1.3',
+    version: '0.1.4',
   }
   assert.equal(surface.kind, 'desktop')
   assert.deepEqual(

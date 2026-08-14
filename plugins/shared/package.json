@@ -1,6 +1,6 @@
 {
   "name": "@oh-dsh/shared",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Shared client contracts for bundled Oh-DSH plugins",
   "private": true,
   "type": "module",
