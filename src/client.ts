@@ -3,12 +3,16 @@
 import type { DesktopBridge, DesktopCommand } from './contracts.ts'
 import type { DesktopPanels } from '../plugins/panel-controls/src/client.ts'
 import type { PinnedSummary } from '../plugins/pinned-summary/src/client.ts'
-import type { WorkspaceTools } from '../plugins/desktop-sidebar/src/client.ts'
+import type { WorkspaceTools } from '../plugins/sidebar/src/client.ts'
 import type {
   LocaleMessages,
   LocaleService,
   Translate,
 } from '../plugins/shared/i18n.ts'
+import {
+  OH_DSH_SURFACE_VIEW_SERVICE,
+  type OhDshSurfaceView,
+} from '../plugins/shared/surface.ts'
 
 interface WorkspaceView {
   workspaceId: string
@@ -276,6 +280,10 @@ export function apply(ctx: ClientContext): void {
     'oh-dsh-desktop: shell dictionaries',
   )
   ctx.reflect.provide('desktopShell', bridge, undefined)
+  // The unified three-surface contract, client plane: the desktop shell.
+  ctx.reflect.provide(OH_DSH_SURFACE_VIEW_SERVICE, Object.freeze({
+    kind: 'desktop',
+  } satisfies OhDshSurfaceView), undefined)
   ctx.effect(() => {
     let disposed = false
     let previewPluginId: string | null = null

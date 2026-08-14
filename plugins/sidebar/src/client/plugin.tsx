@@ -30,7 +30,7 @@ import {
   ToolIcon,
 } from './SideToolsPanel.tsx'
 import sideToolsCss from './side-tools.css'
-import workspaceCss from './desktop-sidebar.css'
+import workspaceCss from './sidebar.css'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import { WORKSPACE_MESSAGES, type WorkspaceMessage } from './i18n.ts'
@@ -422,9 +422,9 @@ class WorkspaceToolsService implements WorkspaceTools {
     this.style.textContent = `${workspaceCss}\n${sideToolsCss}`
     document.head.append(this.style)
     this.element = document.createElement('div')
-    this.element.id = 'oh-dsh-desktop-sidebar-root'
+    this.element.id = 'oh-dsh-sidebar-root'
     const appRoot = document.getElementById('root')
-    if (appRoot === null) throw new Error('desktop-sidebar: app root is unavailable')
+    if (appRoot === null) throw new Error('sidebar: app root is unavailable')
     const layout = document.createElement('div')
     layout.id = 'oh-dsh-embedded-layout'
     appRoot.before(layout)
@@ -462,8 +462,8 @@ class WorkspaceToolsService implements WorkspaceTools {
     this.style?.remove()
     delete document.documentElement.dataset.ohDshDesktopSidebarOpen
     delete document.documentElement.dataset.ohDshPanelMaximized
-    document.documentElement.style.removeProperty('--oh-dsh-desktop-sidebar-width')
-    if (document.documentElement.dataset.ohDshRightPanelOwner === 'desktop-sidebar') {
+    document.documentElement.style.removeProperty('--oh-dsh-sidebar-width')
+    if (document.documentElement.dataset.ohDshRightPanelOwner === 'sidebar') {
       delete document.documentElement.dataset.ohDshRightPanelOwner
       document.getElementById('root')?.style.removeProperty('padding-right')
     }
@@ -506,16 +506,16 @@ class WorkspaceToolsService implements WorkspaceTools {
   }
 
   private applyLayout(): void {
-    document.documentElement.style.setProperty('--oh-dsh-desktop-sidebar-width', `${String(this.state.width)}px`)
+    document.documentElement.style.setProperty('--oh-dsh-sidebar-width', `${String(this.state.width)}px`)
     const html = document.documentElement
     const appRoot = document.getElementById('root')
     if (this.state.open) {
       html.dataset.ohDshDesktopSidebarOpen = 'true'
-      html.dataset.ohDshRightPanelOwner = 'desktop-sidebar'
+      html.dataset.ohDshRightPanelOwner = 'sidebar'
       appRoot?.style.removeProperty('padding-right')
     } else {
       delete html.dataset.ohDshDesktopSidebarOpen
-      if (html.dataset.ohDshRightPanelOwner === 'desktop-sidebar') {
+      if (html.dataset.ohDshRightPanelOwner === 'sidebar') {
         delete html.dataset.ohDshRightPanelOwner
         appRoot?.style.removeProperty('padding-right')
       }
@@ -840,6 +840,7 @@ function WorkspacePanel({
   }
 
   const chooseWorkspace = async (): Promise<void> => {
+    if (window.dshDesktop?.chooseWorkspace === undefined) return
     const paths = await window.dshDesktop?.chooseWorkspace() ?? []
     for (const path of paths) {
       const workspace = await workspaces.create({ path })
@@ -856,7 +857,9 @@ function WorkspacePanel({
         </div>
         <div>
           <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}>↻</button>
-          <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+          {window.dshDesktop?.chooseWorkspace !== undefined && (
+            <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+          )}
           <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}>×</button>
         </div>
       </header>
@@ -1137,7 +1140,9 @@ function WorkspacePanel({
             <section className="oh-dsh-workspace-directory">
               <span>{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
               <small title={cwd}>{cwd}</small>
-              <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
+              {window.dshDesktop?.chooseWorkspace !== undefined && (
+                <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
+              )}
             </section>
 
             <section className="oh-dsh-processes">
@@ -1317,14 +1322,16 @@ function registerBuiltinSidebarTools(options: {
       shortcut: '⌘J',
       title: () => t('terminal'),
     }),
-    sidebar.registerTab({
-      icon: <ToolIcon kind="browser" />,
-      id: 'browser',
-      order: 30,
-      render: props => <BrowserView {...props} t={t} />,
-      shortcut: '⌘T',
-      title: () => t('browser'),
-    }),
+    ...(window.dshDesktop === undefined
+      ? []
+      : [sidebar.registerTab({
+          icon: <ToolIcon kind="browser" />,
+          id: 'browser',
+          order: 30,
+          render: props => <BrowserView {...props} t={t} />,
+          shortcut: '⌘T',
+          title: () => t('browser'),
+        })]),
     sidebar.registerTab({
       dedupeKey: tab => tab.resource,
       icon: <ToolIcon kind="files" />,
@@ -1642,10 +1649,10 @@ function pathBelongsToActiveWorkspace(
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
   const slots = ctx.get('slots') as SlotsService
-  const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.desktop-sidebar')
+  const t: Translate<WorkspaceMessage> = locale.bind('oh-dsh.sidebar')
   ctx.effect(
-    () => locale.register('oh-dsh.desktop-sidebar', WORKSPACE_MESSAGES),
-    'oh-dsh-desktop: workspace tools dictionaries',
+    () => locale.register('oh-dsh.sidebar', WORKSPACE_MESSAGES),
+    'oh-dsh-sidebar: workspace tools dictionaries',
   )
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
@@ -1754,7 +1761,8 @@ export function apply(ctx: ClientContext): void {
       if (url.origin === window.location.origin) return
       const runtime = runtimeSettings.getSnapshot().preferences
       const snapshot = desktopSidebar.getSnapshot()
-      if (!runtime.browserInterceptLinks
+      if (window.dshDesktop === undefined
+        || !runtime.browserInterceptLinks
         || !snapshot.ready
         || !desktopSidebar.isTabEnabled('browser')) return
       event.preventDefault()
@@ -1788,10 +1796,10 @@ export function apply(ctx: ClientContext): void {
       void removeSidebar?.()
       void removeService?.()
     }
-  }, 'oh-dsh-desktop: workspace tools and panel toolbar')
+  }, 'oh-dsh-sidebar: workspace tools and panel toolbar')
 
   slots.inject('settings.section', () => slots.register({
-    id: 'oh-dsh-desktop-sidebar',
+    id: 'oh-dsh-sidebar',
     inject: actions => {
       settingsActions = actions
       syncSidebarSettings(settingsActions, desktopSidebar.getSnapshot())
@@ -1822,7 +1830,7 @@ export function apply(ctx: ClientContext): void {
       }
     },
     label: () => t('settings.title'),
-    locale: 'oh-dsh.desktop-sidebar',
+    locale: 'oh-dsh.sidebar',
     name: 'settings.section',
     order: 40,
     store: settingsStore,

@@ -1,6 +1,7 @@
 packages:
   - .
   - plugins/*
+  - web
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'

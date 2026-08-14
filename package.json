@@ -2,7 +2,7 @@
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH-Desktop",
   "version": "0.1.1",
-  "description": "An extensible DeepSeek Harness plugin collection and Electron desktop distribution",
+  "description": "Oh-DSH: installable DeepSeek Harness surfaces — the Electron desktop distribution with web and TUI surfaces planned",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
   "private": true,
@@ -32,7 +32,7 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@oh-dsh/panel-controls",
         "@oh-dsh/pinned-summary",
-        "@oh-dsh/desktop-sidebar",
+        "@oh-dsh/sidebar",
         "@oh-dsh/plugin-marketplace"
       ],
       "platform": "web",
@@ -47,15 +47,23 @@
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:app": "node scripts/smoke-runtime.mjs \"release/mac-arm64/Oh-DSH-Desktop.app/Contents/Resources\"",
     "smoke:app:linux": "node scripts/smoke-runtime.mjs \"release/linux-unpacked/resources\"",
+    "smoke:web": "node scripts/smoke-web.mjs",
+    "smoke:web:package": "node scripts/smoke-web.mjs release",
     "install:mac": "node scripts/install-mac.mjs",
+    "web": "pnpm run build && pnpm run stage:dsh && node dist/web.js",
     "start": "pnpm run build && pnpm run stage:dsh && electron .",
     "check:screenshot": "electron scripts/check-screenshot-corners.cjs assets/oh-dsh-desktop-ui.png",
     "test": "node --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "dist:mac": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-mac.mjs",
+    "dist:mac:x64": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-mac.mjs x64",
     "dist:mac:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-mac.mjs",
     "dist:linux": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-linux.mjs",
-    "dist:linux:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-linux.mjs"
+    "dist:linux:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-linux.mjs",
+    "dist:win": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-windows.mjs",
+    "dist:win:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-windows.mjs",
+    "dist:web": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-web.mjs",
+    "dist:web:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-web.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
@@ -102,18 +110,8 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "icon": "assets/Oh-DSH-Desktop.icns",
       "identity": null,
@@ -134,19 +132,15 @@
       "syncDesktopName": true,
       "synopsis": "An extensible DeepSeek Harness desktop workbench",
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
+        "AppImage",
+        "deb"
       ]
+    },
+    "win": {
+      "target": [
+        "dir"
+      ],
+      "icon": "assets/icons/512x512.png"
     },
     "dmg": {
       "title": "Oh-DSH-Desktop ${version}",

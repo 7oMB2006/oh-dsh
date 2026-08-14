@@ -1,4 +1,4 @@
-export const WORKSPACE_API_PATH = '/oh-dsh-desktop/workspace'
+export const WORKSPACE_API_PATH = '/oh-dsh/workspace'
 export type WorkspaceFileKind = 'directory' | 'file' | 'symlink'
 
 export interface WorkspaceFileEntry {

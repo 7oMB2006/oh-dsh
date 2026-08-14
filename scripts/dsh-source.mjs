@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process'
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
+  writeFileSync,
 } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,6 +44,59 @@ function capture(command, args, cwd) {
     throw new Error(result.stderr || `${command} ${args.join(' ')} failed`)
   }
   return result.stdout.trim()
+}
+
+/**
+ * Resolve a pnpm CLI that matches the pinned source's declared
+ * `packageManager`. pnpm's own version-switch downloads a native build and
+ * verifies it against a lockfile entry that the pinned source does not
+ * record, which fails on some runners; running the declared JS bundle
+ * directly keeps the frozen install and legacy deploy on the exact version
+ * the lockfile was generated with.
+ */
+export function resolvePinnedPnpm(source) {
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+  const reference = typeof manifest.packageManager === 'string' ? manifest.packageManager : ''
+  const separator = reference.lastIndexOf('@')
+  const name = reference.slice(0, separator)
+  const version = reference.slice(separator + 1)
+  if (name !== 'pnpm' || version === '') {
+    throw new Error(`pinned DSH source declares an unsupported packageManager: ${reference}`)
+  }
+  const cache = join(root, '.cache', 'pnpm-cli')
+  const installRoot = join(cache, `pnpm-${version}`)
+  const cliRoot = join(installRoot, 'package')
+  const cliEntry = join(cliRoot, 'bin', 'pnpm.cjs')
+  if (!existsSync(cliEntry)) {
+    mkdirSync(cache, { recursive: true })
+    const archive = join(cache, `pnpm-${version}.tgz`)
+    rmSync(archive, { force: true })
+    run('curl', ['--fail', '--location', '--silent', '--show-error', '--output', archive,
+      `https://registry.npmjs.org/pnpm/-/pnpm-${version}.tgz`])
+    const extraction = join(cache, `.pnpm-extract-${String(process.pid)}`)
+    rmSync(extraction, { recursive: true, force: true })
+    mkdirSync(extraction, { recursive: true })
+    run('tar', ['-xzf', archive, '-C', extraction])
+    rmSync(installRoot, { recursive: true, force: true })
+    mkdirSync(dirname(cliRoot), { recursive: true })
+    renameSync(join(extraction, 'package'), cliRoot)
+    rmSync(extraction, { recursive: true, force: true })
+  }
+  if (!existsSync(cliEntry)) {
+    throw new Error(`pnpm ${version} CLI did not unpack to ${cliEntry}`)
+  }
+  const binDir = join(installRoot, 'bin')
+  mkdirSync(binDir, { recursive: true })
+  if (process.platform === 'win32') {
+    writeFileSync(join(binDir, 'pnpm.cmd'),
+      `@"${process.execPath}" "${cliEntry}" %*\r\n`)
+  } else {
+    const launcher = join(binDir, 'pnpm')
+    writeFileSync(launcher,
+      `#!/bin/sh\nexec "${process.execPath}" "${cliEntry}" "$@"\n`)
+    chmodSync(launcher, 0o755)
+  }
+  return { binDir, cliEntry }
 }
 
 function validateSource(source, expectedRevision) {

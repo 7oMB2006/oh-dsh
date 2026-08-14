@@ -871,8 +871,17 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
 }
 
 export function apply(ctx: ClientContext): void {
+  // Three-surface adaptation: the marketplace lifecycle runs over the
+  // Electron bridge, which only the desktop shell provides. On the web
+  // surface the marketplace is skipped (its HTTP transport is a roadmap
+  // item); the TUI surface has no browser client graph at all. Skipping
+  // instead of throwing keeps a miscomposed profile from crashing the
+  // client graph.
   const bridge = window.dshDesktop
-  if (bridge === undefined) throw new Error('plugin-marketplace: Electron bridge is unavailable')
+  if (bridge === undefined) {
+    console.info('plugin-marketplace: skipped, the plugin marketplace is desktop-only')
+    return
+  }
   const locale = ctx.get('locale') as LocaleService
   const t: Translate<MarketplaceMessage> = locale.bind('oh-dsh.plugin-marketplace')
   const view = new PluginMarketplaceViewService(bridge, locale, t)

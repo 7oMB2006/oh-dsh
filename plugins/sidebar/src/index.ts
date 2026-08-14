@@ -6,6 +6,11 @@ import {
   mountSidebarPreferences,
   type SidebarDesktopCapability,
 } from './preferences-server.ts'
+import {
+  hasBrowserSurface,
+  OH_DSH_SURFACE_SERVICE,
+  type OhDshSurface,
+} from '../../shared/surface.ts'
 
 interface HostContext {
   effect(effect: () => (() => void) | void, label?: string): void
@@ -22,8 +27,8 @@ interface HostContext {
   }
 }
 
-export const name = 'oh-dsh-desktop-sidebar'
-export const inject = ['desktop', 'webServer']
+export const name = 'oh-dsh-sidebar'
+export const inject = ['webServer']
 
 function sendJson(response: ServerResponse, status: number, payload: unknown): void {
   response.writeHead(status, {
@@ -64,13 +69,22 @@ function isMutation(value: unknown): value is WorkspaceHostMutation {
 }
 
 export function apply(ctx: HostContext): void {
-  ctx.effect(
-    () => mountSidebarPreferences(
-      ctx,
-      ctx.get('desktop') as SidebarDesktopCapability,
-    ),
-    'oh-dsh-desktop: sidebar preferences',
-  )
+  // Three-surface adaptation: the sidebar host is pure Node (workspace facts,
+  // Git, preferences), so desktop and web both mount it. The TUI shell has no
+  // webServer and no browser, so this row never activates there.
+  const surface = ctx.get(OH_DSH_SURFACE_SERVICE) as OhDshSurface | undefined
+  const legacy = ctx.get('desktop') as SidebarDesktopCapability | undefined
+  if (!hasBrowserSurface(surface?.kind) && legacy === undefined) {
+    ctx.logger.warn('oh-dsh-sidebar: no browser surface; sidebar host disabled')
+    return
+  }
+  const dataRoot = surface?.dataRoot ?? legacy?.appDataPath ?? ''
+  if (dataRoot !== '') {
+    ctx.effect(
+      () => mountSidebarPreferences(ctx, { appDataPath: dataRoot }),
+      'oh-dsh-sidebar: sidebar preferences',
+    )
+  }
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
     path: WORKSPACE_API_PATH,
@@ -96,9 +110,9 @@ export function apply(ctx: HostContext): void {
         response.end()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[desktop-sidebar] ${message}`)
+        ctx.logger.warn(`[sidebar] ${message}`)
         sendJson(response, 400, { error: message })
       }
     },
-  }), 'oh-dsh-desktop: workspace Git API')
+  }), 'oh-dsh-sidebar: workspace Git API')
 }

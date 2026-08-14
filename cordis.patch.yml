@@ -20,11 +20,11 @@
     - id: oh-better-sidebar-runtime
       name: '@oh-dsh/better-sidebar-runtime'
 
-    - id: oh-desktop-skins
-      name: '@oh-dsh/desktop-skins'
+    - id: oh-skins
+      name: '@oh-dsh/skins'
 
-    - id: oh-desktop-sidebar
-      name: '@oh-dsh/desktop-sidebar'
+    - id: oh-sidebar
+      name: '@oh-dsh/sidebar'
 
     - id: oh-panel-controls
       name: '@oh-dsh/panel-controls'

@@ -9,6 +9,8 @@ import {
   type DesktopSidebarPreferences,
 } from './sidebar-preferences.ts'
 
+const LEGACY_SIDEBAR_PREFERENCES_FILE = 'desktop-sidebar.json'
+
 export interface SidebarDesktopCapability {
   appDataPath: string
 }
@@ -25,6 +27,16 @@ export interface SidebarPreferencesHostContext {
     }): () => void
   }
   logger: { warn(message: string): void }
+}
+
+async function readSidebarPreferences(
+  path: string,
+): Promise<DesktopSidebarPreferences> {
+  const value = parseSidebarPreferences(
+    JSON.parse(await readFile(path, 'utf8')) as unknown,
+  )
+  if (value === undefined) throw new Error('sidebar preferences are invalid')
+  return value
 }
 
 function sendJson(response: ServerResponse, status: number, value: unknown): void {
@@ -62,17 +74,21 @@ export async function loadSidebarPreferences(
   path: string,
 ): Promise<DesktopSidebarPreferences> {
   try {
-    const value = parseSidebarPreferences(
-      JSON.parse(await readFile(path, 'utf8')) as unknown,
-    )
-    if (value === undefined) throw new Error('sidebar preferences are invalid')
-    return value
+    return await readSidebarPreferences(path)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return DEFAULT_SIDEBAR_PREFERENCES
-    }
-    throw error
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
+  // Migrate once from the pre-rename durable file; the legacy file stays so
+  // the migration is idempotent across restarts and concurrent hosts.
+  const legacy = join(dirname(path), LEGACY_SIDEBAR_PREFERENCES_FILE)
+  try {
+    const migrated = await readSidebarPreferences(legacy)
+    await saveSidebarPreferences(path, migrated)
+    return migrated
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+  return DEFAULT_SIDEBAR_PREFERENCES
 }
 
 export async function saveSidebarPreferences(
@@ -97,9 +113,9 @@ export function mountSidebarPreferences(
   desktop: SidebarDesktopCapability,
 ): () => void {
   if (desktop.appDataPath.length === 0) {
-    throw new Error('desktop-sidebar: application data path is unavailable')
+    throw new Error('sidebar: application data path is unavailable')
   }
-  const path = join(desktop.appDataPath, 'desktop-sidebar.json')
+  const path = join(desktop.appDataPath, 'sidebar.json')
   return ctx.webServer.register({
     kind: 'exact',
     path: SIDEBAR_PREFERENCES_API_PATH,
@@ -127,7 +143,7 @@ export function mountSidebarPreferences(
         response.end()
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`[desktop-sidebar] ${message}`)
+        ctx.logger.warn(`[sidebar] ${message}`)
         sendJson(response, 500, { error: message })
       }
     },

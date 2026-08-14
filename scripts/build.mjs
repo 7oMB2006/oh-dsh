@@ -10,8 +10,8 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
-  { directory: 'desktop-skins', id: '@oh-dsh/desktop-skins' },
-  { directory: 'desktop-sidebar', id: '@oh-dsh/desktop-sidebar' },
+  { directory: 'skins', id: '@oh-dsh/skins' },
+  { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
   { directory: 'pinned-summary', id: '@oh-dsh/pinned-summary' },
   { directory: 'plugin-marketplace', id: '@oh-dsh/plugin-marketplace' },
@@ -47,6 +47,34 @@ const builds = [
     outfile: join(dist, 'plugin.js'),
     platform: 'node',
     format: 'esm',
+  }),
+  build({
+    ...shared,
+    entryPoints: [join(root, 'src', 'web.ts')],
+    outfile: join(dist, 'web.js'),
+    platform: 'node',
+    format: 'esm',
+  }),
+  build({
+    ...shared,
+    entryPoints: [join(root, 'web', 'src', 'index.ts')],
+    outfile: join(dist, 'web', 'index.js'),
+    platform: 'node',
+    format: 'esm',
+  }),
+  build({
+    bundle: true,
+    entryPoints: [join(root, 'web', 'src', 'client.ts')],
+    outfile: join(dist, 'web', 'client.js'),
+    platform: 'browser',
+    format: 'cjs',
+    target: 'es2022',
+    sourcemap: true,
+    logLevel: 'info',
+    banner: {
+      js: 'window.__ModuleLoader__.load({ id: "@oh-dsh/web", factory: (require) => { var module = { exports: {} }; var exports = module.exports;',
+    },
+    footer: { js: 'return module.exports; } });' },
   }),
   build({
     bundle: true,
@@ -95,7 +123,7 @@ for (const plugin of pluginPackages) {
         'react',
         'react-dom/client',
         'react/jsx-runtime',
-        ...(['desktop-skins', 'desktop-sidebar'].includes(plugin.directory)
+        ...(['skins', 'sidebar'].includes(plugin.directory)
           ? ['@deepseek-ai/dsh-client-runtime/client']
           : []),
       ],
@@ -111,3 +139,5 @@ await Promise.all(builds)
 
 copyFileSync(join(root, 'src', 'splash.html'), join(dist, 'splash.html'))
 copyFileSync(join(root, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
+mkdirSync(join(dist, 'web'), { recursive: true })
+copyFileSync(join(root, 'web', 'cordis.patch.yml'), join(dist, 'web', 'cordis.patch.yml'))

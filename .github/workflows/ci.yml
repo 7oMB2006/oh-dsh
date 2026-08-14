@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,9 +17,61 @@ concurrency:
 
 jobs:
   core:
-    name: Core checks
-    runs-on: macos-15
+    name: Core checks (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-15
+            node_architecture: arm64
+          - name: macOS x64
+            os: macos-15-intel
+            node_architecture: x64
+          - name: Linux x64
+            os: ubuntu-24.04
+            node_architecture: x64
+          - name: Windows x64
+            os: windows-2025
+            node_architecture: x64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          architecture: ${{ matrix.node_architecture }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm run build
+
+  runtime:
+    name: Runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     steps:
       - name: Check out repository
@@ -43,11 +94,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type check
-        run: pnpm run typecheck
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
 
-      - name: Run tests
-        run: pnpm test
+      - name: Build and stage the pinned runtime
+        run: pnpm run build && pnpm run build:dsh && pnpm run stage:dsh
 
-      - name: Build
-        run: pnpm run build
+      - name: Smoke the web profile
+        run: pnpm run smoke:web
+
+      - name: Smoke the desktop profile
+        run: xvfb-run -a pnpm run smoke:runtime

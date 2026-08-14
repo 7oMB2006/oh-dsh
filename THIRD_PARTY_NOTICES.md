@@ -24,7 +24,7 @@ separate Web Terminal or shell plugin is required.
 - Pinned revision: `2e9db44a71bb75c9fa1185330541dce2582deee3`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
-  `@oh-dsh/desktop-sidebar`
+  `@oh-dsh/sidebar`
 
 Oh-DSH compiles the pinned upstream Host for PTY, bounded Files, Git status,
 branch operations, history, and commit diffs. It does not load the upstream
@@ -48,7 +48,7 @@ repository.
 ## dsh-skins
 
 - Historical project: dsh-skins (its previous public locator is no longer available)
-- Oh-DSH component: `@oh-dsh/desktop-skins`
+- Oh-DSH component: `@oh-dsh/skins`
 
 Oh-DSH follows the ThemeService extension model while providing original
 skins, a desktop Settings interface, and Host-backed persistence.

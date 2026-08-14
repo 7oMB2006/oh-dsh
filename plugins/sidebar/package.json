@@ -1,5 +1,5 @@
 {
-  "name": "@oh-dsh/desktop-sidebar",
+  "name": "@oh-dsh/sidebar",
   "version": "0.1.1",
   "description": "Extensible Oh-DSH side panel with workspace and desktop tools",
   "private": true,

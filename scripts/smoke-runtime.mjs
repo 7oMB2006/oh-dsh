@@ -183,12 +183,15 @@ try {
   }
 
   const client = spawnSync(electronBinary, [
+    '--no-sandbox',
     join(root, 'scripts', 'smoke-client.cjs'),
-    base.href,
   ], {
     cwd: root,
     encoding: 'utf8',
-    env: runtimeEnvironment,
+    env: {
+      ...runtimeEnvironment,
+      DSH_SMOKE_RUNTIME_URL: base.href,
+    },
     timeout: 30_000,
   })
   assert.equal(
@@ -243,7 +246,7 @@ try {
   assert.match(commitDiff.diff, /review-smoke\.txt/)
 
   const workspaceFactsResponse = await fetch(new URL(
-    `/oh-dsh-desktop/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
+    `/oh-dsh/workspace?cwd=${encodeURIComponent(smokeRoot)}`,
     base,
   ))
   const workspaceFacts = await workspaceFactsResponse.json()

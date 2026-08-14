@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            id: macos-arm64
+            os: macos-15
+            dist_script: dist:mac
+            node_platform: darwin
+            node_arch: arm64
+          - name: macOS x64
+            id: macos-x64
+            os: macos-15-intel
+            dist_script: dist:mac:x64
+            node_platform: darwin
+            node_arch: x64
+          - name: Linux x64
+            id: linux-x64
+            os: ubuntu-24.04
+            dist_script: dist:linux
+            node_platform: linux
+            node_arch: x64
+          # Windows is build-verified in the CI matrix, but the pinned DSH
+          # runtime is not portable on Windows yet: pnpm's junction-based
+          # workspace layout contains cycles that packaging tools follow
+          # until Windows path limits fail. Re-add this job once staging
+          # produces a junction-free runtime on Windows.
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
+      DSH_DESKTOP_NODE_PLATFORM: ${{ matrix.node_platform }}
+      npm_config_pm_on_fail: 'ignore'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          architecture: ${{ matrix.node_arch }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package desktop distribution
+        run: pnpm run ${{ matrix.dist_script }}
+
+      - name: Package Oh-DSH-Web distribution
+        run: node scripts/build-web.mjs
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.id }}
+          compression-level: 0
+          path: |
+            release/Oh-DSH-Desktop-*
+            release/oh-dsh-web-*.tar.gz
+            release/oh-dsh-web-*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        run: gh release create "${{ github.ref_name }}" artifacts/* --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

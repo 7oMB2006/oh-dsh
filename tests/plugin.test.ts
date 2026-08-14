@@ -36,12 +36,12 @@ test('desktop Settings owns the full modal layer above desktop surfaces', () => 
 
 test('every bundled Oh-DSH client follows the native locale service', () => {
   const clients = [
-    '../plugins/desktop-skins/src/client/plugin.tsx',
+    '../plugins/skins/src/client/plugin.tsx',
     '../src/client.ts',
     '../plugins/panel-controls/src/terminal/plugin.tsx',
     '../plugins/pinned-summary/src/client.ts',
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
-    '../plugins/desktop-sidebar/src/client/plugin.tsx',
+    '../plugins/sidebar/src/client/plugin.tsx',
   ]
   for (const path of clients) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -50,11 +50,11 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
   }
 
   const dictionaries = [
-    '../plugins/desktop-skins/src/client/i18n.ts',
+    '../plugins/skins/src/client/i18n.ts',
     '../plugins/panel-controls/src/terminal/i18n.ts',
     '../plugins/pinned-summary/src/i18n.ts',
     '../plugins/plugin-marketplace/src/client/i18n.ts',
-    '../plugins/desktop-sidebar/src/client/i18n.ts',
+    '../plugins/sidebar/src/client/i18n.ts',
   ]
   for (const path of dictionaries) {
     const source = readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -65,16 +65,16 @@ test('every bundled Oh-DSH client follows the native locale service', () => {
 
 test('desktop sidebar exposes one configurable tool registry in settings', () => {
   const client = readFileSync(
-    new URL('../plugins/desktop-sidebar/src/client/plugin.tsx', import.meta.url),
+    new URL('../plugins/sidebar/src/client/plugin.tsx', import.meta.url),
     'utf8',
   )
   const manifest = readFileSync(
-    new URL('../plugins/desktop-sidebar/package.json', import.meta.url),
+    new URL('../plugins/sidebar/package.json', import.meta.url),
     'utf8',
   )
   const runtimeSettings = readFileSync(
     new URL(
-      '../plugins/desktop-sidebar/src/client/runtime-settings.ts',
+      '../plugins/sidebar/src/client/runtime-settings.ts',
       import.meta.url,
     ),
     'utf8',
