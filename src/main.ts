@@ -32,7 +32,12 @@ import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './cont
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
-import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
+import {
+  bundledRuntimePaths,
+  resolveRuntimeResourcesRoot,
+  runtimeSearchPath,
+  type BundledRuntimePaths,
+} from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
@@ -68,7 +73,11 @@ function appendLog(stream: 'desktop' | 'stderr' | 'stdout', line: string): void 
 }
 
 function resourcesRoot(): string {
-  return app.isPackaged ? process.resourcesPath : join(currentDir, '..', '.stage')
+  return resolveRuntimeResourcesRoot(
+    process.resourcesPath,
+    join(currentDir, '..', '.stage'),
+    app.isPackaged,
+  )
 }
 
 function runtimePaths(): BundledRuntimePaths {

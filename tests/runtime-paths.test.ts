@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
+import {
+  bundledRuntimePaths,
+  resolveRuntimeResourcesRoot,
+  runtimeSearchPath,
+} from '../src/runtime-paths.ts'
 
 test('bundled runtime paths use POSIX layouts on macOS and Linux', () => {
   const mac = bundledRuntimePaths('/Applications/Oh.app/Contents/Resources', 'darwin')
@@ -42,4 +46,36 @@ test('bundled runtime paths use Windows executables and PATH separators', () => 
     'C:\\Program Files\\Oh-DSH\\resources\\dsh-runtime\\node_modules\\.bin',
     'C:\\Windows\\System32;D:\\Git\\cmd',
   ].join(';'))
+})
+
+test('runtime resources root honors explicit distribution overrides', () => {
+  assert.equal(
+    resolveRuntimeResourcesRoot(
+      '/electron/resources',
+      '/source/.stage',
+      false,
+      { OH_DSH_RESOURCES_ROOT: '/nix/store/oh-dsh' },
+    ),
+    '/nix/store/oh-dsh',
+  )
+  assert.equal(
+    resolveRuntimeResourcesRoot(
+      '/electron/resources',
+      '/source/.stage',
+      false,
+      { DSH_OH_WEB_ROOT: '/portable/oh-dsh' },
+    ),
+    '/portable/oh-dsh',
+  )
+})
+
+test('runtime resources root falls back to Electron package mode', () => {
+  assert.equal(
+    resolveRuntimeResourcesRoot('/electron/resources', '/source/.stage', true, {}),
+    '/electron/resources',
+  )
+  assert.equal(
+    resolveRuntimeResourcesRoot('/electron/resources', '/source/.stage', false, {}),
+    '/source/.stage',
+  )
 })
