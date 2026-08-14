@@ -675,7 +675,8 @@ export class PluginMarketplaceManager {
     const installed = state.entries
     const current = installed.find(entry => entry.pluginId === pluginId)
     const catalogPlugin = this.#catalog.find(plugin => plugin.id === pluginId)
-    if (isProtectedMarketplacePlugin(pluginId)) {
+    if (isProtectedMarketplacePlugin(pluginId, catalogPlugin?.repository)
+      || catalogPlugin?.protected === true) {
       throw new Error(`${pluginId} is protected by the desktop and cannot be modified by its own marketplace`)
     }
     if (action === 'uninstall' || action === 'enable' || action === 'disable') {
@@ -771,6 +772,15 @@ export class PluginMarketplaceManager {
     if (manifestText === null) throw new Error(`${pluginId} is missing ${manifestPath} at ${commit}`)
     const manifest = parsePackageManifest(manifestText, `${pluginId}/${manifestPath}`)
     const resolvedPackage = packageName(manifest, manifestPath)
+    if (isProtectedMarketplacePlugin(
+      pluginId,
+      catalogPlugin.repository,
+      resolvedPackage,
+    )) {
+      throw new Error(
+        `${pluginId} is protected by the desktop and cannot be modified by its own marketplace`,
+      )
+    }
     if (resolvedMechanism === 'bundle'
       && (!isRecord(manifest.dsh) || !isRecord(manifest.dsh.bundle)
         || typeof manifest.dsh.bundle.patch !== 'string')) {
@@ -862,9 +872,27 @@ export class PluginMarketplaceManager {
               }
             }
           }
-          const checkout = join(sources, `${plan.pluginId}-${plan.resolvedCommit.slice(0, 12)}`)
-          await this.#options.platform.cloneRepository(plan.repository, plan.resolvedCommit, checkout)
-          if (Object.keys(plan.buildScripts).length > 0) allowBuild(candidateProfile, plan.packageName)
+          mkdirSync(sources, { recursive: true, mode: 0o700 })
+          const sourceName = `${plan.pluginId}-${plan.resolvedCommit.slice(0, 12)}`
+          const checkout = join(sources, sourceName)
+          const scriptNames = Object.keys(plan.buildScripts)
+          const cloneTarget = scriptNames.length > 0
+            ? join(root, 'bundle-builds', sourceName)
+            : checkout
+          await this.#options.platform.cloneRepository(
+            plan.repository,
+            plan.resolvedCommit,
+            cloneTarget,
+          )
+          if (scriptNames.length > 0) {
+            allowBuild(candidateProfile, plan.packageName)
+            await this.#options.platform.buildBundle({
+              checkout: cloneTarget,
+              sandboxRoot: root,
+              scripts: scriptNames,
+            })
+            renameSync(cloneTarget, checkout)
+          }
           await this.#options.platform.runDsh({
             args: ['plugin', '--profile', this.#options.profile, 'add', checkout],
             dshHome: candidateHome,

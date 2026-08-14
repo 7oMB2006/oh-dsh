@@ -2,7 +2,7 @@
 
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { posix, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { main as runWeb, UsageError } from './web.ts'
 
@@ -35,8 +35,9 @@ function sourceElectron(
   root: string,
   platform: NodeJS.Platform,
 ): string {
+  const paths = platform === 'win32' ? win32 : posix
   if (platform === 'darwin') {
-    return join(
+    return paths.join(
       root,
       'node_modules',
       'electron',
@@ -47,7 +48,7 @@ function sourceElectron(
       'Electron',
     )
   }
-  return join(
+  return paths.join(
     root,
     'node_modules',
     'electron',
@@ -63,20 +64,21 @@ export function desktopLaunchSpec(
   platform: NodeJS.Platform = process.platform,
   pathExists: (path: string) => boolean = existsSync,
 ): DesktopLaunchSpec {
+  const paths = platform === 'win32' ? win32 : posix
   const explicitApp = env.OH_DSH_DESKTOP_APP
   if (explicitApp !== undefined && explicitApp !== '') {
     if (platform === 'darwin') {
       return {
-        args: [resolve(explicitApp), ...(args.length === 0 ? [] : ['--args', ...args])],
+        args: [paths.resolve(explicitApp), ...(args.length === 0 ? [] : ['--args', ...args])],
         command: '/usr/bin/open',
       }
     }
-    return { args: [...args], command: resolve(explicitApp) }
+    return { args: [...args], command: paths.resolve(explicitApp) }
   }
 
   const sourceRoot = env.OH_DSH_SOURCE_ROOT
   if (sourceRoot !== undefined && sourceRoot !== '') {
-    const root = resolve(sourceRoot)
+    const root = paths.resolve(sourceRoot)
     const electron = sourceElectron(root, platform)
     if (pathExists(electron)) {
       return {

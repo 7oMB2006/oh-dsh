@@ -3,11 +3,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  min-height: 40px;
+  width: calc(100% + 8px);
+  min-height: 34px;
+  height: 34px;
+  margin: 4px -4px;
   padding: 6px 2px 6px 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 12px;
   background: transparent;
   color: var(--dsw-alias-label-primary, #222);
   cursor: pointer;
@@ -36,7 +38,12 @@
 
 .oh-marketplace-nav[data-collapsed='true'] {
   justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  height: 36px;
+  margin: 8px 0 10px;
   padding: 0;
+  border-radius: 50%;
 }
 
 .oh-marketplace-nav[data-collapsed='true'] span {

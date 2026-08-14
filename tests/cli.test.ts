@@ -79,3 +79,12 @@ test('desktop launch keeps source and installed macOS paths distinct', () => {
     command: '/usr/bin/open',
   })
 })
+
+test('desktop launch resolves paths with target platform semantics', () => {
+  assert.deepEqual(desktopLaunchSpec(['--inspect'], {
+    OH_DSH_DESKTOP_APP: 'C:\\Tools\\Oh-DSH Desktop.exe',
+  }, 'win32'), {
+    args: ['--inspect'],
+    command: 'C:\\Tools\\Oh-DSH Desktop.exe',
+  })
+})

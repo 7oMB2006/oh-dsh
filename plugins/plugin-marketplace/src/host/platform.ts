@@ -4,11 +4,21 @@ import {
   accessSync,
   existsSync,
   mkdirSync,
+  realpathSync,
   renameSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, posix, win32 } from 'node:path'
+import {
+  dirname,
+  isAbsolute,
+  join,
+  posix,
+  relative,
+  resolve,
+  sep,
+  win32,
+} from 'node:path'
 import type { MarketplaceAuthStatus } from '../protocol.ts'
 import {
   MARKETPLACE_CATALOG_PATH,
@@ -26,9 +36,16 @@ export interface DshCommandInput {
   sandboxRoot: string
 }
 
+export interface BundleBuildInput {
+  checkout: string
+  sandboxRoot: string
+  scripts: string[]
+}
+
 /** Privileged operations consumed by the marketplace transaction module. */
 export interface MarketplacePlatform {
   authStatus(): Promise<MarketplaceAuthResult>
+  buildBundle(input: BundleBuildInput): Promise<void>
   cloneRepository(repository: string, commit: string, target: string): Promise<void>
   loadCatalog(): Promise<unknown>
   readRepositoryFile(repository: string, path: string, commit: string): Promise<string | null>
@@ -42,6 +59,7 @@ export interface ProductionMarketplacePlatformOptions {
   env: NodeJS.ProcessEnv
   fetch?: typeof globalThis.fetch
   nodeBinary: string
+  pnpmEntry: string
   onLog?: (message: string) => void
 }
 
@@ -130,6 +148,14 @@ function executable(path: string): boolean {
   }
 }
 
+function assertWithin(root: string, target: string): void {
+  const child = relative(resolve(root), resolve(target))
+  if (child === '' || (!isAbsolute(child) && child !== '..' && !child.startsWith(`..${sep}`))) {
+    return
+  }
+  throw new Error(`marketplace build path escapes its preview sandbox: ${target}`)
+}
+
 /** Resolve gh without invoking a shell or changing the user's Git config. */
 export function findGitHubCli(
   environment: NodeJS.ProcessEnv = process.env,
@@ -196,7 +222,12 @@ function seatbeltString(value: string): string {
 
 /** Deny writes outside the disposable preview tree while allowing DSH to run. */
 export function previewSandboxPolicy(root: string): string {
-  const temporary = join(root, '.tmp')
+  const writableRoots = new Set([resolve(root)])
+  if (existsSync(root)) writableRoots.add(realpathSync(root))
+  const writablePaths = [...writableRoots]
+    .flatMap(path => [path, join(path, '.tmp')])
+    .map(path => `(subpath "${seatbeltString(path)}")`)
+    .join(' ')
   return [
     '(version 1)',
     '(deny default)',
@@ -205,8 +236,40 @@ export function previewSandboxPolicy(root: string): string {
     '(allow network*)',
     '(allow mach-lookup)',
     '(allow sysctl-read)',
-    `(allow file-write* (literal "/dev/null") (subpath "${seatbeltString(root)}") (subpath "${seatbeltString(temporary)}"))`,
+    `(allow file-write* (literal "/dev/null") ${writablePaths})`,
   ].join('')
+}
+
+interface PreviewScriptCommandInput {
+  nodeArguments: string[]
+  nodeBinary: string
+  pathExists?: (path: string) => boolean
+  platform?: NodeJS.Platform
+  root: string
+  sandbox?: string
+}
+
+/** Select a write-restricted launcher or reject the scripted preview. */
+export function previewScriptCommand(
+  input: PreviewScriptCommandInput,
+): { args: string[]; command: string } {
+  const platform = input.platform ?? process.platform
+  const sandbox = input.sandbox ?? '/usr/bin/sandbox-exec'
+  const pathExists = input.pathExists ?? existsSync
+  if (platform !== 'darwin' || !pathExists(sandbox)) {
+    throw new Error(
+      `scripted marketplace previews require a write-restricted process sandbox, which is unavailable on ${platform}`,
+    )
+  }
+  return {
+    args: [
+      '-p',
+      previewSandboxPolicy(input.root),
+      input.nodeBinary,
+      ...input.nodeArguments,
+    ],
+    command: sandbox,
+  }
 }
 
 export class ProductionMarketplacePlatform implements MarketplacePlatform {
@@ -236,6 +299,69 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
         detail: error instanceof Error ? error.message : String(error),
         status: 'signed-out',
       }
+    }
+  }
+
+  async buildBundle(input: BundleBuildInput): Promise<void> {
+    assertWithin(input.sandboxRoot, input.checkout)
+    const lifecycle = ['preinstall', 'install', 'postinstall', 'prepare', 'prepack']
+    const allowed = new Set(lifecycle)
+    if (input.scripts.length === 0 || input.scripts.some(script => !allowed.has(script))) {
+      throw new Error('marketplace bundle build contains an unreviewed lifecycle script')
+    }
+    const temporary = join(input.sandboxRoot, '.tmp')
+    const store = join(input.sandboxRoot, '.pnpm-store')
+    mkdirSync(temporary, { recursive: true, mode: 0o700 })
+    mkdirSync(store, { recursive: true, mode: 0o700 })
+    const env = withGitHubCredentials({
+      ...this.#options.env,
+      CI: 'true',
+      DSH_DESKTOP_APP_DATA: input.sandboxRoot,
+      DSH_DESKTOP_PREVIEW: '1',
+      HOME: input.sandboxRoot,
+      TMPDIR: temporary,
+    }, this.#ghPath)
+    const requested = new Set(input.scripts)
+    const commands = [
+      {
+        args: [
+          this.#options.pnpmEntry,
+          'install',
+          '--ignore-scripts',
+          existsSync(join(input.checkout, 'pnpm-lock.yaml'))
+            ? '--frozen-lockfile'
+            : '--no-frozen-lockfile',
+          '--store-dir',
+          store,
+        ],
+        label: 'pnpm install --ignore-scripts',
+      },
+      ...lifecycle
+        .filter(script => requested.has(script))
+        .map(script => ({
+          args: [
+            this.#options.pnpmEntry,
+            '--config.enable-pre-post-scripts=false',
+            'run',
+            script,
+          ],
+          label: `pnpm run ${script}`,
+        })),
+    ]
+    for (const command of commands) {
+      const launcher = previewScriptCommand({
+        nodeArguments: command.args,
+        nodeBinary: this.#options.nodeBinary,
+        root: input.sandboxRoot,
+      })
+      this.#options.onLog?.(`marketplace build: ${command.label}`)
+      const result = await runCommand(launcher.command, launcher.args, {
+        cwd: input.checkout,
+        env,
+        timeoutMs: 300_000,
+      })
+      if (result.stdout.trim() !== '') this.#options.onLog?.(result.stdout.trim())
+      if (result.stderr.trim() !== '') this.#options.onLog?.(result.stderr.trim())
     }
   }
 

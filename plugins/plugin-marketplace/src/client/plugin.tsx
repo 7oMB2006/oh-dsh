@@ -35,6 +35,7 @@ interface ClientContext {
 }
 
 interface MarketplaceViewState {
+  available: boolean
   open: boolean
 }
 
@@ -47,7 +48,26 @@ interface SessionsService {
   list: ObservableSnapshot<SessionListSnapshot>
 }
 
+interface MarketplaceNavigationProps {
+  locale: LocaleService
+  t: Translate<MarketplaceMessage>
+  view: PluginMarketplaceView
+  wide: boolean
+}
+
+interface SlotsService {
+  inject(name: string, register: () => unknown): void
+  register(options: {
+    id: string
+    inject(): Omit<MarketplaceNavigationProps, 'wide'>
+    locale: string
+    name: string
+    order: number
+  }, component: (props: MarketplaceNavigationProps) => JSX.Element | null): unknown
+}
+
 export interface PluginMarketplaceView {
+  getSnapshot(): MarketplaceViewState
   isOpen(): boolean
   setOpen(open: boolean): void
   subscribe(listener: () => void): () => void
@@ -60,7 +80,7 @@ declare global {
   }
 }
 
-export const inject = ['locale', 'sessions']
+export const inject = ['locale', 'sessions', 'slots']
 
 const OPEN_KEY = 'oh-dsh-desktop.plugin-marketplace.open'
 
@@ -154,16 +174,40 @@ function sidebarBox(sidebar: HTMLElement): HTMLElement | null {
   return null
 }
 
-function pluginIcon(label: string): string {
-  return `
+function PluginIcon(): JSX.Element {
+  return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M8.2 5.3a7.5 7.5 0 1 0 9.9 2.1" />
       <path d="M15.7 3.4v4.8h4.8" />
       <circle cx="10" cy="11" r="1.7" />
       <path d="M11.5 12.2l2.8 2.3M7.8 15.8l2.3-2.9" />
     </svg>
-    <span>${label}</span>
-  `
+  )
+}
+
+function MarketplaceNavigationEntry({
+  locale,
+  t,
+  view,
+  wide,
+}: MarketplaceNavigationProps): JSX.Element | null {
+  const state = useSyncExternalStore(view.subscribe, view.getSnapshot)
+  const translate = useTranslate(locale, t)
+  if (!state.available) return null
+  const label = translate('plugins')
+  return (
+    <button
+      aria-label={label}
+      className="oh-marketplace-nav"
+      data-active={String(state.open)}
+      data-collapsed={String(!wide)}
+      onClick={() => { view.toggle() }}
+      type="button"
+    >
+      <PluginIcon />
+      {wide && <span>{label}</span>}
+    </button>
+  )
 }
 
 class PluginMarketplaceViewService implements PluginMarketplaceView {
@@ -172,18 +216,16 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   readonly #t: Translate<MarketplaceMessage>
   readonly #sessions: SessionsService
   readonly #listeners = new Set<() => void>()
-  #state: MarketplaceViewState = { open: readOpen() }
+  #state: MarketplaceViewState = { available: false, open: readOpen() }
   #element: HTMLDivElement | null = null
   #style: HTMLStyleElement | null = null
   #root: Root | null = null
-  #entry: HTMLButtonElement | null = null
   #observer: MutationObserver | null = null
   #resizeObserver: ResizeObserver | null = null
-  #placementFrame: number | null = null
-  #unsubscribeLocale: (() => void) | null = null
+  #geometryFrame: number | null = null
   #unsubscribeSessions: (() => void) | null = null
   #sessionNavigationState: SessionNavigationState = initialSessionNavigationState()
-  readonly #handleResize = (): void => { this.schedulePlacement() }
+  readonly #handleResize = (): void => { this.scheduleGeometry() }
   readonly #handleDocumentClick = (event: MouseEvent): void => {
     if (!this.#state.open || !(event.target instanceof Element)) return
     const button = event.target.closest('button')
@@ -213,7 +255,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
 
   setOpen(open: boolean): void {
     if (this.#state.open === open) return
-    this.#state = { open }
+    this.#state = { ...this.#state, open }
     persistOpen(open)
     this.applyOpenState()
     for (const listener of this.#listeners) listener()
@@ -241,17 +283,17 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
       />,
     )
 
+    this.#state = { ...this.#state, available: true }
+    for (const listener of this.#listeners) listener()
+
     this.#observer = new MutationObserver(() => {
       if (this.#state.open && settingsDialogOpen()) this.setOpen(false)
-      this.schedulePlacement()
+      this.scheduleGeometry()
     })
     this.#observer.observe(document.body, { childList: true, subtree: true })
-    this.#resizeObserver = new ResizeObserver(() => { this.schedulePlacement() })
+    this.#resizeObserver = new ResizeObserver(() => { this.scheduleGeometry() })
     document.addEventListener('click', this.#handleDocumentClick, true)
     window.addEventListener('resize', this.#handleResize)
-    this.#unsubscribeLocale = this.#locale.subscribe(() => {
-      this.renderEntryLabel()
-    })
     const syncSessionNavigation = (): void => {
       const transition = transitionSessionNavigation(
         this.#sessionNavigationState,
@@ -263,23 +305,22 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#unsubscribeSessions = this.#sessions.list.subscribe(syncSessionNavigation)
     syncSessionNavigation()
     this.applyOpenState()
-    this.schedulePlacement()
+    this.scheduleGeometry()
   }
 
   dispose(): void {
     document.removeEventListener('click', this.#handleDocumentClick, true)
     window.removeEventListener('resize', this.#handleResize)
-    this.#unsubscribeLocale?.()
-    this.#unsubscribeLocale = null
     this.#unsubscribeSessions?.()
     this.#unsubscribeSessions = null
-    if (this.#placementFrame !== null) cancelAnimationFrame(this.#placementFrame)
+    if (this.#geometryFrame !== null) cancelAnimationFrame(this.#geometryFrame)
     this.#observer?.disconnect()
     this.#resizeObserver?.disconnect()
-    this.#entry?.remove()
     this.#root?.unmount()
     this.#element?.remove()
     this.#style?.remove()
+    this.#state = { available: false, open: false }
+    for (const listener of this.#listeners) listener()
     delete document.documentElement.dataset.ohDshMarketplaceOpen
     document.documentElement.style.removeProperty('--oh-marketplace-left')
   }
@@ -287,51 +328,30 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   private applyOpenState(): void {
     if (this.#state.open) document.documentElement.dataset.ohDshMarketplaceOpen = 'true'
     else delete document.documentElement.dataset.ohDshMarketplaceOpen
-    if (this.#entry !== null) this.#entry.dataset.active = String(this.#state.open)
   }
 
-  private schedulePlacement(): void {
-    if (this.#placementFrame !== null) return
-    this.#placementFrame = requestAnimationFrame(() => {
-      this.#placementFrame = null
-      this.placeEntry()
+  private scheduleGeometry(): void {
+    if (this.#geometryFrame !== null) return
+    this.#geometryFrame = requestAnimationFrame(() => {
+      this.#geometryFrame = null
+      this.synchronizeGeometry()
     })
   }
 
-  private placeEntry(): void {
+  private synchronizeGeometry(): void {
+    const declared = document.querySelector<HTMLElement>('[data-slot="sidebar"]')
     const settings = settingsButton()
-    if (settings === null || settings.parentElement === null) return
-    const parent = settings.parentElement
-    if (this.#entry === null) {
-      const entry = document.createElement('button')
-      entry.type = 'button'
-      entry.dataset.active = String(this.#state.open)
-      entry.addEventListener('click', () => { this.toggle() })
-      this.#entry = entry
-      this.renderEntryLabel()
+    const sidebar = declared ?? (settings === null ? null : sidebarFor(settings))
+    if (sidebar === null) {
+      document.documentElement.style.setProperty('--oh-marketplace-left', '0px')
+      return
     }
-    // Mirror the settings trigger's classes so the entry tracks the rail's
-    // collapsed/expanded layout state (rc.5 restyles rail buttons in place).
-    this.#entry.className = `${settings.className} oh-marketplace-nav`.trim()
-    if (this.#entry.parentElement !== parent || this.#entry.nextElementSibling !== settings) {
-      parent.insertBefore(this.#entry, settings)
-    }
-    const sidebar = sidebarFor(settings)
-    if (sidebar === null) return
+    const box = sidebarBox(sidebar) ?? sidebar
     this.#resizeObserver?.disconnect()
-    this.#resizeObserver?.observe(sidebar)
-    const box = sidebarBox(sidebar)
-    const rect = box === null ? { right: 0, width: 0 } : box.getBoundingClientRect()
+    this.#resizeObserver?.observe(box)
+    const rect = box.getBoundingClientRect()
     const left = rect.right > 0 && rect.right < window.innerWidth * 0.55 ? rect.right : 0
     document.documentElement.style.setProperty('--oh-marketplace-left', `${String(Math.round(left))}px`)
-    this.#entry.dataset.collapsed = String(rect.width < 100)
-  }
-
-  private renderEntryLabel(): void {
-    if (this.#entry === null) return
-    const label = this.#t('plugins')
-    this.#entry.setAttribute('aria-label', label)
-    this.#entry.innerHTML = pluginIcon(label)
   }
 }
 
@@ -898,12 +918,20 @@ export function apply(ctx: ClientContext): void {
   }
   const locale = ctx.get('locale') as LocaleService
   const sessions = ctx.get('sessions') as SessionsService
+  const slots = ctx.get('slots') as SlotsService
   const t: Translate<MarketplaceMessage> = locale.bind('oh-dsh.plugin-marketplace')
   const view = new PluginMarketplaceViewService(bridge, locale, t, sessions)
   ctx.effect(
     () => locale.register('oh-dsh.plugin-marketplace', MARKETPLACE_MESSAGES),
     'oh-dsh-desktop: marketplace dictionaries',
   )
+  slots.inject('sidebar.footer.action', () => slots.register({
+    name: 'sidebar.footer.action',
+    id: 'oh-dsh-plugin-marketplace',
+    order: 80,
+    locale: 'oh-dsh.plugin-marketplace',
+    inject: () => ({ locale, t, view }),
+  }, MarketplaceNavigationEntry))
   ctx.effect(() => {
     let disposed = false
     let disposeProvider: (() => Promise<void> | void) | void

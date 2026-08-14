@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { parseMarketplaceCatalog } from '../plugins/plugin-marketplace/src/catalog.ts'
 import type {
+  BundleBuildInput,
   DshCommandInput,
   MarketplaceAuthResult,
   MarketplacePlatform,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import {
   findGitHubCli,
+  previewScriptCommand,
   ProductionMarketplacePlatform,
   withGitHubCredentials,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
@@ -75,7 +78,13 @@ function catalogDocument(): unknown {
 }
 
 class FakePlatform implements MarketplacePlatform {
+  readonly builds: Array<{
+    checkout: string
+    sandboxRoot: string
+    scripts: string[]
+  }> = []
   readonly commands: DshCommandInput[] = []
+  catalog: unknown = catalogDocument()
   latestCommit = COMMIT
   bundleName = '@example/bundle-demo'
   bundleDescription = 'Bundle demo manifest'
@@ -84,12 +93,20 @@ class FakePlatform implements MarketplacePlatform {
     return { detail: 'test auth', status: 'ready' }
   }
 
+  async buildBundle(input: BundleBuildInput): Promise<void> {
+    this.builds.push({
+      checkout: input.checkout,
+      sandboxRoot: input.sandboxRoot,
+      scripts: input.scripts,
+    })
+  }
+
   async cloneRepository(_repository: string, _commit: string, target: string): Promise<void> {
     mkdirSync(target, { recursive: true })
   }
 
   async loadCatalog(): Promise<unknown> {
-    return catalogDocument()
+    return this.catalog
   }
 
   async readRepositoryFile(repository: string, path: string): Promise<string | null> {
@@ -305,6 +322,7 @@ test('public catalogs load anonymously without GitHub CLI', async () => {
       })
     },
     nodeBinary: process.execPath,
+    pnpmEntry: '/unused/pnpm.mjs',
   })
 
   assert.notEqual((await platform.authStatus()).status, 'ready')
@@ -313,6 +331,111 @@ test('public catalogs load anonymously without GitHub CLI', async () => {
     requested,
     'https://api.github.com/repos/public-owner/public-catalog/contents/data/plugins.json',
   )
+})
+
+test('production bundle build runs approved hooks in its own workspace', {
+  skip: process.platform !== 'darwin' || !existsSync('/usr/bin/sandbox-exec')
+    ? 'requires macOS Seatbelt'
+    : false,
+}, async () => {
+  const sandboxRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-bundle-build-'))
+  const candidateProfile = join(sandboxRoot, 'dsh-home', 'profiles', 'desktop')
+  const checkout = join(sandboxRoot, 'bundle-builds', 'prepare-fixture')
+  const helper = join(checkout, 'packages', 'helper')
+  mkdirSync(helper, { recursive: true })
+  mkdirSync(candidateProfile, { recursive: true })
+  writeFileSync(join(candidateProfile, 'pnpm-workspace.yaml'), 'packages:\n  - .\n')
+  writeFileSync(join(candidateProfile, 'package.json'), JSON.stringify({
+    name: 'candidate-profile',
+    private: true,
+    scripts: { prepare: 'node profile-build.mjs' },
+  }))
+  writeFileSync(join(candidateProfile, 'profile-build.mjs'), [
+    "import { writeFileSync } from 'node:fs'",
+    "writeFileSync(new URL('./profile-built', import.meta.url), 'wrong project\\n')",
+    '',
+  ].join('\n'))
+  writeFileSync(join(checkout, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n')
+  writeFileSync(join(checkout, 'package.json'), JSON.stringify({
+    name: '@example/prepare-fixture',
+    dependencies: { '@example/workspace-helper': 'workspace:*' },
+    scripts: {
+      prepare: 'node build.mjs',
+      prepack: 'node prepack.mjs',
+      preprepack: 'node unexpected-prepack.mjs',
+    },
+    version: '1.0.0',
+  }))
+  writeFileSync(join(checkout, 'build.mjs'), [
+    "import value from '@example/workspace-helper'",
+    "import { mkdirSync, writeFileSync } from 'node:fs'",
+    "mkdirSync(new URL('./lib/', import.meta.url), { recursive: true })",
+    "writeFileSync(new URL('./lib/index.js', import.meta.url), `${value}\\n`)",
+    '',
+  ].join('\n'))
+  writeFileSync(join(checkout, 'prepack.mjs'), [
+    "import { writeFileSync } from 'node:fs'",
+    "writeFileSync(new URL('./prepacked', import.meta.url), 'prepacked\\n')",
+    '',
+  ].join('\n'))
+  writeFileSync(join(checkout, 'unexpected-prepack.mjs'), [
+    "import { writeFileSync } from 'node:fs'",
+    "writeFileSync(new URL('./unexpected-prepack', import.meta.url), 'unexpected\\n')",
+    '',
+  ].join('\n'))
+  writeFileSync(join(helper, 'package.json'), JSON.stringify({
+    name: '@example/workspace-helper',
+    exports: './index.mjs',
+    scripts: { prepare: 'node unexpected-prepare.mjs' },
+    version: '1.0.0',
+  }))
+  writeFileSync(join(helper, 'index.mjs'), "export default 'workspace-built'\n")
+  writeFileSync(join(helper, 'unexpected-prepare.mjs'), [
+    "import { writeFileSync } from 'node:fs'",
+    "writeFileSync(new URL('./unexpected-prepare', import.meta.url), 'unexpected\\n')",
+    '',
+  ].join('\n'))
+
+  try {
+    const platform = new ProductionMarketplacePlatform({
+      cliEntry: '/unused/dsh.mjs',
+      cwd: checkout,
+      env: process.env,
+      nodeBinary: process.execPath,
+      pnpmEntry: fileURLToPath(new URL('../node_modules/pnpm/bin/pnpm.mjs', import.meta.url)),
+    })
+    await platform.buildBundle({
+      checkout,
+      sandboxRoot,
+      scripts: ['prepare', 'prepack'],
+    })
+    assert.equal(readFileSync(join(checkout, 'lib/index.js'), 'utf8'), 'workspace-built\n')
+    assert.equal(readFileSync(join(checkout, 'prepacked'), 'utf8'), 'prepacked\n')
+    assert.equal(existsSync(join(checkout, 'unexpected-prepack')), false)
+    assert.equal(existsSync(join(helper, 'unexpected-prepare')), false)
+    assert.equal(existsSync(join(candidateProfile, 'profile-built')), false)
+  } finally {
+    rmSync(sandboxRoot, { recursive: true, force: true })
+  }
+})
+
+test('scripted bundle previews fail closed without a write sandbox', () => {
+  for (const platform of ['linux', 'win32'] as const) {
+    assert.throws(() => previewScriptCommand({
+      nodeArguments: ['/preview/pnpm.mjs', 'install'],
+      nodeBinary: '/preview/node',
+      pathExists: () => false,
+      platform,
+      root: '/preview',
+    }), new RegExp(`unavailable on ${platform}`))
+  }
+  assert.throws(() => previewScriptCommand({
+    nodeArguments: ['/preview/pnpm.mjs', 'install'],
+    nodeBinary: '/preview/node',
+    pathExists: () => false,
+    platform: 'darwin',
+    root: '/preview',
+  }), /unavailable on darwin/)
 })
 
 test('refresh keeps public catalogs available when GitHub CLI is unavailable', async () => {
@@ -417,7 +540,7 @@ test('marketplace navigation preserves the intrinsic Settings footer height', ()
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*gap: 8px;/)
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*padding: 6px 2px 6px 10px;/)
   assert.match(css, /\.oh-marketplace-nav svg \{[\s\S]*width: 16px;[\s\S]*height: 16px;/)
-  assert.match(client, /export const inject = \['locale', 'sessions'\]/)
+  assert.match(client, /export const inject = \['locale', 'sessions', 'slots'\]/)
   assert.match(client, /ctx\.get\('sessions'\) as SessionsService/)
   assert.match(client, /this\.#sessions\.list\.subscribe\(syncSessionNavigation\)/)
   assert.match(client, /this\.#unsubscribeSessions\?\.\(\)/)
@@ -441,6 +564,10 @@ test('marketplace navigation preserves the intrinsic Settings footer height', ()
   assert.match(client, /document\.addEventListener\('click', this\.#handleDocumentClick, true\)/)
   assert.match(client, /button === settingsButton\(\)/)
   assert.match(client, /if \(disposed \|\| info\.preview !== null\) return/)
+  assert.match(client, /const slots = ctx\.get\('slots'\) as SlotsService/)
+  assert.match(client, /slots\.inject\('sidebar\.footer\.action'/)
+  assert.doesNotMatch(client, /ctx\.slots/)
+  assert.doesNotMatch(client, /parent\.insertBefore\(this\.#entry, settings\)/)
 })
 
 test('marketplace closes after ready session navigation, not during startup', () => {
@@ -513,6 +640,17 @@ test('bundle preview remains isolated until apply and supports undo', async () =
     snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
     assert.equal(snapshot.error, null)
     assert.equal(snapshot.preview?.pluginId, 'bundle-demo')
+    assert.equal(setup.platform.builds.length, 1)
+    assert.deepEqual(setup.platform.builds[0]?.scripts, ['prepare'])
+    const build = setup.platform.builds[0]
+    assert.equal(
+      build?.checkout,
+      join(
+        build?.sandboxRoot ?? '',
+        'bundle-builds',
+        `bundle-demo-${COMMIT.slice(0, 12)}`,
+      ),
+    )
     assert.equal(setup.runtime.previewStarts.length, 1)
     const liveBefore = JSON.parse(readFileSync(join(setup.profileDir, 'package.json'), 'utf8'))
     assert.deepEqual(liveBefore.dependencies, {})
@@ -715,6 +853,35 @@ test('the marketplace refuses to modify protected desktop plugins', async () => 
       snapshot.catalog.find(plugin => plugin.id === 'oh-dsh-desktop')?.protected,
       true,
     )
+  } finally {
+    setup.cleanup()
+  }
+})
+
+test('the marketplace protects the upstream Better Sidebar alias', async () => {
+  const setup = fixture()
+  try {
+    setup.platform.catalog = {
+      schema: 'dsh-external-hub/v0.1',
+      generated: '2026-08-14T00:00:00Z',
+      repos: [{
+        name: 'dsh-better-sidebar',
+        repo: 'dsh-external/DSH-better-sidebar',
+        category: 'plugin',
+        description: 'Upstream sidebar already bundled by the desktop',
+        bundle: true,
+      }],
+    }
+    await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({
+      type: 'prepare',
+      action: 'install',
+      pluginId: 'dsh-better-sidebar',
+    })
+    assert.match(snapshot.error ?? '', /protected by the desktop/)
+    assert.equal(snapshot.preview, null)
+    assert.equal(snapshot.catalog[0]?.protected, true)
+    assert.equal(setup.platform.commands.length, 0)
   } finally {
     setup.cleanup()
   }
