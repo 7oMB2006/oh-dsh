@@ -382,6 +382,72 @@ function walk(rootPath, visit) {
 }
 
 /**
+ * fetch-blob 3 imports the deprecated node-domexception shim for Node 12.
+ * Oh-DSH ships Node 26 and supports Node 24+, both of which expose the same
+ * Web-standard DOMException globally. Patch only this reviewed import, then
+ * remove the now-unreferenced shim from the portable runtime.
+ */
+function replaceDeprecatedDomExceptionShim() {
+  const store = join(runtime, 'node_modules', '.pnpm')
+  const dependency = 'node-domexception'
+  const importPattern = /^import DOMException from ['"]node-domexception['"]\r?\n/m
+
+  for (const entry of readdirSync(store, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith('fetch-blob@')) continue
+    const packageDir = join(store, entry.name, 'node_modules', 'fetch-blob')
+    const sourcePath = join(packageDir, 'from.js')
+    const manifestPath = join(packageDir, 'package.json')
+    if (!existsSync(sourcePath) || !existsSync(manifestPath)) continue
+
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.dependencies?.[dependency] === undefined) continue
+    const source = readFileSync(sourcePath, 'utf8')
+    if (!importPattern.test(source)) {
+      throw new Error('fetch-blob still depends on node-domexception through an unknown import')
+    }
+    writeFileSync(sourcePath, source.replace(importPattern, ''))
+    delete manifest.dependencies[dependency]
+    writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
+    rmSync(join(dirname(packageDir), dependency), {
+      recursive: true,
+      force: true,
+    })
+  }
+
+  const hoisted = join(store, 'node_modules', dependency)
+  const consumers = []
+  walk(runtime, path => {
+    if (basename(path) === dependency && path !== hoisted) consumers.push(path)
+  })
+  if (consumers.length > 0) {
+    throw new Error(`cannot remove ${dependency}; staged consumers remain:\n${consumers.join('\n')}`)
+  }
+  rmSync(hoisted, { recursive: true, force: true })
+  for (const entry of readdirSync(store, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.startsWith(`${dependency}@`)) {
+      rmSync(join(store, entry.name), { recursive: true, force: true })
+    }
+  }
+}
+
+function assertDeprecatedLockBranchesAreNotShipped() {
+  const store = join(runtime, 'node_modules', '.pnpm')
+  const forbidden = new Set([
+    'glob@10.5.0',
+    'glob@11.1.0',
+    'node-domexception@1.0.0',
+    'tsconfck@3.1.6',
+  ])
+  const shipped = readdirSync(store, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && forbidden.has(entry.name))
+    .map(entry => entry.name)
+  if (shipped.length > 0) {
+    throw new Error(`deprecated dependencies remain in the staged runtime: ${shipped.join(', ')}`)
+  }
+  console.log('Dependency audit: deprecated packages from the shared lock are not shipped')
+}
+
+/**
  * Make the staged tree portable: re-create absolute internal links as
  * relative ones and dereference any link still pointing outside the runtime
  * (Windows junctions the `.pnpm` entries to the global store). Dangling
@@ -773,22 +839,25 @@ for (const required of [
 
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
-  const pnpm = resolvePinnedPnpm(dshSource)
-  console.log('Deploying pinned DSH runtime (copy import mode)')
-  run(process.execPath, [
-    pnpm.cliEntry,
-    '--config.package-import-method=copy',
-    '--ignore-scripts',
+const pnpm = resolvePinnedPnpm(dshSource)
+console.log('Deploying pinned DSH runtime (copy import mode)')
+run(process.execPath, [
+  pnpm.cliEntry,
+  '--reporter=silent',
+  '--config.package-import-method=copy',
+  '--ignore-scripts',
   '--filter', '@deepseek-ai/dsh',
   'deploy', '--prod', '--legacy', runtime,
-  ], {
-    cwd: dshSource,
-    env: {
-      ...process.env,
-      PATH: `${pnpm.binDir}${delimiter}${process.env.PATH ?? ''}`,
-    },
-  })
+], {
+  cwd: dshSource,
+  env: {
+    ...process.env,
+    PATH: `${pnpm.binDir}${delimiter}${process.env.PATH ?? ''}`,
+  },
+})
 
+replaceDeprecatedDomExceptionShim()
+assertDeprecatedLockBranchesAreNotShipped()
 console.log('Relinking workspace packages')
 rewriteWorkspaceLinks()
 relinkInstallationWorkspacePackages()
