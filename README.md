@@ -130,8 +130,17 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 - [设计与插件边界](./docs/design.md)
 - [安装、操作与排错](./docs/usage.md)
 
-部分内置插件是上游能力的 Oh-DSH 下游适配：功能会定期同步，UI、主题、
-运行边界和打包方式由本项目维护。来源与改造范围记录在设计文档中。
+## 上游依赖
+
+| 上游仓库 | Oh-DSH 中的用途 |
+| --- | --- |
+| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime、会话与插件加载器 |
+| [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Oh-DSH TUI 的直接上游插件**，提供终端渲染、交互和命令体系 |
+| [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git Review、文件与 PTY Host 能力 |
+
+`dsh-TUI` 以固定提交的 Git submodule 存放在 `upstream/dsh-TUI`。
+Oh-DSH 保留其上游实现与署名，并负责 `ohdsh tui` 启动器、`~/.ohdsh`
+数据隔离、统一标题、跨端皮肤及发行打包。详细边界见设计文档。
 
 ## License
 

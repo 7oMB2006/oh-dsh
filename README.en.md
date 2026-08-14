@@ -134,10 +134,18 @@ or only TUI with `pnpm run dist:tui`.
 - [Design and plugin boundaries](./docs/design.en.md)
 - [Installation, operations, and troubleshooting](./docs/usage.en.md)
 
-Some bundled plugins are Oh-DSH downstream adaptations of upstream projects.
-Features are synchronized periodically while this project owns the UI,
-themes, runtime boundaries, and packaging. The design guide records every
-source and adaptation boundary.
+## Upstream dependencies
+
+| Upstream repository | Role in Oh-DSH |
+| --- | --- |
+| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime, sessions, and plugin loader |
+| [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Direct upstream plugin for Oh-DSH TUI**, providing terminal rendering, interaction, and commands |
+| [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git review, files, and PTY host capabilities |
+
+`dsh-TUI` is pinned as a Git submodule at `upstream/dsh-TUI`. Oh-DSH keeps
+the upstream implementation and attribution, while owning the `ohdsh tui`
+launcher, isolated `~/.ohdsh` data, unified title, cross-surface skins, and
+distribution packaging. See the design guide for the exact boundary.
 
 ## License
 
