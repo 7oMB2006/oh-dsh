@@ -83,6 +83,7 @@ declare global {
 export const inject = ['locale', 'sessions', 'slots']
 
 const OPEN_KEY = 'oh-dsh-desktop.plugin-marketplace.open'
+const FOOTER_STACK_ATTRIBUTE = 'data-oh-dsh-marketplace-footer-stack'
 
 function readOpen(): boolean {
   try { return localStorage.getItem(OPEN_KEY) === 'true' } catch { return false }
@@ -136,6 +137,17 @@ function settingsDialogOpen(): boolean {
       ].filter(Boolean).join(' ').trim().toLowerCase()
       return label.includes('settings') || label.includes('设置')
     })
+}
+
+function marketplaceFooter(settings: HTMLElement): HTMLElement | null {
+  const navigation = document.querySelector<HTMLElement>('.oh-marketplace-nav')
+  if (navigation === null) return null
+  let candidate = navigation.parentElement
+  while (candidate !== null && candidate !== document.body) {
+    if (candidate.contains(settings)) return candidate
+    candidate = candidate.parentElement
+  }
+  return null
 }
 
 function sidebarFor(settings: HTMLElement): HTMLElement | null {
@@ -223,6 +235,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   #observer: MutationObserver | null = null
   #resizeObserver: ResizeObserver | null = null
   #geometryFrame: number | null = null
+  #footerStack: HTMLElement | null = null
   #unsubscribeSessions: (() => void) | null = null
   #sessionNavigationState: SessionNavigationState = initialSessionNavigationState()
   readonly #handleResize = (): void => { this.scheduleGeometry() }
@@ -317,6 +330,8 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#observer?.disconnect()
     this.#resizeObserver?.disconnect()
     this.#root?.unmount()
+    this.#footerStack?.removeAttribute(FOOTER_STACK_ATTRIBUTE)
+    this.#footerStack = null
     this.#element?.remove()
     this.#style?.remove()
     this.#state = { available: false, open: false }
@@ -341,6 +356,12 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   private synchronizeGeometry(): void {
     const declared = document.querySelector<HTMLElement>('[data-slot="sidebar"]')
     const settings = settingsButton()
+    const footerStack = settings === null ? null : marketplaceFooter(settings)
+    if (footerStack !== this.#footerStack) {
+      this.#footerStack?.removeAttribute(FOOTER_STACK_ATTRIBUTE)
+      footerStack?.setAttribute(FOOTER_STACK_ATTRIBUTE, 'true')
+      this.#footerStack = footerStack
+    }
     const sidebar = declared ?? (settings === null ? null : sidebarFor(settings))
     if (sidebar === null) {
       document.documentElement.style.setProperty('--oh-marketplace-left', '0px')

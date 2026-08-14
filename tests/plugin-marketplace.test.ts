@@ -521,7 +521,7 @@ test('Agent gateway authenticates and defers runtime-restarting applies', async 
   }
 })
 
-test('marketplace navigation preserves the intrinsic Settings footer height', () => {
+test('marketplace navigation preserves the Settings footer geometry', () => {
   const client = readFileSync(new URL(
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
     import.meta.url,
@@ -540,6 +540,10 @@ test('marketplace navigation preserves the intrinsic Settings footer height', ()
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*gap: 8px;/)
   assert.match(css, /\.oh-marketplace-nav \{[\s\S]*padding: 6px 2px 6px 10px;/)
   assert.match(css, /\.oh-marketplace-nav svg \{[\s\S]*width: 16px;[\s\S]*height: 16px;/)
+  assert.match(css, /data-oh-dsh-marketplace-footer-stack='true'/)
+  assert.match(css, /flex-direction: column !important;/)
+  assert.match(client, /marketplaceFooter\(settings\)/)
+  assert.match(client, /removeAttribute\(FOOTER_STACK_ATTRIBUTE\)/)
   assert.match(client, /export const inject = \['locale', 'sessions', 'slots'\]/)
   assert.match(client, /ctx\.get\('sessions'\) as SessionsService/)
   assert.match(client, /this\.#sessions\.list\.subscribe\(syncSessionNavigation\)/)

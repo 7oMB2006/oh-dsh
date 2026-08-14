@@ -50,6 +50,14 @@
   display: none;
 }
 
+[data-oh-dsh-marketplace-footer-stack='true']:has(
+  .oh-marketplace-nav[data-collapsed='true']
+) {
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: column !important;
+}
+
 .oh-marketplace-surface {
   position: fixed;
   z-index: 8800;
