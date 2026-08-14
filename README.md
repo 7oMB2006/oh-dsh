@@ -119,9 +119,9 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 
 ![Oh-DSH 插件市场](./assets/oh-dsh-plugin-marketplace.png)
 
-### 桌面皮肤
+### Oh-DSH 皮肤
 
-![Oh-DSH 桌面皮肤](./assets/oh-dsh-desktop-skins.png)
+![Oh-DSH 跨界面皮肤](./assets/oh-dsh-desktop-skins.png)
 
 </details>
 

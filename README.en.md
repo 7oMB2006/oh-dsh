@@ -123,9 +123,9 @@ or only TUI with `pnpm run dist:tui`.
 
 ![Oh-DSH plugin marketplace](./assets/oh-dsh-plugin-marketplace.png)
 
-### Desktop skins
+### Oh-DSH skins
 
-![Oh-DSH desktop skins](./assets/oh-dsh-desktop-skins.png)
+![Oh-DSH cross-surface skins](./assets/oh-dsh-desktop-skins.png)
 
 </details>
 

@@ -133,8 +133,11 @@ TUI 常用选项：
 | 新建 Side chat | `⌥⌘S` |
 | 退出侧栏专注模式 | `Esc` |
 
-设置页支持中英文、模型、权限、Agent preset、插件配置和 Desktop skin。
+设置页支持中英文、模型、权限、Agent preset、插件配置和 Oh-DSH 皮肤。
 设置弹窗会覆盖并虚化所有工作区和侧栏内容。
+
+Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
+Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。
 
 ## 插件市场
 

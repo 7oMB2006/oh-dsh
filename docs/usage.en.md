@@ -142,7 +142,11 @@ Common TUI options:
 | Leave sidebar focus mode | `Esc` |
 
 Settings covers language, models, permissions, Agent presets, plugin config,
-and Desktop skins. Its modal covers and blurs every workspace and sidebar.
+and Oh-DSH skins. Its modal covers and blurs every workspace and sidebar.
+
+Choose a skin from Settings on Web or Desktop. In TUI, run `/theme` to select
+the same Deep Current, Jade Circuit, Porcelain, or Ember Dusk palette. The
+choice applies immediately and survives restarts.
 
 ## Plugin marketplace
 

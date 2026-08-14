@@ -63,13 +63,19 @@ the smallest supported distribution.
 | `@oh-dsh/panel-controls` | Downstream implementation of the `dsh-web-panel` interaction model | Unified Terminal dock without a separate Web Terminal install |
 | `@oh-dsh/pinned-summary` | Native | Session summary, half-height card, and content-gutter management |
 | `@oh-dsh/plugin-marketplace` | Adopts lifecycle ideas from `plugin-registry` and `dsh-hub` | One Loader, isolated preview, risk approval, TOFU source lock, and recovery |
-| `@oh-dsh/skins` | Downstream implementation of the `dsh-skins` ThemeService model | Original skins, Settings UI, and Host persistence |
+| `@oh-dsh/skins` | Downstream implementation of the `dsh-skins` ThemeService model | One skin id set, Host persistence, Web/Desktop CSS, and TUI palette adapters |
 | `dsh-cc-tui` | Pins [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | Upstream owns terminal rendering, session interaction, commands, and terminal compatibility |
-| `@oh-dsh/tui` | Downstream Profile adapter for `dsh-TUI` | Unified `ohdsh tui`, defaults, packaging, and DSH data boundary |
+| `@oh-dsh/tui` | Downstream Profile adapter for `dsh-TUI` | Unified `ohdsh tui`, Oh-DSH TUI identity, defaults, packaging, and DSH data boundary |
 
 Downstream plugins periodically inspect upstream features and adapt them to
 the current DSH contracts. Upstream code, the Oh-DSH UI, and final permission
 boundaries remain separate layers.
+
+`@oh-dsh/skins` is the only skin-definition module for all three surfaces.
+Web and Desktop adapt the catalog to DSH CSS tokens; TUI adapts the same ids
+to the upstream native `/theme` palettes. TUI retains upstream hot switching
+and its picker, then mirrors the choice into the shared `skins.json` on the
+next launch. There is no second theme loader.
 
 ## Plugin installation transaction
 

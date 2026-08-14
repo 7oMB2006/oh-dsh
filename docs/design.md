@@ -60,12 +60,17 @@ Web-only 与 TUI-only 都去掉 Electron；TUI-only 是容量最小的发行形�
 | `@oh-dsh/panel-controls` | 对 `dsh-web-panel` 交互模型的下游实现 | 提供统一 Terminal dock，不要求单独安装 Web Terminal |
 | `@oh-dsh/pinned-summary` | 自研 | 会话摘要、半高卡片和正文 gutter 管理 |
 | `@oh-dsh/plugin-marketplace` | 吸收 `plugin-registry` 与 `dsh-hub` 的生命周期设计 | 单一 Loader、隔离预览、风险确认、TOFU 来源锁与恢复 |
-| `@oh-dsh/skins` | 对 `dsh-skins` ThemeService 扩展模型的下游实现 | 自有皮肤、设置 UI 和 Host 持久化 |
+| `@oh-dsh/skins` | 对 `dsh-skins` ThemeService 扩展模型的下游实现 | 一套皮肤 ID、Host 持久化，以及 Web/Desktop CSS 与 TUI 调色板适配器 |
 | `dsh-cc-tui` | 固定跟踪 [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | 上游拥有终端渲染、会话交互、命令与终端兼容性 |
-| `@oh-dsh/tui` | `dsh-TUI` 的下游 Profile 适配 | 统一 `ohdsh tui`、默认值、发行打包和 DSH 数据边界 |
+| `@oh-dsh/tui` | `dsh-TUI` 的下游 Profile 适配 | 统一 `ohdsh tui`、Oh-DSH TUI 标题、默认值、发行打包和 DSH 数据边界 |
 
 下游插件会定期检查上游 feature，并在当前 DSH 契约上重新适配。上游代码、
 Oh-DSH UI 和最终权限边界不会混为一层。
+
+`@oh-dsh/skins` 是三个交互面的唯一皮肤定义模块。Web 与 Desktop 把定义
+适配为 DSH CSS token；TUI 把同一组 ID 适配为上游原生 `/theme` 调色板。
+TUI 仍使用上游的热切换与选择器，选择会在下一次启动时回写统一的
+`skins.json`，没有第二套主题 Loader。
 
 ## 插件安装事务
 
