@@ -430,7 +430,10 @@ The bundled Node runtime defaults to the build machine's platform. Set
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs install, type
 check, tests, and the build in parallel on macOS arm64, macOS x64, Linux x64,
 and Windows x64 for every PR and main push, covering the compile path of
-every surface on every target platform.
+every surface on every target platform. A separate Runtime smoke job builds
+and stages the pinned DSH runtime on Linux and then runs the assembled
+desktop and web profiles (smoke:runtime / smoke:web), verifying skins, the
+Sidebar, workspace Git, and the PTY terminal end to end.
 
 Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which

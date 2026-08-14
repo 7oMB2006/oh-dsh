@@ -402,7 +402,9 @@ release/
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) 在每次 PR 与 main
 push 时,于 macOS arm64、macOS x64、Linux x64、Windows x64 四个平台并行跑
 安装、typecheck、测试与构建,保证任一形态的编译链路在所有目标平台上都被
-覆盖。
+覆盖;另有一个 Runtime smoke job 在 Linux 上完整构建并 stage 固定 DSH
+runtime,再跑 desktop 与 web 两个 profile 的组装冒烟(smoke:runtime /
+smoke:web),验证皮肤、Sidebar、workspace Git 与 PTY 终端真实可用。
 
 推送 `v*` tag 后，[`.github/workflows/release.yml`](.github/workflows/release.yml)
 会在 runner 上并行打包 macOS arm64、macOS x64 与 Linux x64，每个平台
