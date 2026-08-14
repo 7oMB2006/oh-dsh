@@ -8,7 +8,7 @@
 
 ## 目标
 
-Oh-DSH 在同一份固定 DSH runtime 上提供 Desktop、Web 和未来的 TUI。
+Oh-DSH 在同一份固定 DSH runtime 上提供 Desktop、Web 和 TUI。
 各形态共享会话、Profile、插件契约和本地能力，但只携带自身需要的交互层，
 避免为轻量部署强制安装 Electron。
 
@@ -26,7 +26,7 @@ Oh-DSH 在同一份固定 DSH runtime 上提供 Desktop、Web 和未来的 TUI�
 flowchart TB
   CLI["ohdsh"] --> Desktop["desktop\nElectron + Web runtime"]
   CLI --> Web["web\nHTTP + Web runtime"]
-  CLI -. planned .-> TUI["tui\nterminal renderer"]
+  CLI --> TUI["tui\ndsh-TUI renderer"]
 
   Desktop --> Core["Pinned DSH runtime"]
   Web --> Core
@@ -43,12 +43,12 @@ flowchart TB
 
 | 发行包 | 包含 | 不包含 |
 | --- | --- | --- |
-| Full/Desktop | Electron、Web runtime、Node、内置插件、统一 CLI | TUI renderer |
+| Full/Desktop | Electron、Web runtime、TUI、Node、内置插件、统一 CLI | 无 |
 | Web-only | HTTP/Web runtime、Node、Web 可用插件、统一 CLI | Electron 和桌面窗口能力 |
-| TUI-only | 规划中：TUI renderer、Node、TUI 可用插件 | Electron 和浏览器 UI |
+| TUI-only | dsh-TUI renderer、Node、TUI 可用插件、统一 CLI | Electron 和浏览器 UI |
 
 Desktop 本身使用 Web UI，因此不再制造一个功能残缺的“Desktop-only”包。
-Web-only 去掉 Electron，是当前容量最小的可用发行形态。
+Web-only 与 TUI-only 都去掉 Electron；TUI-only 是容量最小的发行形态。
 
 ## 内置插件与上游关系
 
@@ -61,6 +61,8 @@ Web-only 去掉 Electron，是当前容量最小的可用发行形态。
 | `@oh-dsh/pinned-summary` | 自研 | 会话摘要、半高卡片和正文 gutter 管理 |
 | `@oh-dsh/plugin-marketplace` | 吸收 `plugin-registry` 与 `dsh-hub` 的生命周期设计 | 单一 Loader、隔离预览、风险确认、TOFU 来源锁与恢复 |
 | `@oh-dsh/skins` | 对 `dsh-skins` ThemeService 扩展模型的下游实现 | 自有皮肤、设置 UI 和 Host 持久化 |
+| `dsh-cc-tui` | 固定跟踪 [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | 上游拥有终端渲染、会话交互、命令与终端兼容性 |
+| `@oh-dsh/tui` | `dsh-TUI` 的下游 Profile 适配 | 统一 `ohdsh tui`、默认值、发行打包和 DSH 数据边界 |
 
 下游插件会定期检查上游 feature，并在当前 DSH 契约上重新适配。上游代码、
 Oh-DSH UI 和最终权限边界不会混为一层。
@@ -92,10 +94,12 @@ stateDiagram-v2
 - Marketplace 的 candidate、current、previous 分离，失败可以恢复。
 - 来源首次使用采用 TOFU 锁，后续 commit 变化需要重新确认。
 - Electron bridge 只存在于 Desktop；Web 不模拟桌面权限。
+- TUI 只在真实 TTY 中启动，并继续使用 DSH Profile 的 sandbox 与 approval。
 
 ## 名称与数据兼容
 
-面向用户的名称是 **Oh-DSH Desktop** 和 **Oh-DSH Web**。内部 package id、
-bundle id 和既有数据目录保持稳定，避免升级后丢失会话、配置或凭据。
+面向用户的名称是 **Oh-DSH Desktop**、**Oh-DSH Web** 和
+**Oh-DSH TUI**。内部 package id、bundle id 和既有数据目录保持稳定，
+避免升级后丢失会话、配置或凭据。
 
 相关操作见[安装、操作与排错](./usage.md)。

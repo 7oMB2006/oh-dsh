@@ -10,11 +10,10 @@
 
 - Install **Oh-DSH Desktop** for the complete local workbench.
 - Install **Oh-DSH Web** for browser-only use without Electron.
-- Wait for TUI-only for terminal use; `ohdsh tui` currently reports that the
-  surface is not implemented.
+- Install **Oh-DSH TUI** for terminal-only use without Electron or browser UI.
 
-The full distribution includes Web, so one installation supports both
-`desktop` and `web`.
+The full distribution includes all three surfaces, so one installation
+supports `desktop`, `web`, and `tui`.
 
 ## Install the full distribution
 
@@ -92,6 +91,18 @@ for a graceful shutdown.
 Do not bind to `0.0.0.0` without an access boundary. For LAN exposure, add
 `--trusted-host` and put authentication and TLS in a trusted reverse proxy.
 
+## Install TUI-only
+
+```sh
+tar -xzf oh-dsh-tui-*.tar.gz
+cd oh-dsh-tui-*/
+./bin/ohdsh tui
+```
+
+Use `bin\ohdsh.cmd tui` on Windows. TUI requires a real interactive terminal.
+It uses the alternate screen by default; upstream `dsh-TUI` owns fullscreen
+selection, scrolling, and copy behavior.
+
 ## Unified commands
 
 ```sh
@@ -103,8 +114,19 @@ ohdsh tui
 - `desktop` opens the installed app and falls back to the Electron development
   entry when run from a source checkout.
 - `web` starts the HTTP service and prints its URL.
-- `tui` reserves the stable command name and currently exits with an explicit
-  unavailable message.
+- `tui` initializes its Profile and attaches the upstream renderer to the
+  current terminal.
+
+Common TUI options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--cwd` | Current directory | Workspace |
+| `--data` | `~/.dsh` | DSH Profile, session, and configuration root |
+| `--resume` | New session | Resume a Session id |
+| `--lang` | Upstream preference | `zh` or `en` |
+| `--preset` | `standard` | Initial Agent preset |
+| `--inline` | Off | Preserve terminal scrollback instead of alternate screen |
 
 ## Desktop operations
 
@@ -149,6 +171,7 @@ export PATH="$PWD/bin:$PATH"
 
 ohdsh desktop
 ohdsh web --port 3080
+ohdsh tui
 ```
 
 Packaging commands:
@@ -158,22 +181,25 @@ pnpm run dist:mac       # macOS full distribution
 pnpm run dist:linux     # Linux full distribution
 pnpm run dist:win       # Windows full distribution
 pnpm run dist:web       # Web-only lightweight distribution
+pnpm run dist:tui       # TUI-only terminal distribution
 ```
 
 ## Data and troubleshooting
 
 Desktop retains the existing internal data directory to preserve state across
 the visible-name migration. Web stores data in `~/.oh-dsh-web` by default.
-Configure the DeepSeek API key in Models settings or in `.env` under the
-matching DSH data directory.
+TUI reuses the standard DSH root at `~/.dsh`. Configure the DeepSeek API key
+in Models settings or in `.env` under the matching DSH data directory.
 
 Troubleshooting order:
 
 1. Run `ohdsh --help` to confirm the CLI source.
 2. Run `ohdsh web --help` to inspect options.
-3. Test a random port with `ohdsh web --port 0 --no-open`.
-4. Confirm that required plugins are both installed and enabled in the Profile.
-5. If Desktop does not start, run its bundled `bin/ohdsh desktop` in a terminal
+3. Run `ohdsh tui --help`, then use `ohdsh tui --inline` to isolate
+   alternate-screen terminal compatibility.
+4. Test a random port with `ohdsh web --port 0 --no-open`.
+5. Confirm that required plugins are both installed and enabled in the Profile.
+6. If Desktop does not start, run its bundled `bin/ohdsh desktop` in a terminal
    to capture logs.
 
 See [design and plugin boundaries](./design.en.md) for architecture and

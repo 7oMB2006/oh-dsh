@@ -10,9 +10,9 @@
 
 - 需要完整本地工作台：安装 **Oh-DSH Desktop**。
 - 只需要浏览器交互：安装 **Oh-DSH Web**，不携带 Electron。
-- 纯终端交互：等待 TUI-only；当前 `ohdsh tui` 会返回未实现提示。
+- 纯终端交互：安装 **Oh-DSH TUI**，不携带 Electron 或浏览器 UI。
 
-完整版已经包含 Web，因此安装一次后可以同时使用 `desktop` 和 `web`。
+完整版已经包含三种形态，因此安装一次后可以使用 `desktop`、`web` 和 `tui`。
 
 ## 安装完整版
 
@@ -86,6 +86,17 @@ bin\ohdsh.cmd web
 不要在未配置访问边界时直接监听 `0.0.0.0`。对局域网开放时，应同时配置
 `--trusted-host`，并由可信反向代理提供鉴权和 TLS。
 
+## 安装 TUI-only
+
+```sh
+tar -xzf oh-dsh-tui-*.tar.gz
+cd oh-dsh-tui-*/
+./bin/ohdsh tui
+```
+
+Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认使用 alternate
+screen，全屏选择、滚动和复制由上游 `dsh-TUI` 处理。
+
 ## 统一启动命令
 
 ```sh
@@ -96,7 +107,18 @@ ohdsh tui
 
 - `desktop` 启动已安装应用；源码仓库中回退到 Electron 开发入口。
 - `web` 启动 HTTP 服务并打印访问地址。
-- `tui` 是保留的稳定命令名，当前退出并说明功能尚未提供。
+- `tui` 初始化独立 Profile，并在当前终端中附着运行上游 renderer。
+
+TUI 常用选项：
+
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--cwd` | 当前目录 | Workspace |
+| `--data` | `~/.dsh` | DSH Profile、会话和配置目录 |
+| `--resume` | 新会话 | 恢复指定 Session id |
+| `--lang` | 上游设置 | `zh` 或 `en` |
+| `--preset` | `standard` | 初始 Agent preset |
+| `--inline` | 关闭 | 保留终端 scrollback，不使用 alternate screen |
 
 ## Desktop 操作
 
@@ -140,6 +162,7 @@ export PATH="$PWD/bin:$PATH"
 
 ohdsh desktop
 ohdsh web --port 3080
+ohdsh tui
 ```
 
 打包命令：
@@ -149,20 +172,22 @@ pnpm run dist:mac       # macOS 完整版
 pnpm run dist:linux     # Linux 完整版
 pnpm run dist:win       # Windows 完整版
 pnpm run dist:web       # Web-only 轻量版
+pnpm run dist:tui       # TUI-only 终端版
 ```
 
 ## 数据与排错
 
 Desktop 保留既有内部数据目录，以保证更名升级兼容。Web 默认数据目录是
-`~/.oh-dsh-web`。DeepSeek API key 可以在 Models 设置中配置，也可以放入
-对应 DSH 数据目录的 `.env`。
+`~/.oh-dsh-web`，TUI 默认复用标准 DSH 目录 `~/.dsh`。DeepSeek API key
+可以在 Models 设置中配置，也可以放入对应 DSH 数据目录的 `.env`。
 
 排查顺序：
 
 1. 运行 `ohdsh --help` 确认 CLI 来源。
 2. 运行 `ohdsh web --help` 检查参数。
-3. 使用随机端口验证：`ohdsh web --port 0 --no-open`。
-4. 检查 Profile 是否同时安装并启用了所需插件。
-5. Desktop 启动失败时，从终端运行应用内 `bin/ohdsh desktop` 获取日志。
+3. 运行 `ohdsh tui --help`，再用 `ohdsh tui --inline` 排除终端全屏兼容问题。
+4. 使用随机端口验证：`ohdsh web --port 0 --no-open`。
+5. 检查 Profile 是否同时安装并启用了所需插件。
+6. Desktop 启动失败时，从终端运行应用内 `bin/ohdsh desktop` 获取日志。
 
 架构与上游关系见[设计与插件边界](./design.md)。

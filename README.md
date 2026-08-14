@@ -20,9 +20,18 @@
   <img src="./assets/oh-dsh-desktop-overview.png" alt="Oh-DSH Desktop" width="100%">
 </p>
 
-Oh-DSH 把 DeepSeek Harness、Node.js 和本地能力打包成可安装的 Desktop
-与 Web 发行版。模型仍运行在云端；Oh-DSH 负责 Workspace、终端、Git
-Review、浏览器、窗口集成和插件生命周期。
+Oh-DSH 把 DeepSeek Harness、Node.js 和本地能力打包成可安装的 Desktop、
+Web 与 TUI 发行版。模型仍运行在云端；Oh-DSH 负责 Workspace、终端、
+Git Review、浏览器、窗口集成和插件生命周期。
+
+## 🎉 官方收录
+
+Oh-DSH 已进入 DeepSeek Harness 官方社区展示。终端端基于同样获得社区认可的
+[dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) 上游插件，并保留完整署名。
+
+<p align="center">
+  <img src="./assets/oh-dsh-official-showcase.png" alt="DeepSeek Harness 官方社区展示" width="100%">
+</p>
 
 ## 下载与安装
 
@@ -31,9 +40,9 @@ Review、浏览器、窗口集成和插件生命周期。
 
 | 发行形态 | 包含内容 | 适合场景 |
 | --- | --- | --- |
-| 完整版 | **Oh-DSH Desktop**、Web、Node runtime 和内置插件 | 本地开发工作台 |
+| 完整版 | **Oh-DSH Desktop**、Web、TUI、Node runtime 和内置插件 | 本地开发工作台 |
 | Web-only | **Oh-DSH Web**、Node runtime 和内置 Web 插件，不含 Electron | 轻量安装、浏览器或远程使用 |
-| TUI-only | 规划中 | 纯终端环境 |
+| TUI-only | **Oh-DSH TUI**、Node runtime 和终端插件，不含 Electron | 纯终端环境 |
 
 完整版按平台提供 DMG/ZIP、AppImage/deb 和 Windows 包。macOS 打开 DMG 后，
 将 **Oh-DSH Desktop** 拖入 Applications；Linux 可直接运行 AppImage，或用
@@ -53,6 +62,14 @@ cd oh-dsh-web-*/
 bin\ohdsh.cmd web
 ```
 
+TUI-only 包同样解压即用：
+
+```sh
+tar -xzf oh-dsh-tui-*.tar.gz
+cd oh-dsh-tui-*/
+./bin/ohdsh tui
+```
+
 ### 安装统一命令
 
 macOS 完整版可将应用内的启动器加入 `PATH`：
@@ -63,17 +80,17 @@ sudo ln -sf \
   /usr/local/bin/ohdsh
 ```
 
-Web-only 包可直接运行 `./bin/ohdsh`，也可以把它加入 `PATH`。
+Web-only 与 TUI-only 包可直接运行 `./bin/ohdsh`，也可以把它加入 `PATH`。
 
 ## 启动方式
 
 ```sh
 ohdsh desktop   # 启动 Oh-DSH Desktop
 ohdsh web       # 启动 Oh-DSH Web
-ohdsh tui       # 规划中的 TUI；当前会明确提示尚未提供
+ohdsh tui       # 启动 Oh-DSH TUI
 ```
 
-使用 `ohdsh web --help` 查看监听地址、端口、数据目录和可信主机选项。
+使用 `ohdsh web --help` 或 `ohdsh tui --help` 查看对应选项。
 
 ## 从源码运行
 
@@ -89,10 +106,11 @@ export PATH="$PWD/bin:$PATH"
 
 ohdsh desktop
 ohdsh web
+ohdsh tui
 ```
 
 打包完整版使用对应平台的 `dist:mac`、`dist:linux` 或 `dist:win`；只打包
-Web 使用 `pnpm run dist:web`。
+Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 
 <details>
 <summary><strong>更多界面</strong></summary>

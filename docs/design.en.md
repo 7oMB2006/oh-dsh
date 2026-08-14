@@ -8,7 +8,7 @@
 
 ## Goals
 
-Oh-DSH provides Desktop, Web, and a future TUI over one pinned DSH runtime.
+Oh-DSH provides Desktop, Web, and TUI over one pinned DSH runtime.
 The surfaces share sessions, Profiles, plugin contracts, and local
 capabilities, while each package carries only the interaction layer it needs.
 Lightweight deployments do not have to install Electron.
@@ -27,7 +27,7 @@ Design principles:
 flowchart TB
   CLI["ohdsh"] --> Desktop["desktop\nElectron + Web runtime"]
   CLI --> Web["web\nHTTP + Web runtime"]
-  CLI -. planned .-> TUI["tui\nterminal renderer"]
+  CLI --> TUI["tui\ndsh-TUI renderer"]
 
   Desktop --> Core["Pinned DSH runtime"]
   Web --> Core
@@ -45,13 +45,13 @@ second plugin system.
 
 | Package | Includes | Excludes |
 | --- | --- | --- |
-| Full/Desktop | Electron, Web runtime, Node, bundled plugins, unified CLI | TUI renderer |
+| Full/Desktop | Electron, Web runtime, TUI, Node, bundled plugins, unified CLI | Nothing |
 | Web-only | HTTP/Web runtime, Node, Web-compatible plugins, unified CLI | Electron and native window features |
-| TUI-only | Planned: TUI renderer, Node, TUI-compatible plugins | Electron and browser UI |
+| TUI-only | dsh-TUI renderer, Node, TUI-compatible plugins, unified CLI | Electron and browser UI |
 
 Desktop itself uses the Web UI, so Oh-DSH does not ship a degraded
-"Desktop-only" package. Web-only removes Electron and is currently the
-smallest supported distribution.
+"Desktop-only" package. Web-only and TUI-only remove Electron; TUI-only is
+the smallest supported distribution.
 
 ## Bundled plugins and upstreams
 
@@ -64,6 +64,8 @@ smallest supported distribution.
 | `@oh-dsh/pinned-summary` | Native | Session summary, half-height card, and content-gutter management |
 | `@oh-dsh/plugin-marketplace` | Adopts lifecycle ideas from `plugin-registry` and `dsh-hub` | One Loader, isolated preview, risk approval, TOFU source lock, and recovery |
 | `@oh-dsh/skins` | Downstream implementation of the `dsh-skins` ThemeService model | Original skins, Settings UI, and Host persistence |
+| `dsh-cc-tui` | Pins [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | Upstream owns terminal rendering, session interaction, commands, and terminal compatibility |
+| `@oh-dsh/tui` | Downstream Profile adapter for `dsh-TUI` | Unified `ohdsh tui`, defaults, packaging, and DSH data boundary |
 
 Downstream plugins periodically inspect upstream features and adapt them to
 the current DSH contracts. Upstream code, the Oh-DSH UI, and final permission
@@ -97,11 +99,13 @@ same transaction and risk approval and cannot bypass the Loader.
 - Marketplace candidate, current, and previous states remain separate.
 - A source receives a TOFU lock on first use; later commit changes need review.
 - The Electron bridge exists only on Desktop; Web does not emulate its rights.
+- TUI starts only on a real TTY and retains the active DSH Profile's sandbox
+  and approval policies.
 
 ## Naming and data compatibility
 
-User-facing names are **Oh-DSH Desktop** and **Oh-DSH Web**. Internal package
-ids, the bundle id, and existing data directories remain stable so upgrades
-preserve sessions, settings, and credentials.
+User-facing names are **Oh-DSH Desktop**, **Oh-DSH Web**, and **Oh-DSH TUI**.
+Internal package ids, the bundle id, and existing data directories remain
+stable so upgrades preserve sessions, settings, and credentials.
 
 See [installation, operations, and troubleshooting](./usage.en.md).
