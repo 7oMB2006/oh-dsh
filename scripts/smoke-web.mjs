@@ -203,7 +203,7 @@ try {
     assert.equal(
       bootEntries.some(entry => entry.id === pluginId),
       false,
-      `${pluginId} must not enroll in the Oh-DSH-Web client graph`,
+      `${pluginId} must not enroll in the Oh-DSH Web client graph`,
     )
   }
 
@@ -324,7 +324,7 @@ try {
     })
   })
 
-  console.log(`Oh-DSH-Web profile ready: ${base.href}`)
+  console.log(`Oh-DSH Web profile ready: ${base.href}`)
   console.log(`Web composition verified: ${dump.stdout.split('\n').length} dump lines`)
   for (const plugin of loaded) {
     console.log(

@@ -12,7 +12,9 @@ import { promisify } from 'node:util'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const execFileAsync = promisify(execFile)
-const APP_NAME = 'Oh-DSH-Desktop.app'
+const APP_NAME = 'Oh-DSH Desktop.app'
+const EXECUTABLE_NAME = 'Oh-DSH Desktop'
+const LEGACY_APP_NAME = 'Oh-DSH-Desktop.app'
 const BUNDLE_ID = 'ai.deepseek.oh-dsh-desktop'
 
 async function exists(path) {
@@ -26,7 +28,7 @@ async function exists(path) {
 
 export async function validateMacBundle(path, options = {}) {
   const required = [
-    join(path, 'Contents', 'MacOS', 'Oh-DSH-Desktop'),
+    join(path, 'Contents', 'MacOS', EXECUTABLE_NAME),
     join(
       path,
       'Contents',
@@ -63,13 +65,13 @@ function timestamp(date = new Date()) {
 }
 
 async function availableBackupPath(directory) {
-  const stem = `Oh-DSH-Desktop-before-${timestamp()}`
+  const stem = `Oh-DSH Desktop-before-${timestamp()}`
   for (let suffix = 0; suffix < 100; suffix += 1) {
     const name = suffix === 0 ? `${stem}.app` : `${stem}-${String(suffix)}.app`
     const candidate = join(directory, name)
     if (!await exists(candidate)) return candidate
   }
-  throw new Error('unable to reserve an Oh-DSH-Desktop backup path')
+  throw new Error('unable to reserve an Oh-DSH Desktop backup path')
 }
 
 export async function replaceMacBundle(options) {
@@ -119,12 +121,12 @@ async function quitInstalledApp() {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     const { stdout } = await execFileAsync('/usr/bin/pgrep', [
       '-f',
-      '/Applications/Oh-DSH-Desktop.app/',
+      '/Applications/Oh-DSH( Desktop|-Desktop).app/',
     ]).catch(() => ({ stdout: '' }))
     if (stdout.trim() === '') return
     await new Promise(resolveDelay => setTimeout(resolveDelay, 100))
   }
-  throw new Error('Oh-DSH-Desktop did not quit cleanly')
+  throw new Error('Oh-DSH Desktop did not quit cleanly')
 }
 
 async function main() {
@@ -136,6 +138,7 @@ async function main() {
     process.argv[2] ?? join(root, 'release', 'mac-arm64', APP_NAME),
   )
   const destination = join('/Applications', APP_NAME)
+  const legacyDestination = join('/Applications', LEGACY_APP_NAME)
   await quitInstalledApp()
   const result = await replaceMacBundle({
     source,
@@ -149,6 +152,11 @@ async function main() {
   process.stdout.write(`Installed ${destination}\n`)
   if (result.backup !== undefined) {
     process.stdout.write(`Previous app moved to ${result.backup}\n`)
+  }
+  if (await exists(legacyDestination)) {
+    const legacyBackup = await availableBackupPath(join(homedir(), '.Trash'))
+    await rename(legacyDestination, legacyBackup)
+    process.stdout.write(`Legacy app moved to ${legacyBackup}\n`)
   }
 }
 

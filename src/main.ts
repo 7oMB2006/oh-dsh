@@ -34,7 +34,8 @@ import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from '
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
 
-const PRODUCT_NAME = 'Oh-DSH-Desktop'
+const PRODUCT_NAME = 'Oh-DSH Desktop'
+const LEGACY_DATA_DIRECTORY = 'Oh-DSH-Desktop'
 const DEFAULT_UI_ZOOM_FACTOR = 1.12
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const splashPath = join(currentDir, 'splash.html')
@@ -422,7 +423,7 @@ async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'
     appendLog('desktop', error instanceof Error ? error.stack ?? error.message : String(error))
     await showSplash({
       error: true,
-      message: 'Oh-DSH-Desktop 启动失败。',
+      message: 'Oh-DSH Desktop 启动失败。',
       detail: error instanceof Error ? error.message : String(error),
     })
   } finally {
@@ -678,6 +679,9 @@ function installIpc(): void {
 
 async function bootstrap(): Promise<void> {
   app.setName(PRODUCT_NAME)
+  // The visible product name changed in 0.1.x. Keep the existing data path so
+  // an in-place upgrade retains sessions, profiles, skins, and credentials.
+  app.setPath('userData', join(app.getPath('appData'), LEGACY_DATA_DIRECTORY))
   app.setAboutPanelOptions({
     applicationName: PRODUCT_NAME,
     applicationVersion: app.getVersion(),
@@ -784,9 +788,9 @@ async function bootstrap(): Promise<void> {
 void bootstrap().catch(async (error: unknown) => {
   const detail = error instanceof Error ? error.stack ?? error.message : String(error)
   appendLog('desktop', detail)
-  if (app.isReady()) await showSplash({ error: true, message: 'Oh-DSH-Desktop 启动失败。', detail })
+  if (app.isReady()) await showSplash({ error: true, message: 'Oh-DSH Desktop 启动失败。', detail })
   else {
     await app.whenReady()
-    await showSplash({ error: true, message: 'Oh-DSH-Desktop 启动失败。', detail })
+    await showSplash({ error: true, message: 'Oh-DSH Desktop 启动失败。', detail })
   }
 })

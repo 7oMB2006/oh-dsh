@@ -1,4 +1,4 @@
-/** Host face for the Oh-DSH-Web browser distribution. */
+/** Host face for the Oh-DSH Web browser distribution. */
 
 import {
   OH_DSH_SURFACE_SERVICE,
@@ -35,7 +35,7 @@ interface HostContext {
 export const name = 'oh-dsh-web'
 
 /**
- * Service name for the Oh-DSH-Web surface. The capability itself is the
+ * Service name for the Oh-DSH Web surface. The capability itself is the
  * shared `ohDshSurface` contract (see plugins/shared/surface.ts). It is
  * deliberately NOT provided under the name `web`: the dsh-base layer already
  * provides the `web` search-provider registry (`@deepseek-ai/dsh-web`), and
@@ -54,11 +54,11 @@ function environmentSurface(): OhDshSurface {
 }
 
 function webPrompt(surface: OhDshSurface): string {
-  return `You are interacting with the user through Oh-DSH-Web ${surface.version} on ${surface.platform}. `
-    + 'Oh-DSH-Web is a browser distribution backed by DeepSeek Harness. '
+  return `You are interacting with the user through Oh-DSH Web ${surface.version} on ${surface.platform}. `
+    + 'Oh-DSH Web is a browser distribution backed by DeepSeek Harness. '
     + 'The web UI is served over HTTP and opened in a regular browser; workspaces, files, skills, subagents, and other agent capabilities are composed through DSH plugins. '
-    + 'When the user says “this page” or “the web UI” without naming another target, they mean the Oh-DSH-Web interface. '
-    + 'Identify this surface as Oh-DSH-Web backed by DeepSeek Harness.'
+    + 'When the user says “this page” or “the web UI” without naming another target, they mean the Oh-DSH Web interface. '
+    + 'Identify this surface as Oh-DSH Web backed by DeepSeek Harness.'
 }
 
 /** Mount the web distribution capability in the DSH graph. */
@@ -80,10 +80,10 @@ export function apply(ctx: HostContext): void {
     runtimeCtx.bashEnv.register({
       name: 'oh-dsh-web-runtime',
       variables: {
-        DSH_OH_WEB: { description: 'Set to 1 inside the Oh-DSH-Web distribution.' },
-        DSH_OH_WEB_DATA: { description: 'Writable data root owned by Oh-DSH-Web.' },
-        DSH_OH_WEB_PROFILE: { description: 'DSH profile mounted by Oh-DSH-Web.' },
-        DSH_OH_WEB_VERSION: { description: 'Installed Oh-DSH-Web version.' },
+        DSH_OH_WEB: { description: 'Set to 1 inside the Oh-DSH Web distribution.' },
+        DSH_OH_WEB_DATA: { description: 'Writable data root owned by Oh-DSH Web.' },
+        DSH_OH_WEB_PROFILE: { description: 'DSH profile mounted by Oh-DSH Web.' },
+        DSH_OH_WEB_VERSION: { description: 'Installed Oh-DSH Web version.' },
       },
       resolve: () => ({
         DSH_OH_WEB: '1',

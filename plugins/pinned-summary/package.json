@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/pinned-summary",
   "version": "0.1.3",
-  "description": "Layout-reserving current-session summary panel for Oh-DSH-Desktop",
+  "description": "Layout-reserving current-session summary panel for Oh-DSH Desktop",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

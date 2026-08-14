@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/skins",
   "version": "0.1.3",
-  "description": "Built-in Oh-DSH-Desktop skin gallery and theme adapter",
+  "description": "Built-in Oh-DSH Desktop skin gallery and theme adapter",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

@@ -49,4 +49,4 @@ const zip = spawnSync('tar', ['-a', '-cf', archive, 'win-unpacked'], {
 if (zip.error !== undefined) throw zip.error
 if (zip.status !== 0) process.exit(zip.status ?? 1)
 if (!existsSync(archive)) throw new Error(`Windows archive was not produced: ${archive}`)
-console.log(`Packaged Oh-DSH-Desktop ${version}: ${archive}`)
+console.log(`Packaged Oh-DSH Desktop ${version}: ${archive}`)

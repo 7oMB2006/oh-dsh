@@ -1,4 +1,4 @@
-# Oh-DSH-Web is a bundle layer over dsh-base + dsh-web-app. The browser
+# Oh-DSH Web is a bundle layer over dsh-base + dsh-web-app. The browser
 # distribution keeps DSH's web UI and mounts each web-capable Oh-DSH behavior
 # as an independently registered Host/Client plugin.
 #

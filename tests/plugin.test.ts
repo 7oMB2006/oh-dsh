@@ -9,7 +9,7 @@ import {
 
 test('desktop client replaces the hero title and keeps the Preview badge', () => {
   const client = readFileSync(new URL('../src/client.ts', import.meta.url), 'utf8')
-  assert.match(client, /element\.textContent = 'Oh-DSH-Desktop'/)
+  assert.match(client, /element\.textContent = 'Oh-DSH Desktop'/)
   assert.match(client, /\['Into the Unknown', '探索未知之境', '探索未至之境'\]/)
   assert.doesNotMatch(client, /data-oh-dsh-hero-preview/)
 })
@@ -145,7 +145,7 @@ test('desktop Host plugin publishes capability, prompt, and bash environment', (
       profile: 'desktop',
       version: '9.8.7',
     })
-    assert.match(prompt, /Oh-DSH-Desktop/)
+    assert.match(prompt, /Oh-DSH Desktop/)
     assert.doesNotMatch(prompt, /ChatGPT|OpenAI/)
     assert.deepEqual(resolvedEnvironment, {
       DSH_DESKTOP: '1',
@@ -205,7 +205,7 @@ test('desktop Agent tools share the guarded marketplace transaction owner', asyn
     await policy({ name: 'desktop_plugin_apply' }, async () => ({ kind: 'allow' })),
     {
       kind: 'ask',
-      reason: 'Apply the tested plugin preview to Oh-DSH-Desktop?',
+      reason: 'Apply the tested plugin preview to Oh-DSH Desktop?',
     },
   )
   assert.deepEqual(

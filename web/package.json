@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/web",
   "version": "0.1.3",
-  "description": "The Oh-DSH-Web browser distribution: a packaged DeepSeek Harness web runtime with Oh-DSH plugin capabilities",
+  "description": "Oh-DSH Web: a packaged DeepSeek Harness browser runtime with Oh-DSH plugin capabilities",
   "private": true,
   "type": "module",
   "exports": {

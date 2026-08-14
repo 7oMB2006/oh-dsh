@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/panel-controls",
   "version": "0.1.3",
-  "description": "Sidebar and resizable bottom-panel controls for Oh-DSH-Desktop",
+  "description": "Sidebar and resizable bottom-panel controls for Oh-DSH Desktop",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

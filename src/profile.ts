@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 /** Profile name reserved for the packaged desktop surface. */
 export const DESKTOP_PROFILE = 'desktop'
 
-/** Profile name reserved for the packaged Oh-DSH-Web browser surface. */
+/** Profile name reserved for the packaged Oh-DSH Web browser surface. */
 export const WEB_PROFILE = 'web'
 
 /** Plugins that enroll a browser-side entry in the desktop client graph. */
@@ -35,7 +35,7 @@ export const DESKTOP_BUNDLES = [
   '@oh-dsh/desktop',
 ] as const
 
-/** Bundle order owned by the Oh-DSH-Web browser distribution. */
+/** Bundle order owned by the Oh-DSH Web browser distribution. */
 export const WEB_BUNDLES = [
   '@deepseek-ai/dsh-base',
   '@deepseek-ai/dsh-web-app',
@@ -56,8 +56,8 @@ export interface DesktopProfilePaths {
   profileDir: string
 }
 
-const ROOT_CONFIG = `# Oh-DSH-Desktop profile root. Composition lives in bundle patch layers.\n[]\n`
-const USER_PATCH = `# User patch layer for Oh-DSH-Desktop. It is applied after the packaged bundles.\n[]\n`
+const ROOT_CONFIG = `# Oh-DSH Desktop profile root. Composition lives in bundle patch layers.\n[]\n`
+const USER_PATCH = `# User patch layer for Oh-DSH Desktop. It is applied after the packaged bundles.\n[]\n`
 const PNPM_WORKSPACE = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
 
 function readManifest(path: string): ProfileManifest {
@@ -93,7 +93,7 @@ export const DESKTOP_PROFILE_SPEC: ProfileSpec = Object.freeze({
   name: DESKTOP_PROFILE,
 })
 
-/** Profile facts for the packaged Oh-DSH-Web browser surface. */
+/** Profile facts for the packaged Oh-DSH Web browser surface. */
 export const WEB_PROFILE_SPEC: ProfileSpec = Object.freeze({
   bundles: WEB_BUNDLES,
   manifestName: 'dsh-profile-web',
@@ -156,7 +156,7 @@ export function ensureDesktopProfile(dshHome: string): DesktopProfilePaths {
 }
 
 /**
- * Initialize or upgrade the writable Oh-DSH-Web profile without replacing
+ * Initialize or upgrade the writable Oh-DSH Web profile without replacing
  * user patches or third-party bundle entries.
  * @param dshHome - application-owned DSH home directory.
  * @returns resolved profile paths.

@@ -291,7 +291,7 @@ try {
     })
   })
 
-  console.log(`Oh-DSH-Desktop profile ready on DSH ${dshVersion}: ${base.href}`)
+  console.log(`Oh-DSH Desktop profile ready on DSH ${dshVersion}: ${base.href}`)
   process.stdout.write(client.stdout)
   console.log('Plugin compatible: @oh-dsh/desktop (bundle profile active)')
   for (const plugin of loaded) {

@@ -61,6 +61,13 @@ test('web profile is a separate surface from the desktop profile', () => {
   assert.equal(WEB_BUNDLES.includes('@oh-dsh/desktop'), false)
 })
 
+test('web client uses the Oh-DSH Web surface name', () => {
+  const client = readFileSync(new URL('../web/src/client.ts', import.meta.url), 'utf8')
+  assert.match(client, /document\.title = 'Oh-DSH Web'/)
+  assert.match(client, /element\.textContent = 'Oh-DSH Web'/)
+  assert.doesNotMatch(client, /Oh-DSH-Web/)
+})
+
 test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const patch = readFileSync(join(root, 'web', 'cordis.patch.yml'), 'utf8')

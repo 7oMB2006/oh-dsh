@@ -1,4 +1,4 @@
-/** Oh-DSH-Web launcher: boot the packaged web profile and expose its URL. */
+/** Oh-DSH Web launcher: boot the packaged web profile and expose its URL. */
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
@@ -170,7 +170,7 @@ function printLine(ring: string[], line: string): void {
 }
 
 /**
- * Boot the Oh-DSH-Web distribution and keep it running until a signal
+ * Boot the Oh-DSH Web distribution and keep it running until a signal
  * arrives. Exits 0 on a clean stop, 1 on runtime failure.
  */
 export async function main(
@@ -196,7 +196,7 @@ export async function main(
     || options.host === '::1'
   if (!loopback && options.trustedHosts.length === 0) {
     throw new UsageError(
-      'exposing Oh-DSH-Web on a non-loopback host requires --trusted-host: '
+      'exposing Oh-DSH Web on a non-loopback host requires --trusted-host: '
       + 'the terminal and workspace APIs are guarded only by the browser trust fence',
     )
   }
@@ -268,7 +268,7 @@ export async function main(
   runtime.on('exit', (exit: RuntimeExit) => {
     if (stopping) return
     process.stderr.write(
-      `Oh-DSH-Web stopped (code=${String(exit.code)}, signal=${String(exit.signal)})\n`
+      `Oh-DSH Web stopped (code=${String(exit.code)}, signal=${String(exit.signal)})\n`
       + `${logTail.slice(-20).join('\n')}\n`,
     )
     process.exit(1)
@@ -276,7 +276,7 @@ export async function main(
 
   try {
     const url = await runtime.start()
-    stdout.write(`Oh-DSH-Web ${version} is running at ${url.href}\n`)
+    stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
     if (options.open) openBrowser(url.href, process.platform)
     await new Promise<void>(() => {})
     return 0
