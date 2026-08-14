@@ -118,6 +118,10 @@
         "to": "lib/oh-dsh/cli.js"
       },
       {
+        "from": "package.json",
+        "to": "lib/oh-dsh/package.json"
+      },
+      {
         "from": "bin",
         "to": "bin",
         "filter": [

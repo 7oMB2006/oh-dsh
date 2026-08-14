@@ -140,12 +140,18 @@ export function resolveWebRoot(env: NodeJS.ProcessEnv = process.env): string {
   return dirname(dirname(fileURLToPath(import.meta.url)))
 }
 
-function versionOf(root: string): string {
-  try {
-    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version?: unknown }
-    if (typeof manifest.version === 'string') return manifest.version
-  } catch {
-    // A missing manifest is a development layout quirk; fall through.
+/** Read release metadata from a standalone package or an Electron resource. */
+export function resolveWebVersion(root: string): string {
+  for (const path of [
+    join(root, 'package.json'),
+    join(root, 'lib', 'oh-dsh', 'package.json'),
+  ]) {
+    try {
+      const manifest = JSON.parse(readFileSync(path, 'utf8')) as { version?: unknown }
+      if (typeof manifest.version === 'string') return manifest.version
+    } catch {
+      // Try the next supported distribution layout.
+    }
   }
   return '0.0.0'
 }
@@ -206,7 +212,7 @@ export async function main(
   // Normalize once and derive every runtime path from the absolute root.
   const dataRoot = resolve(options.dataRoot)
   const root = resolveWebRoot(env)
-  const version = versionOf(root)
+  const version = resolveWebVersion(root)
   // Packaged layout: <root>/node-runtime + <root>/dsh-runtime. Development
   // layout: the staged runtimes live under <root>/.stage/.
   const stagedNode = process.platform === 'win32'

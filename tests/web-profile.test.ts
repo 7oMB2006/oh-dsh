@@ -27,6 +27,7 @@ import {
   DEFAULT_WEB_PORT,
   main,
   parseLaunchArgs,
+  resolveWebVersion,
   UsageError,
 } from '../src/web.ts'
 
@@ -73,6 +74,24 @@ test('packaged web distribution exposes the unified ohdsh command', () => {
   assert.match(build, /join\(packageDir, 'bin', 'ohdsh'\)/)
   assert.match(build, /join\(packageDir, 'lib', 'oh-dsh', 'cli\.js'\)/)
   assert.match(build, /exec "\$ROOT\/bin\/ohdsh" web "\$@"/)
+})
+
+test('full and web-only distributions expose the same release version', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-web-version-'))
+  try {
+    writeFileSync(join(root, 'package.json'), '{"version":"1.2.3"}\n')
+    assert.equal(resolveWebVersion(root), '1.2.3')
+    rmSync(join(root, 'package.json'))
+
+    mkdirSync(join(root, 'lib', 'oh-dsh'), { recursive: true })
+    writeFileSync(
+      join(root, 'lib', 'oh-dsh', 'package.json'),
+      '{"version":"4.5.6"}\n',
+    )
+    assert.equal(resolveWebVersion(root), '4.5.6')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
