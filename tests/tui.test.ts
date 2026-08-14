@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { test } from 'node:test'
@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { TUI_BUNDLES, TUI_PROFILE } from '../src/profile.ts'
 import { adaptTuiRendererPackage } from '../scripts/tui-upstream-adapter.mjs'
 import {
+  DEFAULT_TUI_HOME,
   main,
   parseTuiArgs,
   type TuiSpawner,
@@ -36,6 +37,8 @@ function output(isTTY = false): { stream: NodeJS.WriteStream; text: () => string
 }
 
 test('TUI arguments keep environment defaults behind explicit flags', () => {
+  assert.equal(DEFAULT_TUI_HOME, join(homedir(), '.ohdsh'))
+
   const defaults = parseTuiArgs([], {
     DSH_OH_TUI_CWD: '/env/workspace',
     DSH_OH_TUI_FULLSCREEN: '0',

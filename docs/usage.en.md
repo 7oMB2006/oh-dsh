@@ -122,7 +122,7 @@ Common TUI options:
 | Option | Default | Description |
 | --- | --- | --- |
 | `--cwd` | Current directory | Workspace |
-| `--data` | `~/.dsh` | DSH Profile, session, and configuration root |
+| `--data` | `~/.ohdsh` | Oh-DSH TUI Profile, session, and configuration root |
 | `--resume` | New session | Resume a Session id |
 | `--lang` | Upstream preference | `zh` or `en` |
 | `--preset` | `standard` | Initial Agent preset |
@@ -192,8 +192,9 @@ pnpm run dist:tui       # TUI-only terminal distribution
 
 Desktop retains the existing internal data directory to preserve state across
 the visible-name migration. Web stores data in `~/.oh-dsh-web` by default.
-TUI reuses the standard DSH root at `~/.dsh`. Configure the DeepSeek API key
-in Models settings or in `.env` under the matching DSH data directory.
+TUI uses its own `~/.ohdsh` root and does not load global plugin configuration
+from `~/.dsh`. Configure the DeepSeek API key in Models settings or in `.env`
+under the matching DSH data directory.
 
 Troubleshooting order:
 

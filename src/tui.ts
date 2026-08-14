@@ -14,8 +14,8 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 
-/** Default DSH home, shared with the upstream CLI and session store. */
-export const DEFAULT_TUI_HOME = join(homedir(), '.dsh')
+/** Default Oh-DSH-owned home, isolated from the upstream DSH CLI. */
+export const DEFAULT_TUI_HOME = join(homedir(), '.ohdsh')
 
 /** TUI launch options resolved from command-line flags and environment. */
 export interface TuiLaunchOptions {
@@ -43,7 +43,7 @@ const USAGE = `usage: ohdsh tui [options]
 
 Options:
   --cwd <dir>            workspace directory (default: current directory)
-  --data <dir>           DSH home and session store (default: ~/.dsh)
+  --data <dir>           DSH home and session store (default: ~/.ohdsh)
   --resume <session>     resume an existing session id
   --lang <zh|en>         initial interface language
   --preset <name>        initial agent preset

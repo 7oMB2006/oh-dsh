@@ -114,7 +114,7 @@ TUI 常用选项：
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `--cwd` | 当前目录 | Workspace |
-| `--data` | `~/.dsh` | DSH Profile、会话和配置目录 |
+| `--data` | `~/.ohdsh` | Oh-DSH TUI Profile、会话和配置目录 |
 | `--resume` | 新会话 | 恢复指定 Session id |
 | `--lang` | 上游设置 | `zh` 或 `en` |
 | `--preset` | `standard` | 初始 Agent preset |
@@ -181,8 +181,9 @@ pnpm run dist:tui       # TUI-only 终端版
 ## 数据与排错
 
 Desktop 保留既有内部数据目录，以保证更名升级兼容。Web 默认数据目录是
-`~/.oh-dsh-web`，TUI 默认复用标准 DSH 目录 `~/.dsh`。DeepSeek API key
-可以在 Models 设置中配置，也可以放入对应 DSH 数据目录的 `.env`。
+`~/.oh-dsh-web`，TUI 使用独立的 `~/.ohdsh`，不会加载 `~/.dsh` 中的全局
+插件配置。DeepSeek API key 可以在 Models 设置中配置，也可以放入对应
+DSH 数据目录的 `.env`。
 
 排查顺序：
 
