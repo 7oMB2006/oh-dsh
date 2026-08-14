@@ -10,6 +10,7 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
+  { directory: 'tui', hostOnly: true },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },

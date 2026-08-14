@@ -30,6 +30,7 @@ for (const required of [
   join(stage, 'dsh-runtime', 'lib', 'bin.js'),
   stagedNode,
   join(stage, 'dsh-runtime', 'node_modules', 'dsh-cc-tui', 'lib', 'types', 'index.js'),
+  join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'tui', 'dist', 'index.js'),
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'tui', 'dist', 'cordis.patch.yml'),
 ]) {
   if (!existsSync(required)) {

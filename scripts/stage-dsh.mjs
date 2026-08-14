@@ -27,6 +27,7 @@ import {
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
+import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dshSource = resolveDshSource()
@@ -641,6 +642,7 @@ function installDesktopPackages() {
     {
       manifest: join(root, 'plugins', 'tui', 'package.json'),
       files: [
+        [join(root, 'dist', 'plugins', 'tui', 'index.js'), 'dist/index.js'],
         [join(root, 'dist', 'plugins', 'tui', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
@@ -672,6 +674,7 @@ function installDesktopPackages() {
         copyFileSync(source, output)
       }
     }
+    if (manifest.name === 'dsh-cc-tui') adaptTuiRendererPackage(packageDir)
     installedVersions[manifest.name] = manifest.version
   }
   const cliManifestPath = join(runtime, 'package.json')
@@ -760,6 +763,7 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
+  'plugins/tui/index.js',
   'plugins/tui/cordis.patch.yml',
 ]) {
   if (!existsSync(join(root, 'dist', required))) {

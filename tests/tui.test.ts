@@ -12,7 +12,9 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { TUI_BUNDLES, TUI_PROFILE } from '../src/profile.ts'
+import { adaptTuiRendererPackage } from '../scripts/tui-upstream-adapter.mjs'
 import {
   main,
   parseTuiArgs,
@@ -122,6 +124,8 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
     assert.equal(childEnv?.OH_DSH_TUI_FULLSCREEN, '0')
     assert.equal(childEnv?.OH_DSH_TUI_LANG, 'en')
     assert.equal(childEnv?.DSH_OH_TUI_VERSION, '1.2.3')
+    assert.equal(childEnv?.OH_DSH_TUI_CONFIG_HOME, join(dataRoot, '.dsh-cc'))
+    assert.equal(childEnv?.OH_DSH_TUI_TITLE, 'Oh-DSH TUI')
 
     const manifest = JSON.parse(readFileSync(
       join(dataRoot, 'profiles', TUI_PROFILE, 'package.json'),
@@ -129,6 +133,42 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
     ))
     assert.equal(manifest.name, 'dsh-profile-tui')
     assert.deepEqual(manifest.dsh.profile.bundles, TUI_BUNDLES)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('TUI bundle mounts its surface and skins before the upstream renderer', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const patch = readFileSync(join(root, 'plugins', 'tui', 'cordis.patch.yml'), 'utf8')
+  assert.match(patch, /- id: cc-tui\n  disabled: true/)
+  const surface = patch.indexOf("name: '@oh-dsh/tui'")
+  const skins = patch.indexOf("name: '@oh-dsh/skins'")
+  const renderer = patch.indexOf("name: 'dsh-cc-tui'")
+  assert.ok(surface >= 0 && surface < skins && skins < renderer)
+})
+
+test('TUI upstream adapter unifies product title and scopes theme storage', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-tui-adapter-'))
+  const lib = join(root, 'lib', 'types')
+  mkdirSync(join(lib, 'components'), { recursive: true })
+  mkdirSync(join(lib, 'screens'), { recursive: true })
+  writeFileSync(join(lib, 'components', 'LogoV2.js'),
+    "sweep('✦ dsh-cc', t, wordmarkRGB, wordmarkShimmerRGB, 60); '  v' + VERSION;\n")
+  writeFileSync(join(lib, 'screens', 'Chat.js'),
+    'useTerminalTitle(`${titlePrefix} 🐋 ${channel.sessionTitle}`);\n')
+  writeFileSync(join(lib, 'customTheme.js'),
+    "export const CUSTOM_THEME_DIR = join(homedir(), '.dsh-cc', 'themes');\n")
+  writeFileSync(join(lib, 'themePrefs.js'),
+    "const PREFS_DIR = join(homedir(), '.dsh-cc');\n")
+  try {
+    adaptTuiRendererPackage(root)
+    assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /Oh-DSH TUI/)
+    assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /DSH_OH_TUI_VERSION/)
+    assert.match(readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8'), /Oh-DSH TUI/)
+    assert.match(readFileSync(join(lib, 'customTheme.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
+    assert.match(readFileSync(join(lib, 'themePrefs.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
+    assert.doesNotThrow(() => { adaptTuiRendererPackage(root) })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
