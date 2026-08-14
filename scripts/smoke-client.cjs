@@ -51,8 +51,9 @@ void app.whenReady().then(async () => {
   window.webContents.on('render-process-gone', (_event, details) => {
     settle(new Error(`Chromium renderer exited: ${details.reason}`))
   })
-  window.webContents.on('did-fail-load', (_event, code, description) => {
-    settle(new Error(`Chromium failed to load DSH (${code}): ${description}`))
+  window.webContents.on('did-fail-load', (_event, code, description, validatedUrl, isMainFrame) => {
+    if (isMainFrame === false) return
+    settle(new Error(`Chromium failed to load DSH (${code}): ${description} (${validatedUrl})`))
   })
 
   await window.loadURL(runtimeUrl)
