@@ -1,15 +1,18 @@
 packages:
   - .
   - plugins/*
+  - upstream/dsh-TUI
   - web
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'
+  - dsh-working-activity@0.2.2
 
 allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
+  koffi: false
   node-pty: true
 
 onlyBuiltDependencies:

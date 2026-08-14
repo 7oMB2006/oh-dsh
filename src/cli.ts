@@ -4,7 +4,9 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { main as runWeb, UsageError } from './web.ts'
+import { UsageError } from './errors.ts'
+import { main as runTui } from './tui.ts'
+import { main as runWeb } from './web.ts'
 
 export const CLI_HELP = `Oh-DSH launcher
 
@@ -14,9 +16,9 @@ Usage:
 Surfaces:
   desktop   Start Oh-DSH Desktop
   web       Start Oh-DSH Web
-  tui       Planned; not available yet
+  tui       Start Oh-DSH TUI
 
-Run "ohdsh web --help" for Web options.
+Run "ohdsh <surface> --help" for surface options.
 `
 
 export interface DesktopLaunchSpec {
@@ -26,6 +28,7 @@ export interface DesktopLaunchSpec {
 }
 
 type WebRunner = typeof runWeb
+type TuiRunner = typeof runTui
 type DesktopRunner = (
   args: readonly string[],
   env: NodeJS.ProcessEnv,
@@ -133,6 +136,7 @@ export async function main(
   stderr: NodeJS.WriteStream = process.stderr,
   desktopRunner: DesktopRunner = launchDesktop,
   webRunner: WebRunner = runWeb,
+  tuiRunner: TuiRunner = runTui,
 ): Promise<number> {
   const [surface, ...args] = argv
   if (surface === undefined || surface === '--help' || surface === '-h') {
@@ -141,10 +145,7 @@ export async function main(
   }
   if (surface === 'desktop') return await desktopRunner(args, env)
   if (surface === 'web') return await webRunner(args, env, stdout)
-  if (surface === 'tui') {
-    stderr.write('Oh-DSH TUI is planned but is not available yet.\n')
-    return 2
-  }
+  if (surface === 'tui') return await tuiRunner(args, env, stdout, stderr)
   stderr.write(`Unknown surface: ${surface}\n\n${CLI_HELP}`)
   return 2
 }

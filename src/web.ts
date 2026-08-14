@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
 import {
   DshRuntimeSupervisor,
@@ -30,7 +31,7 @@ export interface LaunchOptions {
   trustedHosts: string[]
 }
 
-export class UsageError extends Error {}
+export { UsageError } from './errors.ts'
 
 const USAGE = `usage: ohdsh web [options]
 

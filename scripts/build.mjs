@@ -149,3 +149,8 @@ copyFileSync(join(root, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
 copyFileSync(join(root, 'package.json'), join(dist, 'release-package.json'))
 mkdirSync(join(dist, 'web'), { recursive: true })
 copyFileSync(join(root, 'web', 'cordis.patch.yml'), join(dist, 'web', 'cordis.patch.yml'))
+mkdirSync(join(dist, 'plugins', 'tui'), { recursive: true })
+copyFileSync(
+  join(root, 'plugins', 'tui', 'cordis.patch.yml'),
+  join(dist, 'plugins', 'tui', 'cordis.patch.yml'),
+)

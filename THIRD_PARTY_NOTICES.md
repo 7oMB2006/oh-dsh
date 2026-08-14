@@ -1,12 +1,12 @@
 # Third-Party Notices
 
-Oh-DSH is distributed under the MIT License. The projects below informed
-independently implemented bundled plugins.
+Oh-DSH is distributed under the MIT License. The projects below are either
+bundled at a pinned revision or informed independently implemented adapters.
 
 Upstream UI, themes, and component styling are not bundled. Oh-DSH adapts
 compatible features to its own persistence, layout, localization, and theme
-contracts. The Better Sidebar Host source is tracked separately as a pinned
-submodule. Upstream releases and features are reviewed regularly.
+contracts. Direct upstream sources are tracked as pinned submodules. Upstream
+releases and features are reviewed regularly.
 
 ## dsh-web-panel
 
@@ -52,3 +52,17 @@ repository.
 
 Oh-DSH follows the ThemeService extension model while providing original
 skins, a desktop Settings interface, and Host-backed persistence.
+
+## dsh-TUI
+
+- Project: <https://github.com/ccch1mneyyy/dsh-TUI>
+- Upstream package: `dsh-cc-tui@0.4.1`
+- Pinned revision: `6a8956678fc3746ed14b62bfee066ee8fc68f3cb`
+- Declared license: MIT
+- Oh-DSH component: `@oh-dsh/tui`
+
+Oh-DSH bundles the pinned upstream renderer, session interaction, commands,
+and terminal compatibility layer. The small downstream component owns only
+the unified launcher, Profile defaults, data boundary, and release packaging.
+We thank the upstream maintainer and keep the original license with the
+packaged source artifacts.

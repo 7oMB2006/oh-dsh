@@ -492,18 +492,40 @@ function resolveDependencyManifest(requireFromPackage, dependency) {
 
 function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
   const installRoot = join(packageDir, 'node_modules')
-  const installed = new Set()
+  const storeRoot = join(installRoot, '.oh-dsh-store')
+  const installed = new Map()
+
+  const instanceName = (manifestPath, manifest) => {
+    const parts = resolve(manifestPath).split(sep)
+    const storeIndex = parts.lastIndexOf('.pnpm')
+    const identity = storeIndex >= 0 && parts[storeIndex + 1] !== undefined
+      ? parts[storeIndex + 1]
+      : `${manifest.name}@${manifest.version}`
+    return identity.replace(/[^A-Za-z0-9._-]/g, '_')
+  }
+
+  const linkDependency = (parent, dependency, target) => {
+    const link = join(parent, 'node_modules', ...dependency.split('/'))
+    mkdirSync(dirname(link), { recursive: true })
+    portableSymlink(relative(dirname(link), target), link)
+  }
 
   const installManifest = manifestPath => {
-    const source = dirname(manifestPath)
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const canonicalManifest = realpathSync(manifestPath)
+    const existing = installed.get(canonicalManifest)
+    if (existing !== undefined) return existing
+    const source = dirname(canonicalManifest)
+    const manifest = JSON.parse(readFileSync(canonicalManifest, 'utf8'))
     if (typeof manifest.name !== 'string' || typeof manifest.version !== 'string') {
-      throw new Error(`invalid runtime dependency manifest: ${manifestPath}`)
+      throw new Error(`invalid runtime dependency manifest: ${canonicalManifest}`)
     }
-    const key = `${manifest.name}@${manifest.version}`
-    if (installed.has(key)) return
-    installed.add(key)
-    const target = join(installRoot, ...manifest.name.split('/'))
+    const target = join(
+      storeRoot,
+      instanceName(canonicalManifest, manifest),
+      'node_modules',
+      ...manifest.name.split('/'),
+    )
+    installed.set(canonicalManifest, target)
     rmSync(target, { recursive: true, force: true })
     mkdirSync(dirname(target), { recursive: true })
     cpSync(source, target, {
@@ -516,21 +538,35 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
       },
     })
 
-    const requireFromPackage = createRequire(manifestPath)
+    const requireFromPackage = createRequire(canonicalManifest)
     for (const [dependency, optional] of dependencyNames(manifest)) {
       try {
-        installManifest(resolveDependencyManifest(requireFromPackage, dependency))
+        const dependencyTarget = installManifest(
+          resolveDependencyManifest(requireFromPackage, dependency),
+        )
+        linkDependency(target, dependency, dependencyTarget)
       } catch (error) {
         if (optional) continue
         throw new Error(`${manifest.name} is missing runtime dependency ${dependency}`, { cause: error })
       }
     }
+    return target
   }
 
   const sourceManifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
   const requireFromSource = createRequire(sourceManifestPath)
-  for (const dependency of Object.keys(sourceManifest.dependencies ?? {})) {
-    installManifest(resolveDependencyManifest(requireFromSource, dependency))
+  for (const [dependency, optional] of dependencyNames(sourceManifest)) {
+    try {
+      const dependencyTarget = installManifest(
+        resolveDependencyManifest(requireFromSource, dependency),
+      )
+      const link = join(installRoot, ...dependency.split('/'))
+      mkdirSync(dirname(link), { recursive: true })
+      portableSymlink(relative(dirname(link), dependencyTarget), link)
+    } catch (error) {
+      if (optional) continue
+      throw new Error(`${sourceManifest.name} is missing runtime dependency ${dependency}`, { cause: error })
+    }
   }
 }
 
@@ -592,6 +628,22 @@ function installDesktopPackages() {
         [join(root, 'dist', 'web', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
+    {
+      manifest: join(root, 'upstream', 'dsh-TUI', 'package.json'),
+      files: [
+        [join(root, 'upstream', 'dsh-TUI', 'lib'), 'lib'],
+        [join(root, 'upstream', 'dsh-TUI', 'skills'), 'skills'],
+        [join(root, 'upstream', 'dsh-TUI', 'cordis.patch.yml'), 'cordis.patch.yml'],
+        [join(root, 'upstream', 'dsh-TUI', 'cordis.yml'), 'cordis.yml'],
+        [join(root, 'upstream', 'dsh-TUI', 'LICENSE'), 'LICENSE'],
+      ],
+    },
+    {
+      manifest: join(root, 'plugins', 'tui', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'tui', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
+      ],
+    },
   ]
   const installedVersions = {}
   for (const spec of packages) {
@@ -610,7 +662,15 @@ function installDesktopPackages() {
     for (const [source, target] of spec.files) {
       const output = join(packageDir, target)
       mkdirSync(dirname(output), { recursive: true })
-      copyFileSync(source, output)
+      if (lstatSync(source).isDirectory()) {
+        cpSync(source, output, {
+          dereference: true,
+          preserveTimestamps: true,
+          recursive: true,
+        })
+      } else {
+        copyFileSync(source, output)
+      }
     }
     installedVersions[manifest.name] = manifest.version
   }
@@ -700,6 +760,7 @@ for (const required of [
   'plugins/pinned-summary/client.js',
   'plugins/plugin-marketplace/index.js',
   'plugins/plugin-marketplace/client.js',
+  'plugins/tui/cordis.patch.yml',
 ]) {
   if (!existsSync(join(root, 'dist', required))) {
     throw new Error(`desktop artifact missing: dist/${required}; run pnpm run build first`)
