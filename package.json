@@ -118,7 +118,7 @@
         "to": "lib/oh-dsh/cli.js"
       },
       {
-        "from": "package.json",
+        "from": "dist/release-package.json",
         "to": "lib/oh-dsh/package.json"
       },
       {

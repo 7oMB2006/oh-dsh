@@ -94,6 +94,15 @@ test('full and web-only distributions expose the same release version', () => {
   }
 })
 
+test('full distribution keeps app and release manifests distinct', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  const releaseManifest = manifest.build.extraResources.find(
+    (resource: { to?: string }) => resource.to === 'lib/oh-dsh/package.json',
+  )
+  assert.equal(releaseManifest.from, 'dist/release-package.json')
+})
+
 test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const patch = readFileSync(join(root, 'web', 'cordis.patch.yml'), 'utf8')

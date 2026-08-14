@@ -146,5 +146,6 @@ await Promise.all(builds)
 
 copyFileSync(join(root, 'src', 'splash.html'), join(dist, 'splash.html'))
 copyFileSync(join(root, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
+copyFileSync(join(root, 'package.json'), join(dist, 'release-package.json'))
 mkdirSync(join(dist, 'web'), { recursive: true })
 copyFileSync(join(root, 'web', 'cordis.patch.yml'), join(dist, 'web', 'cordis.patch.yml'))
