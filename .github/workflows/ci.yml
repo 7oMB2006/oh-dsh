@@ -105,8 +105,9 @@ jobs:
 
       - name: Configure Electron sandbox
         run: |
-          sudo chown root:root node_modules/.pnpm/electron@*/node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/.pnpm/electron@*/node_modules/electron/dist/chrome-sandbox
+          SANDBOX=$(find node_modules/.pnpm -path '*/electron/dist/chrome-sandbox' | head -1)
+          sudo chown root:root "$SANDBOX"
+          sudo chmod 4755 "$SANDBOX"
 
       - name: Smoke the desktop profile
         run: xvfb-run -a pnpm run smoke:runtime
