@@ -1,0 +1,29 @@
+{
+  "name": "@oh-dsh/tui",
+  "version": "0.1.4",
+  "description": "Oh-DSH defaults and profile adapter for the upstream dsh-TUI renderer",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./cordis.patch.yml": "./dist/cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js",
+    "dist/cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./dist/cordis.patch.yml"
+    }
+  },
+  "ohDsh": {
+    "upstream": {
+      "name": "dsh-TUI",
+      "package": "dsh-cc-tui",
+      "repository": "https://github.com/ccch1mneyyy/dsh-TUI"
+    }
+  }
+}

@@ -19,7 +19,7 @@ function output(): { stream: NodeJS.WriteStream; text: () => string } {
   }
 }
 
-test('ohdsh dispatches desktop and web through one surface command', async () => {
+test('ohdsh dispatches desktop, web, and TUI through one surface command', async () => {
   const stdout = output()
   const stderr = output()
   const calls: Array<{ args: readonly string[]; surface: string }> = []
@@ -49,22 +49,23 @@ test('ohdsh dispatches desktop and web through one surface command', async () =>
       return 0
     },
   ), 0)
-  assert.deepEqual(calls, [
-    { args: ['--inspect'], surface: 'desktop' },
-    { args: ['--port', '0'], surface: 'web' },
-  ])
-})
-
-test('ohdsh reports the planned TUI without pretending to start it', async () => {
-  const stdout = output()
-  const stderr = output()
   assert.equal(await main(
-    ['tui'],
+    ['tui', '--inline'],
     {},
     stdout.stream,
     stderr.stream,
-  ), 2)
-  assert.match(stderr.text(), /planned but is not available yet/)
+    async () => 0,
+    async () => 0,
+    async args => {
+      calls.push({ args, surface: 'tui' })
+      return 0
+    },
+  ), 0)
+  assert.deepEqual(calls, [
+    { args: ['--inspect'], surface: 'desktop' },
+    { args: ['--port', '0'], surface: 'web' },
+    { args: ['--inline'], surface: 'tui' },
+  ])
 })
 
 test('desktop launch keeps source and installed macOS paths distinct', () => {

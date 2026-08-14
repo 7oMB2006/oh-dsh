@@ -2,3 +2,7 @@
 	path = upstream/DSH-better-sidebar
 	url = https://github.com/omdsh-dev/DSH-better-sidebar.git
 	branch = main
+[submodule "upstream/dsh-TUI"]
+	path = upstream/dsh-TUI
+	url = https://github.com/ccch1mneyyy/dsh-TUI.git
+	branch = main

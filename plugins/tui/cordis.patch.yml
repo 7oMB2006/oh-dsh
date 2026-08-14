@@ -1,0 +1,28 @@
+# Oh-DSH's downstream layer for the pinned dsh-TUI bundle. The upstream
+# renderer keeps its implementation, while these rows establish the shared
+# surface contract, install @oh-dsh/skins, and then mount the renderer.
+
+- id: cc-tui
+  disabled: true
+
+- insert:
+  - id: oh-tui
+    name: '@oh-dsh/tui'
+
+  - id: oh-skins
+    name: '@oh-dsh/skins'
+
+  - id: oh-tui-renderer
+    name: 'dsh-cc-tui'
+    config:
+      sessionId: !!js process.env.OH_DSH_TUI_SESSION_ID ?? undefined
+      provider: !!js process.env.OH_DSH_TUI_PROVIDER ?? 'deepseek-official'
+      model: !!js process.env.OH_DSH_TUI_MODEL ?? undefined
+      cwd: !!js process.env.OH_DSH_TUI_CWD ?? process.cwd()
+      effort: !!js process.env.OH_DSH_TUI_EFFORT ?? 'max'
+      activity: !!js "process.env.OH_DSH_TUI_ACTIVITY !== '0'"
+      activityFrames: !!js process.env.OH_DSH_TUI_ACTIVITY_FRAMES ?? undefined
+      contextBar: !!js "process.env.OH_DSH_TUI_CONTEXT_BAR !== '0'"
+      fullscreen: !!js "process.env.OH_DSH_TUI_FULLSCREEN !== '0'"
+      lang: !!js process.env.OH_DSH_TUI_LANG ?? undefined
+      preset: !!js process.env.OH_DSH_TUI_PRESET ?? undefined

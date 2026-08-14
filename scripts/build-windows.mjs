@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveProductVersion } from '../src/version.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const version = resolveProductVersion(root)
 const requestedArch = process.argv[2]
 const arch = requestedArch ?? { arm64: 'arm64', x64: 'x64' }[process.arch] ?? process.arch
 if (arch !== 'x64') {
@@ -26,7 +28,14 @@ if (!existsSync(electronBinary)) {
 const builder = join(root, 'node_modules', 'electron-builder', 'out', 'cli', 'cli.js')
 // Packaging runs on tag commits; never let electron-builder infer a publish
 // step from the tag. Releases are attached by the workflow instead.
-const result = spawnSync(process.execPath, [builder, '--win', `--${arch}`, '--publish', 'never'], {
+const result = spawnSync(process.execPath, [
+  builder,
+  '--win',
+  `--${arch}`,
+  '--publish',
+  'never',
+  `--config.extraMetadata.version=${version}`,
+], {
   cwd: root,
   env: {
     ...process.env,
@@ -40,7 +49,6 @@ if (result.status !== 0) process.exit(result.status ?? 1)
 // electron-builder's NSIS/zip targets crash on the size of the bundled DSH
 // runtime; the unpacked app is already complete, so zip it with the system
 // bsdtar, which streams instead of materializing one giant argument string.
-const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
 const archive = join(root, 'release', `Oh-DSH-Desktop-${version}-x64.zip`)
 const zip = spawnSync('tar', ['-a', '-cf', archive, 'win-unpacked'], {
   cwd: join(root, 'release'),

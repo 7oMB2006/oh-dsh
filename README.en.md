@@ -21,9 +21,20 @@
 </p>
 
 Oh-DSH packages DeepSeek Harness, Node.js, and local capabilities as
-installable Desktop and Web distributions. Models still run in the cloud;
-Oh-DSH owns workspaces, terminals, Git review, browser and window integration,
-and the plugin lifecycle.
+installable Desktop, Web, and TUI distributions. Models still run in the
+cloud; Oh-DSH owns workspaces, terminals, Git review, browser and window
+integration, and the plugin lifecycle.
+
+## 🎉 Official showcase
+
+Oh-DSH has been included in the official DeepSeek Harness community showcase.
+Its terminal surface builds on the similarly recognized
+[dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) upstream plugin with full
+attribution preserved.
+
+<p align="center">
+  <img src="./assets/oh-dsh-official-showcase.png" alt="Official DeepSeek Harness community showcase" width="100%">
+</p>
 
 ## Download and install
 
@@ -32,9 +43,9 @@ Choose a distribution from the
 
 | Distribution | Includes | Best for |
 | --- | --- | --- |
-| Full | **Oh-DSH Desktop**, Web, Node runtime, and bundled plugins | Local development workbench |
+| Full | **Oh-DSH Desktop**, Web, TUI, Node runtime, and bundled plugins | Local development workbench |
 | Web-only | **Oh-DSH Web**, Node runtime, and bundled Web plugins; no Electron | Small installs, browser, or remote access |
-| TUI-only | Planned | Terminal-only environments |
+| TUI-only | **Oh-DSH TUI**, Node runtime, and terminal plugins; no Electron | Terminal-only environments |
 
 The full distribution is available as DMG/ZIP, AppImage/deb, and a Windows
 package. On macOS, open the DMG and drag **Oh-DSH Desktop** into Applications.
@@ -54,6 +65,14 @@ The default URL is <http://127.0.0.1:3080>. On Windows, run:
 bin\ohdsh.cmd web
 ```
 
+The TUI-only package is also ready after extraction:
+
+```sh
+tar -xzf oh-dsh-tui-*.tar.gz
+cd oh-dsh-tui-*/
+./bin/ohdsh tui
+```
+
 ### Install the unified command
 
 The macOS full distribution contains a CLI that can be added to `PATH`:
@@ -64,18 +83,17 @@ sudo ln -sf \
   /usr/local/bin/ohdsh
 ```
 
-Use `./bin/ohdsh` from a Web-only package, or add it to `PATH`.
+Use `./bin/ohdsh` from a Web-only or TUI-only package, or add it to `PATH`.
 
 ## Start a surface
 
 ```sh
 ohdsh desktop   # Start Oh-DSH Desktop
 ohdsh web       # Start Oh-DSH Web
-ohdsh tui       # Planned; currently reports that TUI is unavailable
+ohdsh tui       # Start Oh-DSH TUI
 ```
 
-Run `ohdsh web --help` for host, port, data directory, and trusted-host
-options.
+Run `ohdsh web --help` or `ohdsh tui --help` for surface-specific options.
 
 ## Run from source
 
@@ -91,11 +109,12 @@ export PATH="$PWD/bin:$PATH"
 
 ohdsh desktop
 ohdsh web
+ohdsh tui
 ```
 
 Build the full distribution with the platform-specific `dist:mac`,
-`dist:linux`, or `dist:win` script. Build only the Web surface with
-`pnpm run dist:web`.
+`dist:linux`, or `dist:win` script. Build only Web with `pnpm run dist:web`,
+or only TUI with `pnpm run dist:tui`.
 
 <details>
 <summary><strong>More interfaces</strong></summary>
@@ -104,9 +123,9 @@ Build the full distribution with the platform-specific `dist:mac`,
 
 ![Oh-DSH plugin marketplace](./assets/oh-dsh-plugin-marketplace.png)
 
-### Desktop skins
+### Oh-DSH skins
 
-![Oh-DSH desktop skins](./assets/oh-dsh-desktop-skins.png)
+![Oh-DSH cross-surface skins](./assets/oh-dsh-desktop-skins.png)
 
 </details>
 
@@ -115,10 +134,18 @@ Build the full distribution with the platform-specific `dist:mac`,
 - [Design and plugin boundaries](./docs/design.en.md)
 - [Installation, operations, and troubleshooting](./docs/usage.en.md)
 
-Some bundled plugins are Oh-DSH downstream adaptations of upstream projects.
-Features are synchronized periodically while this project owns the UI,
-themes, runtime boundaries, and packaging. The design guide records every
-source and adaptation boundary.
+## Upstream dependencies
+
+| Upstream repository | Role in Oh-DSH |
+| --- | --- |
+| [DeepSeek Harness](https://github.com/deepseek-harness/deepseek-harness) | DSH runtime, sessions, and plugin loader |
+| [dsh-TUI](https://github.com/ccch1mneyyy/dsh-TUI) | **Direct upstream plugin for Oh-DSH TUI**, providing terminal rendering, interaction, and commands |
+| [DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar) | Git review, files, and PTY host capabilities |
+
+`dsh-TUI` is pinned as a Git submodule at `upstream/dsh-TUI`. Oh-DSH keeps
+the upstream implementation and attribution, while owning the `ohdsh tui`
+launcher, isolated `~/.ohdsh` data, unified title, cross-surface skins, and
+distribution packaging. See the design guide for the exact boundary.
 
 ## License
 

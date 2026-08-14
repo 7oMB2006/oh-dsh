@@ -33,11 +33,13 @@ import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
+import { resolveProductVersion } from './version.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
 const LEGACY_DATA_DIRECTORY = 'Oh-DSH-Desktop'
 const DEFAULT_UI_ZOOM_FACTOR = 1.12
 const currentDir = dirname(fileURLToPath(import.meta.url))
+const PRODUCT_VERSION = resolveProductVersion(join(currentDir, '..'))
 const splashPath = join(currentDir, 'splash.html')
 const preloadPath = join(currentDir, 'preload.cjs')
 
@@ -81,7 +83,7 @@ function desktopInfo(preview: DesktopInfo['preview'] = null): DesktopInfo {
     platform: process.platform,
     preview,
     profile: DESKTOP_PROFILE,
-    version: app.getVersion(),
+    version: PRODUCT_VERSION,
   }
 }
 
@@ -685,8 +687,8 @@ async function bootstrap(): Promise<void> {
   app.setPath('userData', join(app.getPath('appData'), LEGACY_DATA_DIRECTORY))
   app.setAboutPanelOptions({
     applicationName: PRODUCT_NAME,
-    applicationVersion: app.getVersion(),
-    version: `DeepSeek Harness plugin distribution ${app.getVersion()}`,
+    applicationVersion: PRODUCT_VERSION,
+    version: `DeepSeek Harness plugin distribution ${PRODUCT_VERSION}`,
   })
   const gotLock = app.requestSingleInstanceLock()
   if (!gotLock) {

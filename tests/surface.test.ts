@@ -34,7 +34,10 @@ test('every bundled plugin adapts explicitly per surface', () => {
   const skins = readFileSync(join(root, 'plugins/skins/src/index.ts'), 'utf8')
   assert.match(skins, /OH_DSH_SURFACE_SERVICE/)
   assert.match(skins, /hasBrowserSurface/)
-  assert.match(skins, /no browser surface; skin preferences disabled/)
+  assert.match(skins, /surface\?\.kind === 'tui'/)
+  assert.match(skins, /mountTuiSkins/)
+  assert.match(skins, /ctx\.inject\(\[OH_DSH_SURFACE_SERVICE\], mountSurface\)/)
+  assert.match(skins, /ctx\.inject\(\['webServer'\]/)
 
   const sidebar = readFileSync(join(root, 'plugins/sidebar/src/index.ts'), 'utf8')
   assert.match(sidebar, /export const inject = \['webServer'\]/)
@@ -61,4 +64,9 @@ test('every bundled plugin adapts explicitly per surface', () => {
   const webClient = readFileSync(join(root, 'web/src/client.ts'), 'utf8')
   assert.match(webClient, /kind: 'web'/)
   assert.match(webClient, /OH_DSH_SURFACE_VIEW_SERVICE/)
+
+  const tuiHost = readFileSync(join(root, 'plugins/tui/src/index.ts'), 'utf8')
+  assert.match(tuiHost, /kind: 'tui'/)
+  assert.match(tuiHost, /OH_DSH_SURFACE_SERVICE/)
+  assert.match(tuiHost, /Oh-DSH TUI/)
 })

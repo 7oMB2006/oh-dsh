@@ -2,8 +2,10 @@ import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveProductVersion } from '../src/version.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const version = resolveProductVersion(root)
 const requestedArch = process.argv[2]
 const arch = requestedArch ?? { arm64: 'arm64', x64: 'x64' }[process.arch] ?? process.arch
 if (arch !== 'arm64' && arch !== 'x64') {
@@ -33,7 +35,13 @@ if (!existsSync(icon)) {
 const builder = join(root, 'node_modules', '.bin', 'electron-builder')
 // Packaging runs on tag commits; never let electron-builder infer a publish
 // step from the tag. Releases are attached by the workflow instead.
-const result = spawnSync(builder, ['--mac', `--${arch}`, '--publish', 'never'], {
+const result = spawnSync(builder, [
+  '--mac',
+  `--${arch}`,
+  '--publish',
+  'never',
+  `--config.extraMetadata.version=${version}`,
+], {
   cwd: root,
   env: {
     ...process.env,

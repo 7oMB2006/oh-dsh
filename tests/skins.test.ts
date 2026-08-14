@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -18,6 +18,7 @@ import {
 import type { SkinDomPort } from '../plugins/skins/src/client/skin-dom.ts'
 import {
   DESKTOP_SKINS,
+  OH_DSH_SKINS,
   type DesktopSkin,
 } from '../plugins/skins/src/client/skins.ts'
 import {
@@ -28,6 +29,10 @@ import {
   loadSkinPreferences,
   saveSkinPreferences,
 } from '../plugins/skins/src/preferences-server.ts'
+import {
+  mountTuiSkins,
+  tuiSkinPaths,
+} from '../plugins/skins/src/tui-adapter.ts'
 
 class MemoryStorage implements StorageLike {
   readonly values = new Map<string, string>()
@@ -117,6 +122,63 @@ test('desktop skins are namespaced and keep every app surface on one opaque base
     assert.match(skin.tokens['--dsw-alias-bg-base'] ?? '', /^#[0-9a-f]{6}$/i)
     assert.equal(skin.tokens['--dsw-alias-bg-base'], skin.tokens['--dsw-specific-sidebar-fill'])
     assert.equal(skin.css, undefined)
+  }
+})
+
+test('one skin catalog supplies browser tokens and TUI semantic palettes', () => {
+  assert.equal(DESKTOP_SKINS, OH_DSH_SKINS)
+  for (const skin of OH_DSH_SKINS) {
+    assert.ok(Object.keys(skin.tui).length >= 30)
+    assert.equal(skin.tui.claude, skin.tokens['--dsw-alias-brand-primary'])
+    assert.equal(skin.tui.text, skin.tokens['--dsw-alias-label-primary'])
+    for (const color of Object.values(skin.tui)) {
+      assert.match(color, /^#[0-9a-f]{6}$/i)
+    }
+  }
+})
+
+test('TUI adapter materializes skins and reconciles the native theme picker', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'oh-dsh-tui-skins-'))
+  const dataRoot = join(directory, 'data')
+  const configRoot = join(directory, 'config')
+  const paths = tuiSkinPaths(dataRoot, configRoot)
+  try {
+    await mkdir(dataRoot, { recursive: true })
+    await writeFile(paths.preferences, JSON.stringify({
+      activeId: 'oh-dsh-skin-jade-circuit',
+      fallbackTheme: 'system',
+    }))
+
+    const seeded = mountTuiSkins(dataRoot, configRoot)
+    assert.equal(seeded.theme, 'oh-dsh-skin-jade-circuit')
+    assert.deepEqual(JSON.parse(await readFile(paths.themePreference, 'utf8')), {
+      theme: 'oh-dsh-skin-jade-circuit',
+    })
+    for (const skin of OH_DSH_SKINS) {
+      const theme = JSON.parse(await readFile(
+        join(paths.themes, `${skin.id}.json`),
+        'utf8',
+      ))
+      assert.equal(theme.name, skin.id)
+      assert.equal(theme.base, skin.colorScheme)
+      assert.deepEqual(theme.colors, skin.tui)
+    }
+
+    await writeFile(paths.themePreference, JSON.stringify({ theme: 'oh-dsh-skin-porcelain' }))
+    mountTuiSkins(dataRoot, configRoot)
+    assert.equal(
+      JSON.parse(await readFile(paths.preferences, 'utf8')).activeId,
+      'oh-dsh-skin-porcelain',
+    )
+
+    await writeFile(paths.themePreference, JSON.stringify({ theme: 'light' }))
+    mountTuiSkins(dataRoot, configRoot)
+    assert.deepEqual(JSON.parse(await readFile(paths.preferences, 'utf8')), {
+      activeId: null,
+      fallbackTheme: 'light',
+    })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
   }
 })
 

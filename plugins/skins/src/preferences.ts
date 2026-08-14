@@ -1,42 +1,50 @@
-export const DESKTOP_SKIN_IDS = [
+export const SKIN_IDS = [
   'oh-dsh-skin-deep-current',
   'oh-dsh-skin-jade-circuit',
   'oh-dsh-skin-porcelain',
   'oh-dsh-skin-ember-dusk',
 ] as const
 
-export type DesktopSkinId = typeof DESKTOP_SKIN_IDS[number]
-export type DesktopFallbackTheme = 'light' | 'dark' | 'system'
+export type SkinId = typeof SKIN_IDS[number]
+export type FallbackTheme = 'light' | 'dark' | 'system'
 
-export interface DesktopSkinPreferences {
-  activeId: DesktopSkinId | null
-  fallbackTheme: DesktopFallbackTheme
+export interface SkinPreferences {
+  activeId: SkinId | null
+  fallbackTheme: FallbackTheme
 }
+
+/** Browser compatibility aliases retained for the existing public API. */
+export const DESKTOP_SKIN_IDS = SKIN_IDS
+export type DesktopSkinId = SkinId
+export type DesktopFallbackTheme = FallbackTheme
+export type DesktopSkinPreferences = SkinPreferences
 
 export const ACTIVE_SKIN_KEY = 'oh-dsh.skins.active'
 export const FALLBACK_THEME_KEY = 'oh-dsh.skins.fallback'
 export const PREFERENCES_API_PATH = '/oh-dsh/skins/preferences'
-export const DEFAULT_SKIN_PREFERENCES: DesktopSkinPreferences = Object.freeze({
+export const DEFAULT_SKIN_PREFERENCES: SkinPreferences = Object.freeze({
   activeId: null,
   fallbackTheme: 'system',
 })
 
-export function isDesktopSkinId(value: unknown): value is DesktopSkinId {
+export function isSkinId(value: unknown): value is SkinId {
   return typeof value === 'string'
-    && (DESKTOP_SKIN_IDS as readonly string[]).includes(value)
+    && (SKIN_IDS as readonly string[]).includes(value)
 }
 
-export function isFallbackTheme(value: unknown): value is DesktopFallbackTheme {
+export const isDesktopSkinId = isSkinId
+
+export function isFallbackTheme(value: unknown): value is FallbackTheme {
   return value === 'light' || value === 'dark' || value === 'system'
 }
 
-export function parseSkinPreferences(value: unknown): DesktopSkinPreferences | undefined {
+export function parseSkinPreferences(value: unknown): SkinPreferences | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const input = value as Record<string, unknown>
-  if (input.activeId !== null && !isDesktopSkinId(input.activeId)) return undefined
+  if (input.activeId !== null && !isSkinId(input.activeId)) return undefined
   if (!isFallbackTheme(input.fallbackTheme)) return undefined
   return Object.freeze({
     activeId: input.activeId,
     fallbackTheme: input.fallbackTheme,
-  }) as DesktopSkinPreferences
+  }) as SkinPreferences
 }

@@ -1,15 +1,21 @@
-import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { resolveProductVersion } from '../src/version.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(root, 'dist')
+const productVersion = resolveProductVersion(root)
+const versionDefine = {
+  __OH_DSH_BUILD_VERSION__: JSON.stringify(productVersion),
+}
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
+  { directory: 'tui', hostOnly: true },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
@@ -19,6 +25,7 @@ const pluginPackages = [
 
 const shared = {
   bundle: true,
+  define: versionDefine,
   logLevel: 'info',
   sourcemap: true,
   target: 'node24',
@@ -71,6 +78,7 @@ const builds = [
   }),
   build({
     bundle: true,
+    define: versionDefine,
     entryPoints: [join(root, 'web', 'src', 'client.ts')],
     outfile: join(dist, 'web', 'client.js'),
     platform: 'browser',
@@ -85,6 +93,7 @@ const builds = [
   }),
   build({
     bundle: true,
+    define: versionDefine,
     entryPoints: [join(root, 'src', 'client.ts')],
     outfile: join(dist, 'client.js'),
     platform: 'browser',
@@ -118,6 +127,7 @@ for (const plugin of pluginPackages) {
   if (plugin.hostOnly !== true) {
     builds.push(build({
       bundle: true,
+      define: versionDefine,
       entryPoints: [join(source, 'client.ts')],
       outfile: join(output, 'client.js'),
       platform: 'browser',
@@ -146,6 +156,16 @@ await Promise.all(builds)
 
 copyFileSync(join(root, 'src', 'splash.html'), join(dist, 'splash.html'))
 copyFileSync(join(root, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
-copyFileSync(join(root, 'package.json'), join(dist, 'release-package.json'))
+const releaseManifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+releaseManifest.version = productVersion
+writeFileSync(
+  join(dist, 'release-package.json'),
+  `${JSON.stringify(releaseManifest, undefined, 2)}\n`,
+)
 mkdirSync(join(dist, 'web'), { recursive: true })
 copyFileSync(join(root, 'web', 'cordis.patch.yml'), join(dist, 'web', 'cordis.patch.yml'))
+mkdirSync(join(dist, 'plugins', 'tui'), { recursive: true })
+copyFileSync(
+  join(root, 'plugins', 'tui', 'cordis.patch.yml'),
+  join(dist, 'plugins', 'tui', 'cordis.patch.yml'),
+)

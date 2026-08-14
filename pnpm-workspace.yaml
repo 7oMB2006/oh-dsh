@@ -1,15 +1,24 @@
 packages:
   - .
   - plugins/*
+  - upstream/dsh-TUI
   - web
 
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'
+  - dsh-working-activity@0.2.2
+
+# dsh-working-activity is renderer-only and works on the React 19 runtime used
+# by the pinned TUI. Its published peer range has not caught up yet.
+peerDependencyRules:
+  allowedVersions:
+    dsh-working-activity>react: ^19.0.0
 
 allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
+  koffi: false
   node-pty: true
 
 onlyBuiltDependencies:

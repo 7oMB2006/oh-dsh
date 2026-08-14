@@ -1,10 +1,11 @@
 /** Oh-DSH Web launcher: boot the packaged web profile and expose its URL. */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
 import {
   DshRuntimeSupervisor,
@@ -12,6 +13,7 @@ import {
   type RuntimeExit,
 } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
+import { resolveProductVersion } from './version.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
 export const DEFAULT_WEB_PORT = 3080
@@ -30,7 +32,7 @@ export interface LaunchOptions {
   trustedHosts: string[]
 }
 
-export class UsageError extends Error {}
+export { UsageError } from './errors.ts'
 
 const USAGE = `usage: ohdsh web [options]
 
@@ -142,18 +144,7 @@ export function resolveWebRoot(env: NodeJS.ProcessEnv = process.env): string {
 
 /** Read release metadata from a standalone package or an Electron resource. */
 export function resolveWebVersion(root: string): string {
-  for (const path of [
-    join(root, 'package.json'),
-    join(root, 'lib', 'oh-dsh', 'package.json'),
-  ]) {
-    try {
-      const manifest = JSON.parse(readFileSync(path, 'utf8')) as { version?: unknown }
-      if (typeof manifest.version === 'string') return manifest.version
-    } catch {
-      // Try the next supported distribution layout.
-    }
-  }
-  return '0.0.0'
+  return resolveProductVersion(root)
 }
 
 function openBrowser(url: string, platform: NodeJS.Platform): void {

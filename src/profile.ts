@@ -7,6 +7,9 @@ export const DESKTOP_PROFILE = 'desktop'
 /** Profile name reserved for the packaged Oh-DSH Web browser surface. */
 export const WEB_PROFILE = 'web'
 
+/** Profile name reserved for the packaged Oh-DSH terminal surface. */
+export const TUI_PROFILE = 'tui'
+
 /** Plugins that enroll a browser-side entry in the desktop client graph. */
 export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/desktop',
@@ -42,6 +45,13 @@ export const WEB_BUNDLES = [
   '@oh-dsh/web',
 ] as const
 
+/** Bundle order owned by the Oh-DSH terminal distribution. */
+export const TUI_BUNDLES = [
+  '@deepseek-ai/dsh-base',
+  'dsh-cc-tui',
+  '@oh-dsh/tui',
+] as const
+
 interface ProfileManifest {
   name?: string
   private?: boolean
@@ -56,9 +66,15 @@ export interface DesktopProfilePaths {
   profileDir: string
 }
 
-const ROOT_CONFIG = `# Oh-DSH Desktop profile root. Composition lives in bundle patch layers.\n[]\n`
-const USER_PATCH = `# User patch layer for Oh-DSH Desktop. It is applied after the packaged bundles.\n[]\n`
 const PNPM_WORKSPACE = `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`
+
+function rootConfig(spec: ProfileSpec): string {
+  return `# Oh-DSH ${spec.name} profile root. Composition lives in bundle patch layers.\n[]\n`
+}
+
+function userPatch(spec: ProfileSpec): string {
+  return `# User patch layer for Oh-DSH ${spec.name}. It is applied after the packaged bundles.\n[]\n`
+}
 
 function readManifest(path: string): ProfileManifest {
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
@@ -100,6 +116,13 @@ export const WEB_PROFILE_SPEC: ProfileSpec = Object.freeze({
   name: WEB_PROFILE,
 })
 
+/** Profile facts for the packaged Oh-DSH terminal surface. */
+export const TUI_PROFILE_SPEC: ProfileSpec = Object.freeze({
+  bundles: TUI_BUNDLES,
+  manifestName: 'dsh-profile-tui',
+  name: TUI_PROFILE,
+})
+
 /**
  * Initialize or upgrade a writable distribution profile without replacing
  * user patches or third-party bundle entries.
@@ -133,8 +156,8 @@ export function ensureProfile(spec: ProfileSpec, dshHome: string): DesktopProfil
   }
 
   const defaults: ReadonlyArray<readonly [string, string]> = [
-    ['cordis.yml', ROOT_CONFIG],
-    ['cordis.patch.yml', USER_PATCH],
+    ['cordis.yml', rootConfig(spec)],
+    ['cordis.patch.yml', userPatch(spec)],
     ['pnpm-workspace.yaml', PNPM_WORKSPACE],
   ]
   for (const [name, contents] of defaults) {
@@ -163,4 +186,14 @@ export function ensureDesktopProfile(dshHome: string): DesktopProfilePaths {
  */
 export function ensureWebProfile(dshHome: string): DesktopProfilePaths {
   return ensureProfile(WEB_PROFILE_SPEC, dshHome)
+}
+
+/**
+ * Initialize or upgrade the writable Oh-DSH TUI profile without replacing
+ * user patches or third-party bundle entries.
+ * @param dshHome - application-owned DSH home directory.
+ * @returns resolved profile paths.
+ */
+export function ensureTuiProfile(dshHome: string): DesktopProfilePaths {
+  return ensureProfile(TUI_PROFILE_SPEC, dshHome)
 }
