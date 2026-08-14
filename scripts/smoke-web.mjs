@@ -4,7 +4,6 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -15,18 +14,25 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ensureWebProfile, WEB_PROFILE } from '../src/profile.ts'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
+import { resolveProductVersion } from '../src/version.ts'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Resolve the smoke resources root: `.stage`, an explicit dir, or the packaged release. */
 function resolveResources(candidate) {
   if (candidate === 'release') {
-    const releases = readdirSync(join(root, 'release'))
-      .filter(name => name.startsWith('oh-dsh-web-'))
-      .filter(name => existsSync(join(root, 'release', name, 'dsh-runtime')))
-    assert.ok(releases.length > 0, 'no packaged oh-dsh-web release found in release/')
-    assert.equal(releases.length, 1, `multiple packaged releases found: ${releases.join(', ')}`)
-    return join(root, 'release', releases[0])
+    const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
+    const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
+    const release = join(
+      root,
+      'release',
+      `oh-dsh-web-${resolveProductVersion(root)}-${platform}-${arch}`,
+    )
+    assert.ok(
+      existsSync(join(release, 'dsh-runtime')),
+      `packaged oh-dsh-web release not found: ${release}`,
+    )
+    return release
   }
   return resolve(candidate)
 }
