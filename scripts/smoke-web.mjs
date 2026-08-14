@@ -307,7 +307,9 @@ try {
     }
     socket.addEventListener('open', () => {
       socket.send(JSON.stringify({ type: 'resize', cols: 80, rows: 24 }))
-      socket.send("printf 'OH_DSH_WEB_TERMINAL_SMOKE\\n'; exit\r")
+      // Split the marker so the echoed command line never contains it; only
+      // real execution produces `OH_DSH_WEB_TERMINAL_SMOKE`.
+      socket.send("printf '%s%s\\n' OH_DSH_WEB_TERMINAL_ SMOKE; exit\r")
     })
     socket.addEventListener('message', (event) => {
       output += String(event.data)
@@ -334,10 +336,19 @@ try {
   console.log('Better Sidebar Host API: ready, session/files/Git verified on the web surface')
   console.log('Better Sidebar terminal PTY: ready, command execution verified on the web surface')
 } finally {
-  if (child.exitCode === null) child.kill('SIGTERM')
-  await new Promise(resolve => {
-    if (child.exitCode !== null) resolve()
-    else child.once('exit', resolve)
-  })
+  if (child.exitCode === null) {
+    child.kill('SIGTERM')
+    await new Promise(resolve => {
+      const escalate = setTimeout(() => { child.kill('SIGKILL') }, 8_000)
+      child.once('exit', () => {
+        clearTimeout(escalate)
+        resolve()
+      })
+      child.once('error', () => {
+        clearTimeout(escalate)
+        resolve()
+      })
+    })
+  }
   rmSync(smokeRoot, { recursive: true, force: true })
 }

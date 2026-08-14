@@ -38,7 +38,7 @@ Options:
   --host <host>           bind host (default ${DEFAULT_WEB_HOST}; use 0.0.0.0 to expose the UI on the LAN)
   --port <port>           listen port (default ${DEFAULT_WEB_PORT}; 0 picks a random port)
   --data <dir>            writable data root (default ~/${DEFAULT_DATA_DIR_NAME})
-  --trusted-host <auth>   extra authority the browser-trust fence accepts (repeatable)
+  --trusted-host <auth>   extra authority the browser-trust fence accepts; required for non-loopback hosts (repeatable)
   --open, --no-open       open the browser when ready (default: open on an interactive terminal)
   --help                  show this help
 
@@ -151,10 +151,11 @@ function versionOf(root: string): string {
 }
 
 function openBrowser(url: string, platform: NodeJS.Platform): void {
-  const command = platform === 'darwin' ? 'open' : platform === 'linux' ? 'xdg-open' : undefined
-  if (command === undefined) return
+  if (platform !== 'darwin' && platform !== 'linux' && platform !== 'win32') return
+  const command = platform === 'darwin' ? 'open' : platform === 'linux' ? 'xdg-open' : 'cmd'
+  const args = platform === 'win32' ? ['/c', 'start', '', url] : [url]
   try {
-    const child = spawn(command, [url], { detached: true, stdio: 'ignore' })
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' })
     child.on('error', () => {})
     child.unref()
   } catch {
@@ -190,6 +191,16 @@ export async function main(
     return 0
   }
 
+  const loopback = options.host === '127.0.0.1'
+    || options.host === 'localhost'
+    || options.host === '::1'
+  if (!loopback && options.trustedHosts.length === 0) {
+    throw new UsageError(
+      'exposing Oh-DSH-Web on a non-loopback host requires --trusted-host: '
+      + 'the terminal and workspace APIs are guarded only by the browser trust fence',
+    )
+  }
+
   // The runtime child runs with cwd set to the data root, so a relative
   // --data/DSH_OH_WEB_HOME would resolve DSH_HOME from a nested directory.
   // Normalize once and derive every runtime path from the absolute root.
@@ -198,9 +209,12 @@ export async function main(
   const version = versionOf(root)
   // Packaged layout: <root>/node-runtime + <root>/dsh-runtime. Development
   // layout: the staged runtimes live under <root>/.stage/.
+  const stagedNode = process.platform === 'win32'
+    ? join(root, '.stage', 'node-runtime', 'node.exe')
+    : join(root, '.stage', 'node-runtime', 'bin', 'node')
   const resourcesRoot = env.DSH_OH_WEB_ROOT !== undefined
     ? root
-    : existsSync(join(root, '.stage', 'node-runtime', 'bin', 'node'))
+    : existsSync(stagedNode)
       ? join(root, '.stage')
       : root
   const paths: BundledRuntimePaths = bundledRuntimePaths(resourcesRoot)

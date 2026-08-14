@@ -2,7 +2,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import type { Readable } from 'node:stream'
 
-const READY_LINE = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)(?:\s|$)/
+const READY_LINE = /^dsh web: (https?:\/\/\S+)(?:\s|$)/
 
 /** Process launch contract for the packaged DSH runtime. */
 export interface DshRuntimeOptions {

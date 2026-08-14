@@ -840,6 +840,7 @@ function WorkspacePanel({
   }
 
   const chooseWorkspace = async (): Promise<void> => {
+    if (window.dshDesktop?.chooseWorkspace === undefined) return
     const paths = await window.dshDesktop?.chooseWorkspace() ?? []
     for (const path of paths) {
       const workspace = await workspaces.create({ path })
@@ -856,7 +857,9 @@ function WorkspacePanel({
         </div>
         <div>
           <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}>↻</button>
-          <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+          {window.dshDesktop?.chooseWorkspace !== undefined && (
+            <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+          )}
           <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}>×</button>
         </div>
       </header>
@@ -1137,7 +1140,9 @@ function WorkspacePanel({
             <section className="oh-dsh-workspace-directory">
               <span>{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
               <small title={cwd}>{cwd}</small>
-              <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
+              {window.dshDesktop?.chooseWorkspace !== undefined && (
+                <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
+              )}
             </section>
 
             <section className="oh-dsh-processes">
@@ -1317,14 +1322,16 @@ function registerBuiltinSidebarTools(options: {
       shortcut: '⌘J',
       title: () => t('terminal'),
     }),
-    sidebar.registerTab({
-      icon: <ToolIcon kind="browser" />,
-      id: 'browser',
-      order: 30,
-      render: props => <BrowserView {...props} t={t} />,
-      shortcut: '⌘T',
-      title: () => t('browser'),
-    }),
+    ...(window.dshDesktop === undefined
+      ? []
+      : [sidebar.registerTab({
+          icon: <ToolIcon kind="browser" />,
+          id: 'browser',
+          order: 30,
+          render: props => <BrowserView {...props} t={t} />,
+          shortcut: '⌘T',
+          title: () => t('browser'),
+        })]),
     sidebar.registerTab({
       dedupeKey: tab => tab.resource,
       icon: <ToolIcon kind="files" />,
@@ -1754,7 +1761,8 @@ export function apply(ctx: ClientContext): void {
       if (url.origin === window.location.origin) return
       const runtime = runtimeSettings.getSnapshot().preferences
       const snapshot = desktopSidebar.getSnapshot()
-      if (!runtime.browserInterceptLinks
+      if (window.dshDesktop === undefined
+        || !runtime.browserInterceptLinks
         || !snapshot.ready
         || !desktopSidebar.isTabEnabled('browser')) return
       event.preventDefault()

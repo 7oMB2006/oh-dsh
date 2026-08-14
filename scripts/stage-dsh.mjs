@@ -739,17 +739,22 @@ assertSelfContained(nodeRuntime, 'Node runtime')
 ensureLinuxPtyBuild()
 
 const stagedNode = join(nodeRuntime, isWindowsNode ? 'node.exe' : join('bin', 'node'))
-run(stagedNode, [join(runtime, 'lib', 'bin.js'), '--version'], {
-  cwd: runtime,
-  env: { ...process.env, DSH_HOME: join(stage, 'smoke-home') },
-})
-if (isWindowsNode) {
-  run(stagedNode, [join(nodeRuntime, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'), '--version'], {
+const hostPlatform = { darwin: 'darwin', linux: 'linux', win: 'win32' }[nodePlatform]
+if (hostPlatform === process.platform) {
+  run(stagedNode, [join(runtime, 'lib', 'bin.js'), '--version'], {
     cwd: runtime,
-    env: process.env,
+    env: { ...process.env, DSH_HOME: join(stage, 'smoke-home') },
   })
+  if (isWindowsNode) {
+    run(stagedNode, [join(nodeRuntime, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'), '--version'], {
+      cwd: runtime,
+      env: process.env,
+    })
+  } else {
+    run(join(nodeRuntime, 'bin', 'pnpm'), ['--version'], { cwd: runtime, env: process.env })
+  }
 } else {
-  run(join(nodeRuntime, 'bin', 'pnpm'), ['--version'], { cwd: runtime, env: process.env })
+  console.log(`Skipping staged runtime launch checks: ${nodePlatform} binaries cannot run on ${process.platform}`)
 }
 
 console.log(`Staged DSH runtime: ${runtime}`)

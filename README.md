@@ -83,7 +83,7 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 **桌面皮肤**：在 DSH 设置页即时切换，由 Host 持久化选择。
 
 <p align="center">
-  <img src="./assets/oh-dsh-skins.png" alt="Oh-DSH 桌面皮肤设置" width="100%">
+  <img src="./assets/oh-dsh-desktop-skins.png" alt="Oh-DSH 桌面皮肤设置" width="100%">
 </p>
 
 ## 安装
@@ -117,11 +117,11 @@ Linux 运行数据位于 `~/.config/Oh-DSH-Desktop/dsh`，DeepSeek API key 可�
 
 ### 安装 Oh-DSH-Web 发行版
 
-从 Release 下载 `Oh-DSH-Web-<version>-<platform>-<arch>.tar.gz`（或
+从 Release 下载 `oh-dsh-web-<version>-<platform>-<arch>.tar.gz`（或
 `.zip`），解压后直接运行：
 
 ```sh
-tar -xzf Oh-DSH-Web-0.1.1-linux-x64.tar.gz
+tar -xzf oh-dsh-web-0.1.1-linux-x64.tar.gz
 cd oh-dsh-web-0.1.1-linux-x64
 ./bin/oh-dsh-web
 ```
@@ -131,7 +131,7 @@ cd oh-dsh-web-0.1.1-linux-x64
 
 | 选项 | 默认 | 说明 |
 | --- | --- | --- |
-| `--host` / `DSH_OH_WEB_HOST` | `127.0.0.1` | 监听地址；`0.0.0.0` 暴露到局域网 |
+| `--host` / `DSH_OH_WEB_HOST` | `127.0.0.1` | 监听地址；`0.0.0.0` 暴露到局域网（必须同时配置 `--trusted-host`） |
 | `--port` / `DSH_OH_WEB_PORT` | `3080` | 监听端口；`0` 表示随机端口 |
 | `--data` / `DSH_OH_WEB_HOME` | `~/.oh-dsh-web` | 可写数据根目录 |
 | `--no-open` / `DSH_OH_WEB_OPEN=0` | 自动打开 | 不自动打开浏览器 |

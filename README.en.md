@@ -93,7 +93,7 @@ in an isolated environment.
 persisted by the Host.
 
 <p align="center">
-  <img src="./assets/oh-dsh-skins.png" alt="Oh-DSH desktop skin settings" width="100%">
+  <img src="./assets/oh-dsh-desktop-skins.png" alt="Oh-DSH desktop skin settings" width="100%">
 </p>
 
 ## Installation
@@ -124,11 +124,11 @@ has not been published yet. It will appear on the same Releases page.
 
 ### Install the Oh-DSH-Web distribution
 
-Download `Oh-DSH-Web-<version>-<platform>-<arch>.tar.gz` (or `.zip`) from the
+Download `oh-dsh-web-<version>-<platform>-<arch>.tar.gz` (or `.zip`) from the
 Release, extract, and run:
 
 ```sh
-tar -xzf Oh-DSH-Web-0.1.1-linux-x64.tar.gz
+tar -xzf oh-dsh-web-0.1.1-linux-x64.tar.gz
 cd oh-dsh-web-0.1.1-linux-x64
 ./bin/oh-dsh-web
 ```
@@ -139,7 +139,7 @@ data root. Common options:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--host` / `DSH_OH_WEB_HOST` | `127.0.0.1` | Bind host; `0.0.0.0` exposes the UI on the LAN |
+| `--host` / `DSH_OH_WEB_HOST` | `127.0.0.1` | Bind host; `0.0.0.0` exposes the UI on the LAN and requires `--trusted-host` |
 | `--port` / `DSH_OH_WEB_PORT` | `3080` | Listen port; `0` picks a random port |
 | `--data` / `DSH_OH_WEB_HOME` | `~/.oh-dsh-web` | Writable data root |
 | `--no-open` / `DSH_OH_WEB_OPEN=0` | auto-open | Do not open the browser |

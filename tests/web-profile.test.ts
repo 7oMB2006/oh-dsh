@@ -131,6 +131,13 @@ test('web launcher rejects invalid arguments', () => {
   assert.throws(() => parseLaunchArgs([], { DSH_OH_WEB_PORT: 'abc' }, false, '/d'), UsageError)
 })
 
+test('web launcher requires trusted hosts for non-loopback exposure', async () => {
+  await assert.rejects(
+    main(['--host', '0.0.0.0'], {}, { isTTY: false } as NodeJS.WriteStream),
+    UsageError,
+  )
+})
+
 test('web launcher --help short-circuits', () => {
   const options = parseLaunchArgs(['--help'], {}, false, '/d')
   assert.equal(options.help, true)

@@ -19,7 +19,8 @@ const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).ver
 const platform = process.env.DSH_DESKTOP_NODE_PLATFORM ?? process.platform
 const arch = process.env.DSH_DESKTOP_NODE_ARCH ?? process.arch
 const isWindowsHost = process.platform === 'win32'
-const stagedNode = join(stage, 'node-runtime', isWindowsHost ? 'node.exe' : join('bin', 'node'))
+const isWindowsTarget = platform === 'win'
+const stagedNode = join(stage, 'node-runtime', isWindowsTarget ? 'node.exe' : join('bin', 'node'))
 const dirName = `oh-dsh-web-${version}-${platform}-${arch}`
 const packageDir = join(release, dirName)
 
@@ -51,8 +52,17 @@ copyFileSync(join(root, 'dist', 'web.js'), join(packageDir, 'lib', 'oh-dsh-web',
 copyFileSync(join(root, 'package.json'), join(packageDir, 'package.json'))
 copyFileSync(join(root, 'LICENSE'), join(packageDir, 'LICENSE'))
 copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(packageDir, 'THIRD_PARTY_NOTICES.md'))
-cpSync(join(stage, 'dsh-runtime'), join(packageDir, 'dsh-runtime'), { recursive: true })
-cpSync(join(stage, 'node-runtime'), join(packageDir, 'node-runtime'), { recursive: true })
+// Keep the staged relative links relative: Node's default cpSync rewrites
+// them as absolute links into this build's .stage, which would dangle after
+// the package is extracted elsewhere.
+cpSync(join(stage, 'dsh-runtime'), join(packageDir, 'dsh-runtime'), {
+  recursive: true,
+  verbatimSymlinks: true,
+})
+cpSync(join(stage, 'node-runtime'), join(packageDir, 'node-runtime'), {
+  recursive: true,
+  verbatimSymlinks: true,
+})
 
 const launcher = join(packageDir, 'bin', 'oh-dsh-web')
 writeFileSync(launcher, `#!/usr/bin/env sh
@@ -63,7 +73,7 @@ export DSH_OH_WEB_ROOT="$ROOT"
 exec "$ROOT/node-runtime/bin/node" "$ROOT/lib/oh-dsh-web/main.js" "$@"
 `)
 chmodSync(launcher, 0o755)
-if (isWindowsHost) {
+if (isWindowsTarget) {
   writeFileSync(join(packageDir, 'bin', 'oh-dsh-web.cmd'), [
     '@ECHO off',
     'SETLOCAL',
@@ -87,6 +97,12 @@ DeepSeek Harness 的浏览器发行版：开箱即用的 DSH Web UI，附带 Oh-
 tar -xzf ${dirName}.tar.gz
 cd ${dirName}
 ./bin/oh-dsh-web
+\`\`\`
+
+Windows 发行包使用 \`bin\\oh-dsh-web.cmd\` 启动：
+
+\`\`\`bat
+bin\\oh-dsh-web.cmd
 \`\`\`
 
 启动后终端会打印地址（默认 \`http://127.0.0.1:3080\`），交互式终端下会
@@ -148,10 +164,15 @@ console.log(`  ${zip}`)
 
 // Self-verify the packaged layout exactly like the staged one.
 const smoke = join(root, 'scripts', 'smoke-web.mjs')
-const verify = spawnSync(process.execPath, [smoke, 'release'], {
-  cwd: root,
-  env: process.env,
-  stdio: 'inherit',
-})
-if (verify.error !== undefined) throw verify.error
-if (verify.status !== 0) process.exit(verify.status ?? 1)
+const hostPlatform = { darwin: 'darwin', linux: 'linux', win: 'win32' }[platform]
+if (hostPlatform === process.platform) {
+  const verify = spawnSync(process.execPath, [smoke, 'release'], {
+    cwd: root,
+    env: process.env,
+    stdio: 'inherit',
+  })
+  if (verify.error !== undefined) throw verify.error
+  if (verify.status !== 0) process.exit(verify.status ?? 1)
+} else {
+  console.log(`Skipping packaged smoke test: ${platform} runtime cannot launch on ${process.platform}`)
+}
