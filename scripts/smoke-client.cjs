@@ -68,6 +68,21 @@ void app.whenReady().then(async () => {
         const onboardingButton = [...document.querySelectorAll('button')]
           .find(button => /^(继续|continue|start using|开始使用|稍后配置|configure later|skip|later)$/i.test((button.textContent ?? '').trim()))
         if (onboardingButton !== undefined) onboardingButton.click()
+        const marketplaceButton = document.querySelector('.oh-marketplace-nav')
+        const collapsed = marketplaceButton?.dataset.collapsed === 'true'
+        if (document.documentElement.dataset.ohDshDesktop === 'true'
+          && marketplaceButton instanceof HTMLButtonElement
+          && !collapsed
+          && window.__OH_DSH_SMOKE_COLLAPSE_REQUESTED__ !== true) {
+          const toggle = [...document.querySelectorAll('button')]
+            .find(button => /^(collapse sidebar|收起侧边栏)$/i.test(
+              button.getAttribute('aria-label') ?? '',
+            ))
+          if (toggle instanceof HTMLButtonElement) {
+            window.__OH_DSH_SMOKE_COLLAPSE_REQUESTED__ = true
+            toggle.click()
+          }
+        }
         return {
         body: document.body?.innerText ?? '',
         navigation: (() => {
@@ -88,8 +103,20 @@ void app.whenReady().then(async () => {
                 .filter(button => button.closest('[data-slot="sidebar"]') !== null)
                 .sort((left, right) => right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom)[0])
           const settingsIcon = settings?.querySelector('svg')
+          const pluginsButton = pluginsIcon?.closest('button')
           if (!(pluginsIcon instanceof SVGElement)
-            || !(settingsIcon instanceof SVGElement)) return null
+            || !(settingsIcon instanceof SVGElement)
+            || !(pluginsButton instanceof HTMLButtonElement)
+            || !(settings instanceof HTMLButtonElement)) return null
+          if (collapsed) {
+            let footer = pluginsButton.parentElement
+            while (footer !== null && !footer.contains(settings)) {
+              footer = footer.parentElement
+            }
+            // Replay hosts that lay out both collapsed footer actions in a row.
+            // The marketplace contract must keep the icon rail vertical.
+            footer?.style.setProperty('flex-direction', 'row')
+          }
           const pluginsRect = pluginsIcon.getBoundingClientRect()
           const settingsRect = settingsIcon.getBoundingClientRect()
           const pluginsBox = pluginsIcon.getBBox()
@@ -109,6 +136,7 @@ void app.whenReady().then(async () => {
               Math.abs(pluginsArtwork.height - settingsArtwork.height),
               Math.abs(pluginsArtwork.width - settingsArtwork.width),
             ),
+            collapsed,
             delta: Math.abs(
               pluginsRect.left + pluginsRect.width / 2
               - settingsRect.left - settingsRect.width / 2
@@ -127,7 +155,19 @@ void app.whenReady().then(async () => {
         ready: document.documentElement.dataset.ohDshDesktop === 'true',
       }
     })()`)
-      if (state.ready === true && state.navigation !== null) {
+      if (state.ready === true
+        && state.navigation !== null
+        && state.navigation.collapsed === false
+        && state.navigation.artworkDelta > 1) {
+        settle(new Error(
+          'Plugins and Settings icons are not optically sized: '
+          + JSON.stringify(state.navigation),
+        ))
+        return
+      }
+      if (state.ready === true
+        && state.navigation !== null
+        && state.navigation.collapsed === true) {
         if (state.navigation.pluginsTop < 0
           || state.navigation.pluginsBottom > state.navigation.viewportHeight
           || state.navigation.settingsTop < 0
@@ -145,9 +185,9 @@ void app.whenReady().then(async () => {
           ))
           return
         }
-        if (state.navigation.artworkDelta > 1) {
+        if (state.navigation.settingsTop < state.navigation.pluginsBottom) {
           settle(new Error(
-            'Plugins and Settings icons are not optically sized: '
+            'Plugins and Settings icons are not stacked vertically: '
             + JSON.stringify(state.navigation),
           ))
           return
