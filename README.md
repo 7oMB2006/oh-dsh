@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="./assets/oh-dsh-desktop-hero.png" alt="Oh-DSH Desktop Preview" width="100%">
-</p>
-
-<p align="center">
   <strong>简体中文</strong> ·
   <a href="./README.en.md">English</a>
 </p>
