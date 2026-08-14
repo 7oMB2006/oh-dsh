@@ -144,7 +144,10 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
 
 test('TUI bundle mounts its surface and skins before the upstream renderer', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-  const patch = readFileSync(join(root, 'plugins', 'tui', 'cordis.patch.yml'), 'utf8')
+  const patch = readFileSync(
+    join(root, 'plugins', 'tui', 'cordis.patch.yml'),
+    'utf8',
+  ).replace(/\r\n?/g, '\n')
   assert.match(patch, /- id: cc-tui\n  disabled: true/)
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
