@@ -6,3 +6,6 @@ release/
 tmp/
 *.log
 .DS_Store
+.direnv/
+result
+result-*

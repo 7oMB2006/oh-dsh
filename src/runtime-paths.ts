@@ -14,6 +14,18 @@ function pathApi(platform: NodeJS.Platform): typeof posix | typeof win32 {
   return platform === 'win32' ? win32 : posix
 }
 
+/** Resolve an explicit distribution root before Electron's packaged/dev defaults. */
+export function resolveRuntimeResourcesRoot(
+  packagedRoot: string,
+  developmentRoot: string,
+  isPackaged: boolean,
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const explicit = environment.OH_DSH_RESOURCES_ROOT ?? environment.DSH_OH_WEB_ROOT
+  if (explicit !== undefined && explicit !== '') return explicit
+  return isPackaged ? packagedRoot : developmentRoot
+}
+
 /** Resolve the bundled DSH and Node entry points for one target platform. */
 export function bundledRuntimePaths(
   resourcesRoot: string,
