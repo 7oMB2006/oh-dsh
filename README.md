@@ -64,7 +64,7 @@ Summary、Sidebar 与 PTY 终端能力。见 [Oh-DSH-Web 发行版](#oh-dsh-web-
 
 ## 主要能力
 
-- 自包含的 Apple Silicon / Intel macOS 应用与安装包、Linux x64 AppImage / deb，以及 Windows x64 NSIS 安装包。
+- 自包含的 Apple Silicon / Intel macOS 应用与安装包、Linux x64 AppImage / deb，以及 Windows x64 便携包（zip）。
 - 多标签 PTY Terminal、逐提交/逐行 Review、Browser 和 Files。
 - Review 评论可汇总进消息输入框，直接交给 Agent 处理。
 - Pinned Summary、可展开 Side Panel 与原生窗口控制。
@@ -397,7 +397,7 @@ Windows 产物同样位于 `release/`：
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.1-x64.exe
+├── Oh-DSH-Desktop-0.1.1-x64.zip
 └── win-unpacked/
 ```
 
@@ -414,7 +414,7 @@ push 时,于 macOS arm64、macOS x64、Linux x64、Windows x64 四个平台并�
 
 推送 `v*` tag 后，[`.github/workflows/release.yml`](.github/workflows/release.yml)
 会在四台 runner 上并行打包 macOS arm64、macOS x64、Linux x64 与 Windows
-x64，每个平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、NSIS）与
+x64，每个平台同时产出桌面发行包（DMG/ZIP、AppImage/deb、ZIP）与
 Oh-DSH-Web 发行包（tar.gz/ZIP）。全部 job 通过后，publish job 会用
 `gh release create` 把产物挂到同名 GitHub Release；任何失败都会阻止发布。
 

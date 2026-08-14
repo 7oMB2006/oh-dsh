@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,3 +36,15 @@ const result = spawnSync(process.execPath, [builder, '--win', `--${arch}`, '--pu
 })
 if (result.error !== undefined) throw result.error
 if (result.status !== 0) process.exit(result.status ?? 1)
+
+// electron-builder's NSIS/zip targets crash on the size of the bundled DSH
+// runtime; the unpacked app is already complete, so zip it with the system
+// bsdtar, which streams instead of materializing one giant argument string.
+const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
+const archive = join(root, 'release', `Oh-DSH-Desktop-${version}-x64.zip`)
+spawnSync('tar', ['-a', '-cf', archive, 'win-unpacked'], {
+  cwd: join(root, 'release'),
+  stdio: 'inherit',
+})
+if (!existsSync(archive)) throw new Error(`Windows archive was not produced: ${archive}`)
+console.log(`Packaged Oh-DSH-Desktop ${version}: ${archive}`)

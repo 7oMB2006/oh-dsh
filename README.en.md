@@ -72,7 +72,7 @@ macOS, Linux, and Windows.
 
 ## Capabilities
 
-- Self-contained Apple Silicon / Intel macOS and Linux x64 applications and installers, plus a Windows x64 NSIS installer.
+- Self-contained Apple Silicon / Intel macOS and Linux x64 applications and installers, plus a Windows x64 portable zip.
 - Multi-tab PTY Terminal, commit/line Review, Browser, and Files.
 - Review comments attach to the message composer for direct Agent handling.
 - Pinned Summary, expandable Side Panel, and native window controls.
@@ -425,7 +425,7 @@ Windows artifacts are written to the same directory:
 
 ```text
 release/
-├── Oh-DSH-Desktop-0.1.1-x64.exe
+├── Oh-DSH-Desktop-0.1.1-x64.zip
 └── win-unpacked/
 ```
 
@@ -443,7 +443,7 @@ every surface on every target platform.
 Pushing a `v*` tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml), which
 packages macOS arm64, macOS x64, Linux x64, and Windows x64 in parallel.
-Each platform produces the desktop package (DMG/ZIP, AppImage/deb, NSIS)
+Each platform produces the desktop package (DMG/ZIP, AppImage/deb, ZIP)
 and the Oh-DSH-Web package (tar.gz/ZIP). After every job passes, a publish
 job attaches all artifacts to a same-named GitHub Release via `gh release
 create`; any failure blocks the release.
