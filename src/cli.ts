@@ -8,18 +8,36 @@ import { UsageError } from './errors.ts'
 import { main as runTui } from './tui.ts'
 import { main as runWeb } from './web.ts'
 
-export const CLI_HELP = `Oh-DSH launcher
+const SURFACE_NAMES = ['desktop', 'web', 'tui'] as const
+type SurfaceName = typeof SURFACE_NAMES[number]
+
+export function availableSurfaces(env: NodeJS.ProcessEnv = process.env): readonly SurfaceName[] {
+  const configured = env.OH_DSH_SURFACES
+  if (configured === undefined || configured === '') return SURFACE_NAMES
+  const requested = new Set(configured.split(',').map(value => value.trim()))
+  return SURFACE_NAMES.filter(surface => requested.has(surface))
+}
+
+export function cliHelp(env: NodeJS.ProcessEnv = process.env): string {
+  const surfaces = availableSurfaces(env)
+  const descriptions: Record<SurfaceName, string> = {
+    desktop: 'Start Oh-DSH Desktop',
+    web: 'Start Oh-DSH Web',
+    tui: 'Start Oh-DSH TUI',
+  }
+  return `Oh-DSH launcher
 
 Usage:
   ohdsh <surface> [options]
 
 Surfaces:
-  desktop   Start Oh-DSH Desktop
-  web       Start Oh-DSH Web
-  tui       Start Oh-DSH TUI
+${surfaces.map(surface => `  ${surface.padEnd(9)} ${descriptions[surface]}`).join('\n')}
 
 Run "ohdsh <surface> --help" for surface options.
 `
+}
+
+export const CLI_HELP = cliHelp()
 
 export interface DesktopLaunchSpec {
   args: string[]
@@ -139,14 +157,20 @@ export async function main(
   tuiRunner: TuiRunner = runTui,
 ): Promise<number> {
   const [surface, ...args] = argv
+  const help = cliHelp(env)
   if (surface === undefined || surface === '--help' || surface === '-h') {
-    stdout.write(CLI_HELP)
+    stdout.write(help)
     return 0
+  }
+  if (SURFACE_NAMES.includes(surface as SurfaceName)
+    && !availableSurfaces(env).includes(surface as SurfaceName)) {
+    stderr.write(`Surface '${surface}' is not included in this Oh-DSH distribution.\n\n${help}`)
+    return 2
   }
   if (surface === 'desktop') return await desktopRunner(args, env)
   if (surface === 'web') return await webRunner(args, env, stdout)
   if (surface === 'tui') return await tuiRunner(args, env, stdout, stderr)
-  stderr.write(`Unknown surface: ${surface}\n\n${CLI_HELP}`)
+  stderr.write(`Unknown surface: ${surface}\n\n${help}`)
   return 2
 }
 
