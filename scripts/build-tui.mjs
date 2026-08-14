@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { portableZipArguments } from '../src/archive.ts'
 import { resolveProductVersion } from '../src/version.ts'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 
@@ -108,7 +109,7 @@ run('tar', ['-czf', tarball, dirName], { cwd: release })
 if (isWindowsHost) {
   run('tar', ['-a', '-cf', zip, dirName], { cwd: release })
 } else {
-  run('zip', ['-qry', zip, dirName], { cwd: release })
+  run('zip', portableZipArguments(zip, dirName), { cwd: release })
 }
 
 console.log(`Packaged Oh-DSH TUI ${version}: ${packageDir}`)
