@@ -50,8 +50,15 @@ const builds = [
   }),
   build({
     ...shared,
-    entryPoints: [join(root, 'src', 'web.ts')],
+    entryPoints: [join(root, 'src', 'web-entry.ts')],
     outfile: join(dist, 'web.js'),
+    platform: 'node',
+    format: 'esm',
+  }),
+  build({
+    ...shared,
+    entryPoints: [join(root, 'src', 'cli.ts')],
+    outfile: join(dist, 'ohdsh.js'),
     platform: 'node',
     format: 'esm',
   }),

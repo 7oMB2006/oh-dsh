@@ -68,6 +68,13 @@ test('web client uses the Oh-DSH Web surface name', () => {
   assert.doesNotMatch(client, /Oh-DSH-Web/)
 })
 
+test('packaged web distribution exposes the unified ohdsh command', () => {
+  const build = readFileSync(new URL('../scripts/build-web.mjs', import.meta.url), 'utf8')
+  assert.match(build, /join\(packageDir, 'bin', 'ohdsh'\)/)
+  assert.match(build, /join\(packageDir, 'lib', 'oh-dsh', 'cli\.js'\)/)
+  assert.match(build, /exec "\$ROOT\/bin\/ohdsh" web "\$@"/)
+})
+
 test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const patch = readFileSync(join(root, 'web', 'cordis.patch.yml'), 'utf8')

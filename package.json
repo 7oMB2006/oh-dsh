@@ -8,6 +8,9 @@
   "private": true,
   "type": "module",
   "main": "dist/main.js",
+  "bin": {
+    "ohdsh": "bin/ohdsh"
+  },
   "exports": {
     ".": {
       "default": "./dist/plugin.js"
@@ -20,7 +23,10 @@
     "dist/plugin.js",
     "dist/client.js",
     "dist/client.js.map",
-    "dist/cordis.patch.yml"
+    "dist/cordis.patch.yml",
+    "dist/ohdsh.js",
+    "bin/ohdsh",
+    "bin/ohdsh.cmd"
   ],
   "dsh": {
     "bundle": {
@@ -50,6 +56,7 @@
     "smoke:web": "node scripts/smoke-web.mjs",
     "smoke:web:package": "node scripts/smoke-web.mjs release",
     "install:mac": "node scripts/install-mac.mjs",
+    "ohdsh": "pnpm run build && pnpm run stage:dsh && node dist/ohdsh.js",
     "web": "pnpm run build && pnpm run stage:dsh && node dist/web.js",
     "start": "pnpm run build && pnpm run stage:dsh && electron .",
     "check:screenshot": "electron scripts/check-screenshot-corners.cjs assets/oh-dsh-desktop-ui.png",
@@ -105,6 +112,18 @@
       {
         "from": "assets/icons/512x512.png",
         "to": "oh-dsh-desktop.png"
+      },
+      {
+        "from": "dist/ohdsh.js",
+        "to": "lib/oh-dsh/cli.js"
+      },
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "ohdsh",
+          "ohdsh.cmd"
+        ]
       }
     ],
     "mac": {

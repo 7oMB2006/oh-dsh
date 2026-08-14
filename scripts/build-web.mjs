@@ -26,6 +26,7 @@ const packageDir = join(release, dirName)
 
 for (const required of [
   join(root, 'dist', 'web.js'),
+  join(root, 'dist', 'ohdsh.js'),
   join(stage, 'dsh-runtime', 'lib', 'bin.js'),
   stagedNode,
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'web', 'dist', 'index.js'),
@@ -47,8 +48,10 @@ function run(command, args, options = {}) {
 rmSync(packageDir, { recursive: true, force: true })
 mkdirSync(join(packageDir, 'bin'), { recursive: true })
 mkdirSync(join(packageDir, 'lib', 'oh-dsh-web'), { recursive: true })
+mkdirSync(join(packageDir, 'lib', 'oh-dsh'), { recursive: true })
 
 copyFileSync(join(root, 'dist', 'web.js'), join(packageDir, 'lib', 'oh-dsh-web', 'main.js'))
+copyFileSync(join(root, 'dist', 'ohdsh.js'), join(packageDir, 'lib', 'oh-dsh', 'cli.js'))
 copyFileSync(join(root, 'package.json'), join(packageDir, 'package.json'))
 copyFileSync(join(root, 'LICENSE'), join(packageDir, 'LICENSE'))
 copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(packageDir, 'THIRD_PARTY_NOTICES.md'))
@@ -64,27 +67,30 @@ cpSync(join(stage, 'node-runtime'), join(packageDir, 'node-runtime'), {
   verbatimSymlinks: true,
 })
 
-const launcher = join(packageDir, 'bin', 'oh-dsh-web')
-writeFileSync(launcher, `#!/usr/bin/env sh
-# Oh-DSH-Web ${version} launcher: runs the bundled Node runtime against the packaged DSH.
+const launcher = join(packageDir, 'bin', 'ohdsh')
+copyFileSync(join(root, 'bin', 'ohdsh'), launcher)
+chmodSync(launcher, 0o755)
+
+const legacyLauncher = join(packageDir, 'bin', 'oh-dsh-web')
+writeFileSync(legacyLauncher, `#!/usr/bin/env sh
+# Compatibility launcher. Prefer: ohdsh web
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-export DSH_OH_WEB_ROOT="$ROOT"
-exec "$ROOT/node-runtime/bin/node" "$ROOT/lib/oh-dsh-web/main.js" "$@"
+exec "$ROOT/bin/ohdsh" web "$@"
 `)
-chmodSync(launcher, 0o755)
+chmodSync(legacyLauncher, 0o755)
 if (isWindowsTarget) {
+  copyFileSync(join(root, 'bin', 'ohdsh.cmd'), join(packageDir, 'bin', 'ohdsh.cmd'))
   writeFileSync(join(packageDir, 'bin', 'oh-dsh-web.cmd'), [
     '@ECHO off',
     'SETLOCAL',
     'SET "ROOT=%~dp0.."',
-    'SET "DSH_OH_WEB_ROOT=%ROOT%"',
-    '"%ROOT%\\node-runtime\\node.exe" "%ROOT%\\lib\\oh-dsh-web\\main.js" %*',
+    'CALL "%ROOT%\\bin\\ohdsh.cmd" web %*',
     '',
   ].join('\r\n'))
 }
 
-writeFileSync(join(packageDir, 'README.md'), `# Oh-DSH-Web ${version}
+writeFileSync(join(packageDir, 'README.md'), `# Oh-DSH Web
 
 DeepSeek Harness 的浏览器发行版：开箱即用的 DSH Web UI，附带 Oh-DSH 的
 皮肤、Pinned Summary、Sidebar（Files/Git/Review）与 PTY 终端能力。
@@ -96,13 +102,13 @@ DeepSeek Harness 的浏览器发行版：开箱即用的 DSH Web UI，附带 Oh-
 \`\`\`sh
 tar -xzf ${dirName}.tar.gz
 cd ${dirName}
-./bin/oh-dsh-web
+./bin/ohdsh web
 \`\`\`
 
-Windows 发行包使用 \`bin\\oh-dsh-web.cmd\` 启动：
+Windows 发行包使用 \`bin\\ohdsh.cmd\` 启动：
 
 \`\`\`bat
-bin\\oh-dsh-web.cmd
+bin\\ohdsh.cmd web
 \`\`\`
 
 启动后终端会打印地址（默认 \`http://127.0.0.1:3080\`），交互式终端下会
@@ -158,7 +164,7 @@ if (isWindowsHost) {
   run('zip', ['-qry', zip, dirName], { cwd: release })
 }
 
-console.log(`Packaged Oh-DSH-Web ${version}: ${packageDir}`)
+console.log(`Packaged Oh-DSH Web ${version}: ${packageDir}`)
 console.log(`  ${tarball}`)
 console.log(`  ${zip}`)
 

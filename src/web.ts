@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
 import {
   DshRuntimeSupervisor,
@@ -32,7 +32,7 @@ export interface LaunchOptions {
 
 export class UsageError extends Error {}
 
-const USAGE = `usage: oh-dsh-web [options]
+const USAGE = `usage: ohdsh web [options]
 
 Options:
   --host <host>           bind host (default ${DEFAULT_WEB_HOST}; use 0.0.0.0 to expose the UI on the LAN)
@@ -286,15 +286,4 @@ export async function main(
     await stop()
     return 1
   }
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  void main(process.argv.slice(2)).then(code => { process.exit(code) }, error => {
-    if (error instanceof UsageError) {
-      process.stderr.write(`${error.message}\n\n${USAGE}`)
-      process.exit(2)
-    }
-    process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`)
-    process.exit(1)
-  })
 }
