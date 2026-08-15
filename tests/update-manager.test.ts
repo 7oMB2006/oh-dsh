@@ -77,6 +77,17 @@ test('manager rejects prereleases and downgrades', async () => {
   assert.equal((await manager.check()).status, 'not-available')
 })
 
+test('manager offers the official Release page when the platform asset is missing', async () => {
+  const updater = new FakeUpdater()
+  updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0', 'Oh-DSH-Desktop-1.2.0-x64.zip') }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  const state = await manager.check()
+  assert.equal(state.status, 'unsupported')
+  if (state.status === 'unsupported') {
+    assert.equal(state.releaseUrl, 'https://github.com/hust-open-atom-club/oh-dsh/releases/tag/v1.2.0')
+  }
+})
+
 test('manager provides a deb installer fallback without invoking updater install', async () => {
   const updater = new FakeUpdater()
   updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0', 'Oh-DSH-Desktop-1.2.0-amd64.deb') }

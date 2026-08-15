@@ -271,6 +271,16 @@ export class DesktopUpdateManager {
         releaseUrl: officialReleaseUrl(normalized),
       })
     } catch (error) {
+      const code = errorCode(error)
+      if (code === 'UPDATE_ASSET_MISSING' || code === 'UPDATE_ASSET_AMBIGUOUS') {
+        return this.publish({
+          status: 'unsupported',
+          currentVersion: this.currentVersion,
+          platform: this.platform,
+          message: 'The latest Release does not contain one verified installer for this platform and architecture.',
+          releaseUrl: officialReleaseUrl(normalized),
+        })
+      }
       return this.fail(error, 'check')
     }
   }
