@@ -502,6 +502,7 @@ function createPluginMarketplace(): PluginMarketplaceManager {
   return new PluginMarketplaceManager({
     appDataPath: info.appDataPath,
     dshHome: info.dshHome,
+    onWarn: line => { appendLog('desktop', `[marketplace] ${line}`) },
     platform: new ProductionMarketplacePlatform({
       cliEntry: paths.cliEntry,
       cwd: workingDirectory,
