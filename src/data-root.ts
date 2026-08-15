@@ -179,7 +179,7 @@ export function migrateLegacyDesktopState(input: {
   if (existsSync(migrationMarker(input.ohDshHome, DESKTOP_MIGRATION))) return false
 
   const legacyRoot = join(input.appDataRoot, LEGACY_DESKTOP_DATA_DIRECTORY)
-  const legacyStat = stat(legacyRoot)
+  const legacyStat = followedStat(legacyRoot)
   if (legacyStat === undefined || !legacyStat.isDirectory()) return false
 
   const legacyDshHome = join(legacyRoot, 'dsh')
@@ -189,9 +189,11 @@ export function migrateLegacyDesktopState(input: {
     if (entry === 'dsh') continue
     copyEntry(join(legacyRoot, entry), join(input.ohDshHome, entry))
   }
-  copyDirectoryContents(legacyRoot, desktopElectronDataRoot(input.ohDshHome), {
-    exclude: DESKTOP_SHARED_ENTRIES,
-  })
+  if (!copyDirectoryContents(
+    legacyRoot,
+    desktopElectronDataRoot(input.ohDshHome),
+    { exclude: DESKTOP_SHARED_ENTRIES },
+  )) return false
   completeMigration(input.ohDshHome, DESKTOP_MIGRATION)
   return true
 }

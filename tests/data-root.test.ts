@@ -132,13 +132,20 @@ test('legacy directory links are followed before migration completes', t => {
 
   const appDataRoot = join(temporaryRoot, 'app-data')
   const legacyDesktopRoot = join(appDataRoot, 'Oh-DSH-Desktop')
+  const legacyDesktopTarget = join(temporaryRoot, 'legacy-desktop')
   const desktopTarget = join(temporaryRoot, 'desktop-dsh')
   const sharedDesktopRoot = join(temporaryRoot, 'shared-desktop')
   write(join(desktopTarget, 'sessions', 'desktop.json'), 'desktop')
-  mkdirSync(legacyDesktopRoot, { recursive: true })
+  mkdirSync(legacyDesktopTarget, { recursive: true })
   symlinkSync(
     desktopTarget,
-    join(legacyDesktopRoot, 'dsh'),
+    join(legacyDesktopTarget, 'dsh'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  )
+  mkdirSync(appDataRoot, { recursive: true })
+  symlinkSync(
+    legacyDesktopTarget,
+    legacyDesktopRoot,
     process.platform === 'win32' ? 'junction' : 'dir',
   )
 
