@@ -44,6 +44,10 @@ import {
   type ComposerHistoryNode,
   type ComposerHistorySnapshot,
 } from './composer-input-history.ts'
+import {
+  historyDirectionForKey,
+  isAtHistoryBoundary,
+} from './composer-history-keyboard.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 import {
   betterSidebarApi,
@@ -54,6 +58,7 @@ import {
 import {
   nextReviewCommentId,
   ReviewCommentsService,
+  type ReviewAgentContext,
   type ReviewCommentSide,
   type ReviewSessionsService,
   type ReviewInputTriggersService,
@@ -122,6 +127,16 @@ interface ClientContext {
   get(name: string): unknown
   reflect: {
     provide(name: string, value: unknown, options?: unknown): (() => Promise<void> | void) | void
+  }
+}
+
+interface ComposerInput {
+  setDraft(text: string): void
+}
+
+interface ConversationInputService {
+  input: {
+    for(context: ReviewAgentContext): ComposerInput
   }
 }
 
@@ -1656,6 +1671,28 @@ function pathBelongsToActiveWorkspace(
     || normalizedPath.startsWith(`${normalizedRoot}/`)
 }
 
+function composerInputForSession(
+  ctx: ClientContext,
+  sessions: SessionsService,
+  sessionId: string,
+): ComposerInput | undefined {
+  const scope = sessions.scope?.(sessionId)
+  if (scope === undefined) return undefined
+  try {
+    const conversation = ctx.get('conversation') as ConversationInputService | undefined
+    return conversation?.input.for(scope)
+  } catch {
+    return undefined
+  }
+}
+
+function isComposerTextarea(target: EventTarget | null): target is HTMLTextAreaElement {
+  return target instanceof HTMLTextAreaElement
+    && target.dataset.phase !== undefined
+    && !target.disabled
+    && !target.readOnly
+}
+
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
   const slots = ctx.get('slots') as SlotsService
@@ -1752,6 +1789,50 @@ export function apply(ctx: ClientContext): void {
       desktopSidebar.setSession(sessions.list.getSnapshot().current ?? null)
       synchronizeHistory()
     }
+    const resetComposerHistory = (target: EventTarget | null): void => {
+      if (!isComposerTextarea(target)) return
+      composerHistory.resetNavigation(sessions.list.getSnapshot().current)
+    }
+    const onComposerInput = (event: Event): void => {
+      resetComposerHistory(event.target)
+    }
+    const onComposerClick = (event: MouseEvent): void => {
+      const target = event.target
+      const button = target instanceof Element ? target.closest('button') : null
+      if (button === null || button.closest('[data-composer-card]') === null) return
+      composerHistory.resetNavigation(sessions.list.getSnapshot().current)
+    }
+    const onComposerKeyDown = (event: KeyboardEvent): void => {
+      const textarea = event.target
+      if (!isComposerTextarea(textarea)) return
+      const sessionId = sessions.list.getSnapshot().current
+      if (sessionId === undefined) return
+      if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        composerHistory.resetNavigation(sessionId)
+        return
+      }
+      const direction = historyDirectionForKey(event)
+      if (direction === null || !isAtHistoryBoundary(textarea, direction)) return
+      const history = composerHistory.forSession(sessionId)
+      const state = history.snapshot()
+      if (state.entries.length === 0 || (direction === 'newer' && state.cursor === null)) return
+      const input = composerInputForSession(ctx, sessions, sessionId)
+      if (input === undefined) return
+      const result = history.navigate(direction, textarea.value)
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (!result.changed || result.value === null) {
+        if (direction === 'older') {
+          const binding = sessions.binding(sessionId)
+          if (binding !== undefined) composerHistory.requestOlder(sessionId, binding.session)
+        }
+        return
+      }
+      input.setDraft(result.value)
+      window.requestAnimationFrame(() => {
+        if (textarea.isConnected) textarea.setSelectionRange(result.value?.length ?? 0, result.value?.length ?? 0)
+      })
+    }
     syncSession()
     const stopSessions = sessions.list.subscribe(syncSession)
     const stopSettings = desktopSidebar.subscribe(() => {
@@ -1800,6 +1881,9 @@ export function apply(ctx: ClientContext): void {
     }
     workspaces.openPath = interceptOpenPath
     document.addEventListener('click', interceptExternalLink, true)
+    document.addEventListener('click', onComposerClick, true)
+    document.addEventListener('input', onComposerInput, true)
+    document.addEventListener('keydown', onComposerKeyDown, true)
     syncRuntime()
     void runtimeSettings.start()
     void desktopSidebar.start()
@@ -1816,6 +1900,9 @@ export function apply(ctx: ClientContext): void {
       stopSettings()
       stopRuntime()
       document.removeEventListener('click', interceptExternalLink, true)
+      document.removeEventListener('click', onComposerClick, true)
+      document.removeEventListener('input', onComposerInput, true)
+      document.removeEventListener('keydown', onComposerKeyDown, true)
       if (workspaces.openPath === interceptOpenPath) {
         workspaces.openPath = originalOpenPath
       }
