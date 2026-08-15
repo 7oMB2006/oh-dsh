@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { test } from 'node:test'
 import {
   defaultOhDshHome,
@@ -153,9 +153,12 @@ test('legacy directory links are followed before migration completes', t => {
   write(join(desktopTarget, 'sessions', 'desktop.json'), 'desktop')
   write(join(dependencyTarget, 'package.json'), '{"name":"linked"}\n')
   mkdirSync(join(desktopTarget, 'node_modules'), { recursive: true })
+  const dependencyLink = join(desktopTarget, 'node_modules', 'linked')
   symlinkSync(
-    dependencyTarget,
-    join(desktopTarget, 'node_modules', 'linked'),
+    process.platform === 'win32'
+      ? dependencyTarget
+      : relative(dirname(dependencyLink), dependencyTarget),
+    dependencyLink,
     process.platform === 'win32' ? 'junction' : 'dir',
   )
   mkdirSync(legacyDesktopTarget, { recursive: true })

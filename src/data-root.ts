@@ -111,9 +111,40 @@ function containsPath(parent: string, candidate: string): boolean {
     && !isAbsolute(path)
 }
 
+interface CopyRoots {
+  destination: string
+  source: string
+}
+
+function relocatedLinkTarget(
+  source: string,
+  destination: string,
+  roots: CopyRoots | undefined,
+  targetStat: Stats | undefined,
+): { absolute: string; posix: string } {
+  const original = readlinkSync(source)
+  const lexicalTarget = isAbsolute(original)
+    ? resolve(original)
+    : resolve(realpathSync(dirname(source)), original)
+  const canonicalTarget = targetStat === undefined
+    ? lexicalTarget
+    : realpathSync(source)
+  const movesWithTree = roots !== undefined
+    && (canonicalTarget === roots.source
+      || containsPath(roots.source, canonicalTarget))
+  const absolute = movesWithTree
+    ? join(roots.destination, relative(roots.source, canonicalTarget))
+    : canonicalTarget
+  const posix = !movesWithTree && isAbsolute(original)
+    ? original
+    : relative(realpathSync(dirname(destination)), absolute) || '.'
+  return { absolute, posix }
+}
+
 function copyEntry(
   source: string,
   destination: string,
+  roots?: CopyRoots,
 ): void {
   const sourceStat = stat(source)
   if (sourceStat === undefined) return
@@ -122,8 +153,12 @@ function copyEntry(
   if (sourceStat.isDirectory()) {
     if (destinationStat !== undefined && !destinationStat.isDirectory()) return
     mkdirSync(destination, { recursive: true, mode: sourceStat.mode & 0o777 })
+    const copyRoots = roots ?? {
+      destination: realpathSync(destination),
+      source: realpathSync(source),
+    }
     for (const entry of readdirSync(source)) {
-      copyEntry(join(source, entry), join(destination, entry))
+      copyEntry(join(source, entry), join(destination, entry), copyRoots)
     }
     return
   }
@@ -143,9 +178,10 @@ function copyEntry(
   if (!sourceStat.isSymbolicLink() || destinationStat !== undefined) return
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 })
   const targetStat = followedStat(source)
+  const linkTarget = relocatedLinkTarget(source, destination, roots, targetStat)
   if (process.platform === 'win32') {
     if (targetStat?.isDirectory() === true) {
-      symlinkSync(realpathSync(source), destination, 'junction')
+      symlinkSync(linkTarget.absolute, destination, 'junction')
     } else if (targetStat?.isFile() === true) {
       try {
         copyFileSync(source, destination, fsConstants.COPYFILE_EXCL)
@@ -157,7 +193,7 @@ function copyEntry(
   }
   try {
     symlinkSync(
-      readlinkSync(source),
+      linkTarget.posix,
       destination,
       targetStat?.isDirectory() === true ? 'dir' : 'file',
     )
@@ -178,9 +214,10 @@ function copyDirectoryContents(
   const destinationRoot = realpathSync(destination)
   if (sourceRoot === destinationRoot) return true
   if (containsPath(sourceRoot, destinationRoot)) return false
+  const roots = { destination: destinationRoot, source: sourceRoot }
   for (const entry of readdirSync(source)) {
     if (options.exclude?.has(entry) === true) continue
-    copyEntry(join(source, entry), join(destination, entry))
+    copyEntry(join(source, entry), join(destination, entry), roots)
   }
   return true
 }
