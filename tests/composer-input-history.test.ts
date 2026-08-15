@@ -11,8 +11,9 @@ test('reads only confirmed text user messages in chronological order', () => {
     { kind: 'command', content: [{ type: 'text', text: '/help' }] },
     { kind: 'user', content: [{ type: 'image' }, { type: 'text', text: 'first' }] },
     { kind: 'user', content: [{ type: 'text', text: 'second ' }, { type: 'text', text: 'part' }] },
+    { kind: 'steering', content: [{ type: 'text', text: 'follow up' }] },
     { kind: 'user', content: [{ type: 'text', text: '' }] },
-  ]), ['first', 'second part'])
+  ]), ['first', 'second part', 'follow up'])
 })
 test('keeps histories isolated by session', () => {
   const histories = new ComposerInputHistory()

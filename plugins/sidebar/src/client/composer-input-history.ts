@@ -26,7 +26,7 @@ export function submittedInputTexts(nodes: readonly ComposerHistoryNode[] | unde
   if (nodes === undefined) return []
   const texts: string[] = []
   for (const node of nodes) {
-    if (node.kind !== 'user' || !Array.isArray(node.content)) continue
+    if ((node.kind !== 'user' && node.kind !== 'steering') || !Array.isArray(node.content)) continue
     const text = node.content
       .filter((block): block is ComposerHistoryContentBlock =>
         typeof block === 'object' && block !== null
