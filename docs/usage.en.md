@@ -56,9 +56,31 @@ sudo apt install ./Oh-DSH-Desktop-*.deb
 
 ### Windows
 
-Extract the Windows package and start **Oh-DSH Desktop**. The unified CLI is
+Run the Windows installer from the Release and start **Oh-DSH Desktop**. The unified CLI is
 `bin\ohdsh.cmd` under the application resources directory; add that directory
 to `PATH` if desired.
+
+### Desktop online updates
+
+Choose **Oh-DSH Desktop -> Check for Updates...** from the application menu.
+The updater checks only stable GitHub Releases from
+`hust-open-atom-club/oh-dsh`; it does not need a GitHub login or token.
+
+- macOS, Windows, and Linux AppImage can restart and install after a verified
+  download, or install on the next application quit.
+- `.deb` downloads and opens the system package installer. It never runs
+  `sudo`, `apt`, or `dpkg` around the system permission boundary.
+- The updater uses the system proxy configuration. Offline, proxy-auth, 404,
+  insufficient-space, verification, cancellation, and retry states are shown
+  in the update window. A verification failure never replaces the current app.
+- An update replaces only the application. DSH data, workspace settings,
+  sessions, installed plugins, and marketplace receipts remain in the existing
+  data directory.
+
+Automatic updates require a signed packaged Desktop build. Versions installed
+before the first updater-enabled Release need one manual install; local
+development builds and Releases without a matching platform package fall back
+to the official Release page.
 
 ## Install Web-only
 
@@ -188,6 +210,11 @@ pnpm run dist:win       # Windows full distribution
 pnpm run dist:web       # Web-only lightweight distribution
 pnpm run dist:tui       # TUI-only terminal distribution
 ```
+
+Publishing an auto-update tag also requires GitHub Actions secrets for macOS
+signing/notarization and Windows Authenticode signing. The workflow refuses to
+publish if credentials, an installer, a blockmap, or `latest*.yml` metadata is
+missing.
 
 ## Data and troubleshooting
 

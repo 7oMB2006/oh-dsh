@@ -37,24 +37,13 @@ const result = spawnSync(process.execPath, [
   `--config.extraMetadata.version=${version}`,
 ], {
   cwd: root,
-  env: {
-    ...process.env,
-    CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-  },
+  env: process.env.CSC_LINK || process.env.WIN_CSC_LINK || process.env.CSC_NAME
+    ? { ...process.env }
+    : { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
   stdio: 'inherit',
 })
 if (result.error !== undefined) throw result.error
 if (result.status !== 0) process.exit(result.status ?? 1)
-
-// electron-builder's NSIS/zip targets crash on the size of the bundled DSH
-// runtime; the unpacked app is already complete, so zip it with the system
-// bsdtar, which streams instead of materializing one giant argument string.
-const archive = join(root, 'release', `Oh-DSH-Desktop-${version}-x64.zip`)
-const zip = spawnSync('tar', ['-a', '-cf', archive, 'win-unpacked'], {
-  cwd: join(root, 'release'),
-  stdio: 'inherit',
-})
-if (zip.error !== undefined) throw zip.error
-if (zip.status !== 0) process.exit(zip.status ?? 1)
-if (!existsSync(archive)) throw new Error(`Windows archive was not produced: ${archive}`)
-console.log(`Packaged Oh-DSH Desktop ${version}: ${archive}`)
+const installer = join(root, 'release', `Oh-DSH-Desktop-${version}-x64.exe`)
+if (!existsSync(installer)) throw new Error(`Windows NSIS installer was not produced: ${installer}`)
+console.log(`Packaged Oh-DSH Desktop ${version}: ${installer}`)

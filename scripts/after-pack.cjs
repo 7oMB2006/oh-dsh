@@ -4,6 +4,9 @@ const { join } = require('node:path')
 /** Ad-hoc sign local macOS test builds before DMG/ZIP targets consume them. */
 module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return
+  // Production CI signs and notarizes through electron-builder. The ad-hoc
+  // fallback is only for local builds without a Developer ID certificate.
+  if (process.env.CSC_LINK || process.env.CSC_NAME || process.env.APPLE_ID) return
   const appPath = join(
     context.appOutDir,
     `${context.packager.appInfo.productFilename}.app`,

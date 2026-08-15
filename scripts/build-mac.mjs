@@ -43,10 +43,9 @@ const result = spawnSync(builder, [
   `--config.extraMetadata.version=${version}`,
 ], {
   cwd: root,
-  env: {
-    ...process.env,
-    CSC_IDENTITY_AUTO_DISCOVERY: 'false',
-  },
+  env: process.env.CSC_LINK || process.env.CSC_NAME
+    ? { ...process.env }
+    : { ...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false' },
   stdio: 'inherit',
 })
 if (result.error !== undefined) throw result.error

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { test } from 'node:test'
@@ -19,6 +19,7 @@ import {
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import {
   PluginMarketplaceManager,
+  removeWithin,
   type MarketplacePreviewRuntimeInput,
   type MarketplaceRuntime,
 } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
@@ -216,6 +217,102 @@ function fixture(): {
     runtime,
   }
 }
+
+test('preview tree cleanup clears Windows read-only attributes before retrying', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-cleanup-'))
+  const previews = join(root, 'plugin-marketplace', 'previews')
+  const pack = join(previews, 'stale', '.git', 'objects', 'pack')
+  try {
+    mkdirSync(pack, { recursive: true })
+    writeFileSync(join(pack, 'pack-demo.pack'), 'pack', { mode: 0o444 })
+    writeFileSync(join(pack, 'pack-demo.idx'), 'idx', { mode: 0o444 })
+    chmodSync(previews, 0o555)
+    chmodSync(pack, 0o555)
+    const warnings: string[] = []
+    removeWithin(root, previews, message => { warnings.push(message) }, 'win32')
+    assert.deepEqual(warnings, [])
+    assert.equal(existsSync(previews), false)
+  } finally {
+    if (existsSync(previews)) chmodSync(previews, 0o755)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('marketplace startup clears read-only Git pack files on Windows', {
+  skip: process.platform !== 'win32' ? 'requires Windows read-only attribute semantics' : false,
+}, () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-windows-'))
+  const dshHome = join(appDataPath, 'dsh')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const previews = join(appDataPath, 'plugin-marketplace', 'previews')
+  const pack = join(previews, 'stale', '.git', 'objects', 'pack')
+  try {
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: ['@oh-dsh/desktop'] } },
+    }, undefined, 2) + '\n')
+    mkdirSync(pack, { recursive: true })
+    writeFileSync(join(pack, 'pack-demo.pack'), 'pack')
+    writeFileSync(join(pack, 'pack-demo.idx'), 'idx')
+    chmodSync(join(pack, 'pack-demo.pack'), 0o444)
+    chmodSync(join(pack, 'pack-demo.idx'), 0o444)
+    const warnings: string[] = []
+    const manager = new PluginMarketplaceManager({
+      appDataPath,
+      dshHome,
+      onWarn: message => { warnings.push(message) },
+      platform: new FakePlatform(),
+      profile: 'desktop',
+      runtime: new FakeRuntime(),
+    })
+    assert.deepEqual(warnings, [])
+    assert.equal(existsSync(join(previews, 'stale')), false)
+    assert.deepEqual(manager.getSnapshot().installed, [])
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('marketplace startup survives a previews tree that cannot be removed', {
+  skip: process.platform === 'win32'
+    ? 'Windows directory read-only attributes do not block recursive removal'
+    : false,
+}, () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-startup-'))
+  const dshHome = join(appDataPath, 'dsh')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const previews = join(appDataPath, 'plugin-marketplace', 'previews')
+  try {
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: ['@oh-dsh/desktop'] } },
+    }, undefined, 2) + '\n')
+    mkdirSync(join(previews, 'stale'), { recursive: true })
+    writeFileSync(join(previews, 'stale', 'pack-demo.pack'), 'pack')
+    chmodSync(previews, 0o555)
+    const warnings: string[] = []
+    const manager = new PluginMarketplaceManager({
+      appDataPath,
+      dshHome,
+      onWarn: message => { warnings.push(message) },
+      platform: new FakePlatform(),
+      profile: 'desktop',
+      runtime: new FakeRuntime(),
+    })
+    assert.match(warnings.join('\n'), /failed to clean plugin marketplace tree/)
+    assert.equal(existsSync(previews), true)
+    assert.deepEqual(manager.getSnapshot().installed, [])
+  } finally {
+    if (existsSync(previews)) chmodSync(previews, 0o755)
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
 
 test('catalog parser keeps safe entries and labels unsupported managers', () => {
   const catalog = parseMarketplaceCatalog(catalogDocument())

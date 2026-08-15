@@ -68,6 +68,28 @@ test('ohdsh dispatches desktop, web, and TUI through one surface command', async
   ])
 })
 
+test('layered distributions list and reject unavailable surfaces', async () => {
+  const stdout = output()
+  const stderr = output()
+  assert.equal(await main(
+    ['--help'],
+    { OH_DSH_SURFACES: 'web' },
+    stdout.stream,
+    stderr.stream,
+  ), 0)
+  assert.match(stdout.text(), /web\s+Start Oh-DSH Web/)
+  assert.doesNotMatch(stdout.text(), /Start Oh-DSH Desktop/)
+  assert.doesNotMatch(stdout.text(), /Start Oh-DSH TUI/)
+
+  assert.equal(await main(
+    ['desktop'],
+    { OH_DSH_SURFACES: 'web' },
+    stdout.stream,
+    stderr.stream,
+  ), 2)
+  assert.match(stderr.text(), /Surface 'desktop' is not included/)
+})
+
 test('desktop launch keeps source and installed macOS paths distinct', () => {
   assert.deepEqual(desktopLaunchSpec([], {
     OH_DSH_DESKTOP_APP: '/Applications/Oh-DSH Desktop.app',

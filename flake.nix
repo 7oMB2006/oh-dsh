@@ -1,5 +1,5 @@
 {
-  description = "Oh-DSH: an installable DeepSeek Harness desktop and web distribution";
+  description = "Oh-DSH: installable Desktop, Web, and TUI distributions";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -46,18 +46,24 @@
           };
         in
         rec {
-          # Default dsh source: numtide/llm-agents.nix.
+          # Full distribution: Desktop, Web, and TUI through one launcher.
+          oh-dsh = mkOhDsh { surface = "full"; dshSource = "llm-agents"; };
+          oh-dsh-desktop = oh-dsh;
+
+          # Layered distributions without Electron.
           oh-dsh-web = mkOhDsh { surface = "web"; dshSource = "llm-agents"; };
-          oh-dsh-desktop = mkOhDsh { surface = "desktop"; dshSource = "llm-agents"; };
+          oh-dsh-tui = mkOhDsh { surface = "tui"; dshSource = "llm-agents"; };
 
-          # Variant pinning the DSH runtime to this repo's dsh-source.json.
+          # Variants pinning the DSH runtime to this repo's dsh-source.json.
+          oh-dsh-pinned = mkOhDsh { surface = "full"; dshSource = "pinned"; };
+          oh-dsh-desktop-pinned = oh-dsh-pinned;
           oh-dsh-web-pinned = mkOhDsh { surface = "web"; dshSource = "pinned"; };
-          oh-dsh-desktop-pinned = mkOhDsh { surface = "desktop"; dshSource = "pinned"; };
+          oh-dsh-tui-pinned = mkOhDsh { surface = "tui"; dshSource = "pinned"; };
 
-          # "nixpkgs" variant is available via mkOhDsh but not exposed as a
-          # package until pkgs.deepseek-harness lands (NixOS/nixpkgs#552467).
+          # "nixpkgs" variants remain available through mkOhDsh once
+          # pkgs.deepseek-harness lands (NixOS/nixpkgs#552467).
 
-          default = oh-dsh-web;
+          default = oh-dsh;
         });
     };
 }

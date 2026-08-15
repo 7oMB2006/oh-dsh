@@ -1,7 +1,7 @@
 {
   "name": "@oh-dsh/desktop",
   "productName": "Oh-DSH Desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Oh-DSH: installable Desktop, Web, and TUI surfaces over DeepSeek Harness",
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
@@ -75,13 +75,19 @@
     "dist:tui": "pnpm run build && pnpm run build:dsh && pnpm run stage:dsh && node scripts/build-tui.mjs",
     "dist:tui:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-tui.mjs"
   },
+  "dependencies": {
+    "electron-updater": "6.8.9",
+    "semver": "7.7.4"
+  },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "@types/semver": "7.8.0",
     "electron": "42.3.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.12",
     "pnpm": "11.20.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "yaml": "2.8.1"
   },
   "engines": {
     "node": ">=24"
@@ -98,6 +104,10 @@
     "files": [
       "dist/main.js",
       "dist/preload.cjs",
+      "dist/update-preload.cjs",
+      "dist/update-dialog.js",
+      "dist/update-dialog.js.map",
+      "dist/update.html",
       "dist/splash.html",
       "LICENSE",
       "THIRD_PARTY_NOTICES.md",
@@ -133,6 +143,11 @@
         ]
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "hust-open-atom-club",
+      "repo": "oh-dsh"
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
@@ -140,7 +155,6 @@
         "zip"
       ],
       "icon": "assets/Oh-DSH-Desktop.icns",
-      "identity": null,
       "darkModeSupport": true,
       "minimumSystemVersion": "12.0.0",
       "extendInfo": {
@@ -164,9 +178,15 @@
     },
     "win": {
       "target": [
-        "dir"
+        "nsis"
       ],
       "icon": "assets/icons/512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
     },
     "dmg": {
       "title": "Oh-DSH Desktop ${version}",
