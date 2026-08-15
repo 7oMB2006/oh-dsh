@@ -5,24 +5,45 @@ description: Use when reviewing a pull request in the deepseek-harness repo — 
 
 # Reviewing a DeepSeek-Harness PR
 
-This is a where-to-look map, not a rules list. The rules live in the docs below and are the source of truth — read them there so this skill never drifts out of sync with them.
+**This skill is guidance, not a complete checklist.** Verify and fetch the PR's live base and exact head, then run `pnpm --silent run change-scope --base <verified-base-ref> --head <verified-head-ref>` before reading the diff and enough surrounding code to understand the design. The report identifies paths and dirty layers but does not replace semantic review. Re-establish the base and rerun it after a retarget or merge. Prioritize correctness, lifecycle, security, and broken required behavior over style; a short review with one substantiated blocker is better than a list of nits.
 
-## Sources of truth (read, don't re-summarize)
+## Sources of truth
 
-- **[AGENTS.md](../../../AGENTS.md) § Conventions** — effect-based registrations, declaration-merging for events/ctx keys, waterfall `next()` discipline, discriminated-union match-don't-chain, explicit-over-implicit at seams, the empty-`catch` rule, symmetry. Every PR is checked against these.
-- **AGENTS.md § Defensive patterns (hard-won)** — each bullet is a bug class that bit us. Reviewing anything touching process lifecycle, async/await, disposal, or adapter error paths? Re-read this first.
-- **AGENTS.md § Type Safety and Documentation** — the doc-sync rule (code change ⇒ update README + JSDoc in the SAME commit) and the no-hard-wrap markdown convention.
-- **[packages/AGENTS.md](../../../packages/AGENTS.md)** — per-package conventions (file layout, the HMR-safety test requirement).
-- **[ADR index](../../../docs/adr/README.md)** — the *why* behind the architecture. Especially [0007 quality gates](../../../docs/adr/0007-quality-gates.md) (what a PR must pass) and [0009 capability seams](../../../docs/adr/0009-capability-seams.md) (the three-package split). If a change seems to fight an ADR, that's a discussion, not a silent override.
+- [AGENTS.md](../../../AGENTS.md) and [packages/AGENTS.md](../../../packages/AGENTS.md): standing repository and package authoring rules.
+- [docs/defensive-patterns.md](../../../docs/defensive-patterns.md): subprocess, callback, async-state, and disposal bug classes.
+- [docs/AGENTS.md](../../../docs/AGENTS.md): documentation placement and prose discipline.
+- [dsh-prose-standard](../dsh-prose-standard/SKILL.md): required coverage and editorial judgment for comments, docs, prompts, and visible strings.
+- [docs/testing.md](../../../docs/testing.md) and the [quality-gates Agent Note](../../notes/implemented/process/2026-06-11-quality-gates.md): required test tiers and gates.
+- [Agent Notes](../../notes/README.md): design rationale. Treat disagreement with an Agent Note as a design discussion, not an automatic veto.
+- For bilingual changes, read [translation-rules.md](../../../docs/i18n/translation-rules.md) and [terminology.md](../../../docs/i18n/terminology.md); the extended translation skill is outside automatic review and runs only on explicit user invocation.
 
-## Where to look first (review-specific, not in the docs)
+## Blocking requirements
 
-1. **Docs in sync?** If the PR changes a config key, default, error code, wire field, or event name, did it update the package README + module/JSDoc in the same diff? Stale docs are the most common miss — `yarn doc-sync` only gates compilable `ts` blocks and the event-taxonomy table, so prose drift (config keys, defaults, error codes, wire fields) has no gate and is on the reviewer to catch.
-2. **HMR-safety test present?** Any new registry/registration needs a test that disposes the contributing fiber and asserts cleanup. Its absence is a blocking gap.
-3. **Gates green?** typecheck, lint, test, test:coverage (100% per-file on `packages/*/src`), knip, build, publint, constraints. Don't re-review what a gate already enforces — trust the gate, spend attention on what gates can't check (intent, contracts, doc sync).
-4. **e2e verifies the world, not the agent's self-report.** For real-API tests, confirm the assertion re-runs the command/checks the file externally — a keyword probe lets a cheating agent pass (see AGENTS.md e2e bullet).
-5. **Seam discipline.** New swappable capability? Check it's split per ADR 0009 (interface / impl / consumer), and that the consumer injects the interface key, never an implementation type.
+1. **New prose receives semantic review.** Use [dsh-prose-standard](../dsh-prose-standard/SKILL.md) to critically review every added or changed Markdown passage, JSDoc, comment, prompt, description, diagnostic, and visible string. Verify required coverage, accuracy, placement, and editorial quality against the owning code or behavior; automated checks do not establish those properties.
+2. **Docs match the code.** Config, defaults, errors, wire fields, events, and public behavior update the package README and JSDoc in the same diff. Comments state non-obvious contracts; flag implementation narration, test walkthroughs, review history, and duplicated rationale for deletion or a link to their one home.
+3. **Core type docs match.** Changes to spine or seam vocabulary update the appropriate [subsystems](../../../docs/subsystems/README.md) page and any `type-equiv` entry. Internal types need no catalog entry.
+4. **Registrations clean up.** Verify each new registry contribution passes the disposal tests required by [packages/AGENTS.md](../../../packages/AGENTS.md).
+5. **Invariant companions are semantic.** For every touched `./invariant`, require an owner event-stream or mutable-data relationship at the point where that package can observe it; service or method presence, plugin metadata or effects, and fixed pure examples belong in type, load, or unit tests. Accept an empty installer when its package-specific reason establishes that no plausible runtime relationship exists; do not demand an invented check merely to eliminate emptiness ([repository rule](../../../AGENTS.md#conventions); [package invariant rules](../../../packages/AGENTS.md)).
+6. **Required evidence exists.** Verify the author ran the [relevant local checks](../../../AGENTS.md#run-relevant-checks-locally) for the diff and that CI covers the exhaustive matrix; review the semantic gaps neither can detect.
 
-## How to respond
+## Manual checks
 
-Technical, specific, non-performative — no "great catch", no "you're absolutely right". State the issue and where; cite the AGENTS.md bullet or ADR it relates to. When replying to inline threads on GitHub, reply in the thread (`gh api repos/{owner}/{repo}/pulls/{n}/comments/{id}/replies`), not as a top-level comment. If a suggestion would fight an ADR or an established convention, say so and link it rather than relitigating in the thread.
+- **Intent and interface contracts:** trace both sides of every changed interface. Confirm the implementation matches the PR and any Agent Note, including errors, cancellation, ownership, and disposal.
+- **Lifecycle and concurrency:** for async setup, callbacks, processes, or teardown, apply [defensive-patterns.md](../../../docs/defensive-patterns.md). Check races before publication, cancellation during awaits, independent error reporting, callback containment, ownership before reentry, complete detach cleanup, and quiescent disposal.
+- **Capability and consumer fit:** trace every current consumer, then flag consumer-specific behavior leaking into the interface under [the package rules](../../../packages/AGENTS.md). Flag the inverse too: a new public method on a generic service (registry, session, agent) whose only caller is one internal consumer is an unnecessary API expansion — require a private capability closure handed to that consumer at construction instead.
+- **Scope, ownership, and necessity:** map each abstraction, state machine, option, defensive copy, and compatibility path to its current contract, production consumer, and owning plugin or service. Challenge unrelated features and speculative generality, then test the PR against [the root rules](../../../AGENTS.md#conventions).
+- **Configuration and public choices:** ask what current-consumer evidence or prior art supports each default, public operation set, format, or imported external concept. Require an explicit choice or deferral when that evidence is absent.
+- **Model perspective:** inspect the exact prompts, tool schemas, results, and diagnostics the model receives across affected modes. Flag concepts outside the model's task, then verify stable text verbatim and dynamic behavior through snapshots or end-to-end coverage.
+- **Enforcement:** follow every denial path to the operation that executes it; exercise direct and alternate callers that can bypass schemas, prompts, facades, wrappers, or listener ordering.
+- **Borrowed and derived state:** determine whether each retained value is borrowed or owned under the package contract, then trace notifications and every cache, prompt, UI echo, replay, and query view to the documented success point and authoritative source.
+- **Bounds cover the final operation:** locate the owner of the complete emitted or retained result, including wrappers and metadata. Probe tiny and exact limits, oversized single chunks, and multibyte text for byte limits.
+- **Real entry path:** tests exercise the shipped Loader, bin, worker, ACP bridge, or subprocess where relevant. A hand-mounted plugin does not catch invalid Loader exports; a function plugin must named-export its namespace and have no default export.
+- **Test strength:** assertions fail on the intended regression and verify external state, logs, events, or disposal rather than restating the implementation or trusting an agent's report. Coverage is necessary but not evidence that the scenario is correct.
+- **Invariant lifecycle and negative controls:** verify candidate observations are rejected before publication where possible, session-backed checks reconstruct durable history after late loading or HMR, and a deliberately invalid case fails through the real runner for the intended rule.
+- **Implemented Agent Notes match shipped reality:** when a PR implements a proposed Agent Note, move and rewrite it as present-tense shipped state in the same diff, then verify paths, names, and mechanisms against the implementation.
+- **Transcript changes:** editor-visible or model-visible changes update snapshots or explain why no snapshot applies. Review expected-output diffs as behavior changes, not formatting noise.
+- **Bilingual changes:** compare meaning and terminology on both sides; a green pairing hash does not prove translation quality.
+
+## Reporting findings
+
+State the defect, location, impact, and evidence. Place a localized defect inline on the tightest relevant diff range; use a PR-level comment for cross-cutting architecture, scope, or review-wide synthesis. Separate blockers from suggestions and omit issues already enforced by a green gate. Use the existing GitHub review thread for replies. When receiving review, verify each claim and fix or rebut it on technical grounds without performative agreement.
