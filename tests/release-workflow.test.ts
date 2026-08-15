@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
 import { validateReleaseTag } from '../scripts/validate-release-tag.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -23,6 +24,30 @@ test('tagged releases build and upload both TUI archive formats', () => {
   assert.match(workflow, /if: github\.event_name == 'push'/)
   assert.match(workflow, /macOS signing credentials are incomplete; producing an ad-hoc-signed package/)
   assert.match(workflow, /Windows signing credentials are incomplete; producing an unsigned installer/)
+
+  const config = parse(workflow)
+  const packageJob = config.jobs.package
+  assert.equal('CSC_LINK' in packageJob.env, false)
+  assert.equal('CSC_KEY_PASSWORD' in packageJob.env, false)
+
+  const fallbackStep = packageJob.steps.find(
+    (step: { name?: string }) =>
+      step.name === 'Package desktop distribution without release credentials',
+  )
+  assert.equal(fallbackStep.if, "env.DSH_DESKTOP_SIGNING != 'enabled'")
+  assert.equal(fallbackStep.env.CSC_IDENTITY_AUTO_DISCOVERY, 'false')
+
+  const signedMacStep = packageJob.steps.find(
+    (step: { name?: string }) =>
+      step.name === 'Package signed macOS desktop distribution',
+  )
+  assert.match(signedMacStep.env.CSC_LINK, /secrets\.MACOS_CSC_LINK/)
+
+  const signedWindowsStep = packageJob.steps.find(
+    (step: { name?: string }) =>
+      step.name === 'Package signed Windows desktop distribution',
+  )
+  assert.match(signedWindowsStep.env.CSC_LINK, /secrets\.WINDOWS_CSC_LINK/)
 })
 
 test('release tags must match a stable package version', () => {
