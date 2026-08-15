@@ -104,17 +104,17 @@ void app.whenReady().then(async () => {
                 button.getAttribute('aria-label'),
                 button.getAttribute('title'),
               ].filter(Boolean).join(' ')))
+            const remove = removeButtons.find(button => !button.disabled)
             window.__OH_DSH_SMOKE_VISION_FACTS__ = {
               bubbleBottom: thumbnailRect.bottom,
               cardTop: cardRect.top,
               imageWidth: image.naturalWidth,
-              removeLabel: removeButtons[0]?.getAttribute('aria-label') ?? null,
-              removeDisabled: removeButtons[0]?.disabled ?? null,
+              removeLabel: remove?.getAttribute('aria-label') ?? null,
+              removeDisabled: remove?.disabled ?? null,
               status: 'ready',
             }
             window.__OH_DSH_SMOKE_VISION_SEEN__ = true
             if (window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ !== true) {
-              const remove = removeButtons[0]
               if (remove instanceof HTMLButtonElement) {
                 window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
                 remove.focus()
@@ -185,6 +185,8 @@ void app.whenReady().then(async () => {
           return {
             error: null,
             facts: window.__OH_DSH_SMOKE_VISION_FACTS__ ?? null,
+            removeAvailable: window.__OH_DSH_SMOKE_VISION_FACTS__?.removeLabel !== null
+              && window.__OH_DSH_SMOKE_VISION_FACTS__?.removeDisabled === false,
             removed: window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ === true
               && current === null,
             requested: window.__OH_DSH_SMOKE_VISION_REQUESTED__ === true,
@@ -284,7 +286,7 @@ void app.whenReady().then(async () => {
       if (webSmoke
         && state.webReady === true
         && state.vision.seen === true
-        && state.vision.removed === true) {
+        && state.vision.removeAvailable === true) {
         settle()
         return
       }
@@ -292,7 +294,7 @@ void app.whenReady().then(async () => {
         && state.navigation !== null
         && state.navigation.collapsed === true
         && state.vision.seen === true
-        && state.vision.removed === true) {
+        && state.vision.removeAvailable === true) {
         if (state.navigation.pluginsTop < 0
           || state.navigation.pluginsBottom > state.navigation.viewportHeight
           || state.navigation.settingsTop < 0
