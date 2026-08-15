@@ -4,6 +4,7 @@ import {
   accessSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   renameSync,
   writeFileSync,
@@ -19,6 +20,7 @@ import {
   sep,
   win32,
 } from 'node:path'
+import { parseMarketplaceCatalog } from '../catalog.ts'
 import type { MarketplaceAuthStatus } from '../protocol.ts'
 import {
   MARKETPLACE_CATALOG_PATH,
@@ -47,10 +49,14 @@ export interface MarketplacePlatform {
   authStatus(): Promise<MarketplaceAuthResult>
   buildBundle(input: BundleBuildInput): Promise<void>
   cloneRepository(repository: string, commit: string, target: string): Promise<void>
-  loadCatalog(): Promise<unknown>
+  loadCatalog(options?: LoadCatalogOptions): Promise<unknown>
   readRepositoryFile(repository: string, path: string, commit: string): Promise<string | null>
   resolveCommit(repository: string): Promise<string>
   runDsh(input: DshCommandInput): Promise<void>
+}
+
+export interface LoadCatalogOptions {
+  force?: boolean
 }
 
 export interface ProductionMarketplacePlatformOptions {
@@ -59,6 +65,7 @@ export interface ProductionMarketplacePlatformOptions {
   env: NodeJS.ProcessEnv
   fetch?: typeof globalThis.fetch
   nodeBinary: string
+  now?: () => number
   pnpmEntry: string
   onLog?: (message: string) => void
 }
@@ -70,6 +77,20 @@ interface CommandOptions {
 }
 
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024
+export const MARKETPLACE_CATALOG_CACHE_TTL_MS = 2 * 60 * 60 * 1000
+const CATALOG_CACHE_VERSION = 1
+
+interface CatalogCache {
+  document: unknown
+  etag: string | null
+  fetchedAt: number
+  locator: string
+  version: 1
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
 function validateRepository(repository: string): void {
   if (!/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(repository)) {
@@ -77,13 +98,65 @@ function validateRepository(repository: string): void {
   }
 }
 
-function repositoryContentPath(repository: string, path: string): string {
-  validateRepository(repository)
+function repositoryPathSegments(path: string): string[] {
   const segments = path.split('/').filter(Boolean)
   if (segments.length === 0 || segments.some(segment => segment === '.' || segment === '..')) {
     throw new Error(`invalid repository file path: ${JSON.stringify(path)}`)
   }
+  return segments
+}
+
+function repositoryContentPath(repository: string, path: string): string {
+  validateRepository(repository)
+  const segments = repositoryPathSegments(path)
   return `repos/${repository}/contents/${segments.map(encodeURIComponent).join('/')}`
+}
+
+function repositoryRawUrl(repository: string, path: string): string {
+  validateRepository(repository)
+  const segments = repositoryPathSegments(path)
+  return `https://raw.githubusercontent.com/${repository}/HEAD/${segments.map(encodeURIComponent).join('/')}`
+}
+
+function catalogCachePath(environment: NodeJS.ProcessEnv): string | null {
+  const appDataPath = environment.DSH_DESKTOP_APP_DATA
+  if (appDataPath === undefined || appDataPath === '') return null
+  return join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')
+}
+
+function readCatalogCache(path: string | null, locator: string): CatalogCache | null {
+  if (path === null) return null
+  try {
+    const value = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    if (!isRecord(value)
+      || value.version !== CATALOG_CACHE_VERSION
+      || value.locator !== locator
+      || typeof value.fetchedAt !== 'number'
+      || !Number.isFinite(value.fetchedAt)
+      || value.fetchedAt < 0
+      || (value.etag !== null && typeof value.etag !== 'string')
+      || !Object.hasOwn(value, 'document')) {
+      return null
+    }
+    parseMarketplaceCatalog(value.document)
+    return {
+      document: value.document,
+      etag: value.etag as string | null,
+      fetchedAt: value.fetchedAt,
+      locator,
+      version: CATALOG_CACHE_VERSION,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeCatalogCache(path: string | null, cache: CatalogCache): void {
+  if (path === null) return
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+  const temporary = `${path}.tmp-${String(process.pid)}`
+  writeFileSync(temporary, JSON.stringify(cache) + '\n', { mode: 0o600 })
+  renameSync(temporary, path)
 }
 
 function commandError(command: string, args: readonly string[], stderr: string, stdout: string): Error {
@@ -365,7 +438,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
     }
   }
 
-  async loadCatalog(): Promise<unknown> {
+  async loadCatalog(options: LoadCatalogOptions = {}): Promise<unknown> {
     const locator = this.#options.env.OH_DSH_MARKETPLACE_CATALOG
       ?? `${MARKETPLACE_CATALOG_REPOSITORY}/${MARKETPLACE_CATALOG_PATH}`
     const match = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(.+)$/.exec(locator)
@@ -373,20 +446,58 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       throw new Error('OH_DSH_MARKETPLACE_CATALOG must be owner/repository/path')
     }
     validateRepository(match[1] ?? '')
+    const repository = match[1] ?? ''
     const path = match[2] ?? ''
-    const contentPath = repositoryContentPath(match[1] ?? '', path)
+    const contentPath = repositoryContentPath(repository, path)
+    const cachePath = catalogCachePath(this.#options.env)
+    const cached = readCatalogCache(cachePath, locator)
+    const now = this.#options.now?.() ?? Date.now()
+    const age = cached === null ? Number.POSITIVE_INFINITY : now - cached.fetchedAt
+    if (options.force !== true && cached !== null
+      && age >= 0 && age < MARKETPLACE_CATALOG_CACHE_TTL_MS) {
+      this.#options.onLog?.('marketplace catalog: using fresh local cache')
+      return cached.document
+    }
+    const save = (document: unknown, etag: string | null): void => {
+      try {
+        writeCatalogCache(cachePath, {
+          document,
+          etag,
+          fetchedAt: now,
+          locator,
+          version: CATALOG_CACHE_VERSION,
+        })
+      } catch (error) {
+        this.#options.onLog?.(`marketplace catalog: failed to update local cache: ${String(error)}`)
+      }
+    }
+    const stale = (cache: CatalogCache, reason: unknown): unknown => {
+      this.#options.onLog?.(`marketplace catalog: using stale local cache after refresh failed: ${String(reason)}`)
+      return cache.document
+    }
     const request = this.#options.fetch ?? globalThis.fetch
     let publicError: unknown
     try {
-      const response = await request(`https://api.github.com/${contentPath}`, {
-        headers: {
-          accept: 'application/vnd.github.raw+json',
-          'user-agent': 'oh-dsh-desktop',
-        },
+      const headers: Record<string, string> = {
+        accept: 'application/json',
+        'user-agent': 'oh-dsh-desktop',
+      }
+      if (cached?.etag !== null && cached?.etag !== undefined) {
+        headers['if-none-match'] = cached.etag
+      }
+      const response = await request(repositoryRawUrl(repository, path), {
+        headers,
         signal: AbortSignal.timeout(30_000),
       })
-      if (!response.ok) throw new Error(`GitHub public catalog request failed with HTTP ${String(response.status)}`)
-      return JSON.parse(await response.text()) as unknown
+      if (response.status === 304 && cached !== null) {
+        save(cached.document, response.headers.get('etag') ?? cached.etag)
+        return cached.document
+      }
+      if (!response.ok) throw new Error(`GitHub Raw catalog request failed with HTTP ${String(response.status)}`)
+      const document = JSON.parse(await response.text()) as unknown
+      parseMarketplaceCatalog(document)
+      save(document, response.headers.get('etag'))
+      return document
     } catch (error) {
       publicError = error
     }
@@ -395,16 +506,22 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
         const result = await runCommand(this.#ghPath, [
           'api',
           contentPath,
-          '--jq',
-          '.content',
-        ], { env: this.#options.env, timeoutMs: 30_000 })
-        return JSON.parse(Buffer.from(result.stdout.replaceAll(/\s/g, ''), 'base64').toString('utf8')) as unknown
+          '-H',
+          'Accept: application/vnd.github.raw+json',
+        ], { cwd: this.#options.cwd, env: this.#options.env, timeoutMs: 30_000 })
+        const document = JSON.parse(result.stdout) as unknown
+        parseMarketplaceCatalog(document)
+        save(document, null)
+        return document
       } catch (authenticatedError) {
-        throw new Error(
+        const failure = new Error(
           `failed to load marketplace catalog anonymously (${String(publicError)}) or with GitHub CLI (${String(authenticatedError)})`,
         )
+        if (cached !== null) return stale(cached, failure)
+        throw failure
       }
     }
+    if (cached !== null) return stale(cached, publicError)
     throw new Error(`failed to load public marketplace catalog: ${String(publicError)}`)
   }
 

@@ -662,7 +662,7 @@ export class PluginMarketplaceManager {
     try {
       switch (command.type) {
         case 'refresh':
-          await this.refresh()
+          await this.refresh(command.force === true)
           break
         case 'inspect':
           await this.inspect(command.action, command.pluginId)
@@ -694,10 +694,10 @@ export class PluginMarketplaceManager {
     return this.getSnapshot()
   }
 
-  private async refresh(): Promise<void> {
+  private async refresh(force = false): Promise<void> {
     this.#auth = await this.#options.platform.authStatus()
     const installed = readMarketplaceState(this.#profileDir).entries
-    const catalog = parseMarketplaceCatalog(await this.#options.platform.loadCatalog(), installed)
+    const catalog = parseMarketplaceCatalog(await this.#options.platform.loadCatalog({ force }), installed)
     this.#catalog = catalog.plugins
     this.#catalogGeneratedAt = catalog.generatedAt
     this.#latestCommits.clear()

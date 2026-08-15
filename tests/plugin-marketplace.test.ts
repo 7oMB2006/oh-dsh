@@ -8,11 +8,13 @@ import { parseMarketplaceCatalog } from '../plugins/plugin-marketplace/src/catal
 import type {
   BundleBuildInput,
   DshCommandInput,
+  LoadCatalogOptions,
   MarketplaceAuthResult,
   MarketplacePlatform,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import {
   findGitHubCli,
+  MARKETPLACE_CATALOG_CACHE_TTL_MS,
   previewScriptCommand,
   ProductionMarketplacePlatform,
   withGitHubCredentials,
@@ -85,6 +87,7 @@ class FakePlatform implements MarketplacePlatform {
     scripts: string[]
   }> = []
   readonly commands: DshCommandInput[] = []
+  readonly catalogLoads: LoadCatalogOptions[] = []
   catalog: unknown = catalogDocument()
   latestCommit = COMMIT
   bundleName = '@example/bundle-demo'
@@ -106,7 +109,8 @@ class FakePlatform implements MarketplacePlatform {
     mkdirSync(target, { recursive: true })
   }
 
-  async loadCatalog(): Promise<unknown> {
+  async loadCatalog(options: LoadCatalogOptions = {}): Promise<unknown> {
+    this.catalogLoads.push(options)
     return this.catalog
   }
 
@@ -426,8 +430,144 @@ test('public catalogs load anonymously without GitHub CLI', async () => {
   assert.deepEqual(await platform.loadCatalog(), catalogDocument())
   assert.equal(
     requested,
-    'https://api.github.com/repos/public-owner/public-catalog/contents/data/plugins.json',
+    'https://raw.githubusercontent.com/public-owner/public-catalog/HEAD/data/plugins.json',
   )
+})
+
+test('catalog cache survives restarts, revalidates with ETags, and expires after two hours', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-catalog-cache-'))
+  let now = 1_000
+  let requests = 0
+  let transportFails = false
+  const conditionalHeaders: Array<string | null> = []
+  const createPlatform = (): ProductionMarketplacePlatform => new ProductionMarketplacePlatform({
+    cliEntry: '/unused/dsh.mjs',
+    cwd: appDataPath,
+    env: {
+      DSH_DESKTOP_APP_DATA: appDataPath,
+      DSH_DESKTOP_GH_PATH: process.execPath,
+      OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+      PATH: '',
+    },
+    fetch: async (_input, init): Promise<Response> => {
+      requests += 1
+      conditionalHeaders.push(new Headers(init?.headers).get('if-none-match'))
+      if (transportFails) throw new Error('offline')
+      if (requests === 2) {
+        return new Response(null, { headers: { etag: '"catalog-v1"' }, status: 304 })
+      }
+      return new Response(JSON.stringify(catalogDocument()), {
+        headers: { etag: '"catalog-v1"' },
+        status: 200,
+      })
+    },
+    nodeBinary: process.execPath,
+    now: () => now,
+    pnpmEntry: '/unused/pnpm.mjs',
+  })
+
+  try {
+    writeFileSync(join(appDataPath, 'api'), 'process.exit(1)\n')
+    assert.deepEqual(await createPlatform().loadCatalog(), catalogDocument())
+    now += MARKETPLACE_CATALOG_CACHE_TTL_MS - 1
+    assert.deepEqual(await createPlatform().loadCatalog(), catalogDocument())
+    assert.equal(requests, 1)
+
+    assert.deepEqual(await createPlatform().loadCatalog({ force: true }), catalogDocument())
+    assert.equal(requests, 2)
+    assert.deepEqual(conditionalHeaders, [null, '"catalog-v1"'])
+
+    now += MARKETPLACE_CATALOG_CACHE_TTL_MS
+    assert.deepEqual(await createPlatform().loadCatalog(), catalogDocument())
+    assert.equal(requests, 3)
+
+    transportFails = true
+    assert.deepEqual(await createPlatform().loadCatalog({ force: true }), catalogDocument())
+    assert.equal(requests, 4)
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('catalog cache rejects unsupported documents before reuse', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-invalid-cache-'))
+  const command = join(appDataPath, 'api')
+  const cachePath = join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')
+  let document: unknown = { schema: 'unsupported/v1' }
+  let requests = 0
+  const createPlatform = (): ProductionMarketplacePlatform => new ProductionMarketplacePlatform({
+    cliEntry: '/unused/dsh.mjs',
+    cwd: appDataPath,
+    env: {
+      DSH_DESKTOP_APP_DATA: appDataPath,
+      DSH_DESKTOP_GH_PATH: process.execPath,
+      OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+      PATH: '',
+    },
+    fetch: async (): Promise<Response> => {
+      requests += 1
+      return new Response(JSON.stringify(document), { status: 200 })
+    },
+    nodeBinary: process.execPath,
+    now: () => 1_000,
+    pnpmEntry: '/unused/pnpm.mjs',
+  })
+
+  try {
+    writeFileSync(command, 'process.exit(1)\n')
+    await assert.rejects(createPlatform().loadCatalog(), /unsupported plugin catalog/)
+    assert.equal(existsSync(cachePath), false)
+
+    document = catalogDocument()
+    assert.deepEqual(await createPlatform().loadCatalog(), catalogDocument())
+    assert.equal(requests, 2)
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('GitHub CLI fallback reads raw catalogs larger than one megabyte', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-gh-raw-'))
+  const command = join(root, 'api')
+  const catalogPath = join(root, 'catalog.json')
+  const argumentsPath = join(root, 'arguments.json')
+  const largeCatalog = {
+    ...catalogDocument() as Record<string, unknown>,
+    padding: 'x'.repeat(1024 * 1024),
+  }
+  try {
+    const serializedCatalog = JSON.stringify(largeCatalog)
+    assert.ok(Buffer.byteLength(serializedCatalog) > 1024 * 1024)
+    writeFileSync(catalogPath, serializedCatalog)
+    writeFileSync(command, [
+      "const { readFileSync, writeFileSync } = require('node:fs')",
+      "writeFileSync(process.env.OH_DSH_TEST_GH_ARGS, JSON.stringify(process.argv.slice(2)))",
+      "process.stdout.write(readFileSync(process.env.OH_DSH_TEST_CATALOG))",
+      '',
+    ].join('\n'))
+    const platform = new ProductionMarketplacePlatform({
+      cliEntry: '/unused/dsh.mjs',
+      cwd: root,
+      env: {
+        DSH_DESKTOP_GH_PATH: process.execPath,
+        OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+        OH_DSH_TEST_CATALOG: catalogPath,
+        OH_DSH_TEST_GH_ARGS: argumentsPath,
+      },
+      fetch: async (): Promise<Response> => new Response('rate limited', { status: 403 }),
+      nodeBinary: process.execPath,
+      pnpmEntry: '/unused/pnpm.mjs',
+    })
+
+    assert.deepEqual(await platform.loadCatalog(), largeCatalog)
+    assert.deepEqual(JSON.parse(readFileSync(argumentsPath, 'utf8')), [
+      'repos/public-owner/public-catalog/contents/data/plugins.json',
+      '-H',
+      'Accept: application/vnd.github.raw+json',
+    ])
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('production bundle build runs approved hooks in its own workspace', {
@@ -542,10 +682,11 @@ test('refresh keeps public catalogs available when GitHub CLI is unavailable', a
       detail: 'GitHub CLI is unavailable',
       status: 'missing-cli',
     })
-    const snapshot = await setup.manager.dispatch({ type: 'refresh' })
+    const snapshot = await setup.manager.dispatch({ type: 'refresh', force: true })
     assert.equal(snapshot.auth.status, 'missing-cli')
     assert.equal(snapshot.catalog.length, 6)
     assert.equal(snapshot.error, null)
+    assert.deepEqual(setup.platform.catalogLoads, [{ force: true }])
   } finally {
     setup.cleanup()
   }
@@ -669,6 +810,16 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.match(client, /slots\.inject\('sidebar\.footer\.action'/)
   assert.doesNotMatch(client, /ctx\.slots/)
   assert.doesNotMatch(client, /parent\.insertBefore\(this\.#entry, settings\)/)
+})
+
+test('marketplace startup disables manual refresh until refresh settles', () => {
+  const client = readFileSync(new URL(
+    '../plugins/plugin-marketplace/src/client/plugin.tsx',
+    import.meta.url,
+  ), 'utf8')
+  assert.match(client, /const \[pending, setPending\] = useState\(true\)/)
+  assert.match(client, /\.finally\(\(\) => \{\s*if \(alive\) setPending\(false\)\s*\}\)/)
+  assert.match(client, /disabled=\{pending\}[\s\S]{0,160}type: 'refresh', force: true/)
 })
 
 test('marketplace closes after ready session navigation, not during startup', () => {
