@@ -12,6 +12,12 @@
     --accent-strong: #a9c4ff;
 }
 
+html:lang(zh-CN) {
+    font-family:
+        -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", ui-sans-serif, sans-serif;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -165,7 +171,7 @@ a:focus-visible {
 
 .hero {
     display: grid;
-    grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.65fr);
+    grid-template-columns: minmax(0, 1.55fr) minmax(400px, 0.75fr);
     gap: clamp(44px, 5vw, 96px);
     align-items: start;
     min-height: calc(100vh - 154px);
@@ -213,16 +219,44 @@ a:focus-visible {
 }
 
 .hero-copy {
-    max-width: 460px;
+    max-width: 500px;
 }
 
-h1 {
-    max-width: 12ch;
+.hero-title {
+    display: grid;
+    gap: 0.06em;
     margin: 0;
-    font-size: clamp(48px, 5vw, 82px);
-    line-height: 1.02;
-    letter-spacing: -0.055em;
-    text-wrap: balance;
+    font-size: clamp(38px, 3vw, 52px);
+    font-weight: 680;
+    line-height: 1.08;
+    letter-spacing: -0.045em;
+}
+
+.hero-title > span {
+    display: block;
+    white-space: nowrap;
+}
+
+.hero-title-surfaces {
+    margin: 0.28em 0 0.22em;
+    color: var(--accent-strong);
+    font-size: 0.4em;
+    font-weight: 740;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+html:lang(zh-CN) .hero-title {
+    font-size: clamp(40px, 3.2vw, 52px);
+    font-weight: 650;
+    line-height: 1.15;
+    letter-spacing: -0.04em;
+}
+
+html:lang(zh-CN) .hero-title-surfaces {
+    font-size: 0.38em;
+    letter-spacing: 0.035em;
 }
 
 .hero-actions {
@@ -254,6 +288,79 @@ h1 {
     background: #ffffff;
     box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
     transform: translateY(-2px);
+}
+
+.surface-support {
+    padding: 0 0 clamp(88px, 9vw, 150px);
+}
+
+.surface-heading {
+    display: grid;
+    grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1.55fr);
+    gap: 32px;
+    align-items: start;
+    padding: 30px 0 38px;
+    border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.section-label {
+    margin: 5px 0 0;
+    color: var(--accent-strong);
+    font-size: 12px;
+    font-weight: 720;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.surface-heading h2 {
+    max-width: 18ch;
+    margin: 0;
+    font-size: clamp(30px, 3vw, 48px);
+    line-height: 1.12;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+}
+
+html:lang(zh-CN) .surface-heading h2 {
+    font-weight: 650;
+    line-height: 1.24;
+    letter-spacing: -0.035em;
+}
+
+.surface-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.surface-card {
+    min-height: 168px;
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    backdrop-filter: blur(18px);
+}
+
+.surface-index {
+    color: var(--quiet);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+}
+
+.surface-card h3 {
+    margin: 30px 0 0;
+    font-size: 20px;
+    font-weight: 680;
+    letter-spacing: -0.025em;
+}
+
+.surface-card p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
 }
 
 .site-footer {
@@ -399,7 +506,7 @@ h1 {
 
 @media (max-width: 1120px) {
     .hero {
-        grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.9fr);
         gap: 42px;
     }
 }
@@ -429,9 +536,18 @@ h1 {
         grid-row: 2;
     }
 
-    h1 {
-        max-width: 11ch;
-        font-size: clamp(46px, 12vw, 68px);
+    .hero-title,
+    html:lang(zh-CN) .hero-title {
+        font-size: clamp(40px, 8vw, 56px);
+    }
+
+    .surface-heading {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .surface-heading h2 {
+        max-width: 22ch;
     }
 }
 
@@ -450,6 +566,19 @@ h1 {
 
     .download-dialog {
         padding: 30px 22px 22px;
+    }
+
+    .hero-title,
+    html:lang(zh-CN) .hero-title {
+        font-size: 36px;
+    }
+
+    .surface-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .surface-card {
+        min-height: 138px;
     }
 
     .site-footer {
