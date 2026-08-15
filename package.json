@@ -47,6 +47,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
     "build:dsh": "node scripts/build-dsh.mjs",
     "stage:dsh": "node scripts/stage-dsh.mjs",
     "check:plugins": "node scripts/smoke-runtime.mjs",
