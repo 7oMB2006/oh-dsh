@@ -120,7 +120,14 @@ function downloadCopyKey() {
 }
 
 function preferredLanguage() {
-    const saved = window.localStorage.getItem(storageKey);
+    let saved;
+
+    try {
+        saved = window.localStorage.getItem(storageKey);
+    } catch {
+        saved = null;
+    }
+
     if (saved && Object.hasOwn(translations, saved)) return saved;
     return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
@@ -186,8 +193,13 @@ function setDownloadUrl(url) {
 elements.languageToggle.addEventListener("click", () => {
     const language =
         elements.languageToggle.dataset.language === "zh-CN" ? "en" : "zh-CN";
-    window.localStorage.setItem(storageKey, language);
     applyLanguage(language);
+
+    try {
+        window.localStorage.setItem(storageKey, language);
+    } catch {
+        // The language switch still works when persistent storage is blocked.
+    }
 });
 
 elements.downloadTrigger.addEventListener("click", (event) => {
