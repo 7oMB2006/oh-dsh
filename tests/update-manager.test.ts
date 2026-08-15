@@ -91,6 +91,7 @@ test('manager provides a deb installer fallback without invoking updater install
   })
   await manager.check()
   await manager.download()
+  assert.equal('installerPath' in manager.getState(), false)
   assert.equal((await manager.command({ type: 'install-now' })).status, 'scheduled')
   assert.deepEqual(opened, ['/tmp/Oh-DSH-Desktop-update.zip'])
   assert.equal(updater.quitCalls, 0)

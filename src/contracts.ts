@@ -45,7 +45,7 @@ export type DesktopUpdateState =
   | { status: 'not-available'; currentVersion: string; checkedVersion: string }
   | { status: 'available'; currentVersion: string; latestVersion: string; releaseName: string | null; releaseNotes: string; size: number | null; platform: DesktopUpdatePlatform; releaseUrl: string }
   | { status: 'downloading'; currentVersion: string; latestVersion: string; releaseName: string | null; releaseNotes: string; size: number | null; platform: DesktopUpdatePlatform; releaseUrl: string; percent: number; transferred: number; total: number; bytesPerSecond: number; etaSeconds: number | null }
-  | { status: 'downloaded'; currentVersion: string; latestVersion: string; releaseName: string | null; releaseNotes: string; size: number | null; platform: DesktopUpdatePlatform; releaseUrl: string; installerPath: string | null; installOnQuit: boolean }
+  | { status: 'downloaded'; currentVersion: string; latestVersion: string; releaseName: string | null; releaseNotes: string; size: number | null; platform: DesktopUpdatePlatform; releaseUrl: string; installOnQuit: boolean }
   | { status: 'scheduled'; currentVersion: string; latestVersion: string; releaseName: string | null; releaseNotes: string; size: number | null; platform: DesktopUpdatePlatform; releaseUrl: string }
   | { status: 'cancelled'; currentVersion: string; latestVersion?: string }
   | { status: 'unsupported'; currentVersion: string; platform: DesktopUpdatePlatform; message: string; releaseUrl: string | null }

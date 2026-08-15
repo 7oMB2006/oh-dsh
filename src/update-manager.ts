@@ -336,10 +336,10 @@ export class DesktopUpdateManager {
 
   private publishDownloaded(): void {
     if (this.metadata === undefined) return
+    const { installerPath: _installerPath, ...publicMetadata } = this.metadata
     this.publish({
       status: 'downloaded',
-      ...this.metadata,
-      installerPath: this.metadata.platform === 'deb' ? this.metadata.installerPath : null,
+      ...publicMetadata,
       installOnQuit: false,
     })
   }
