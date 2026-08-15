@@ -593,6 +593,7 @@ function DesktopPanelToolbar({
         : (
           <button
             type="button"
+            data-oh-dsh-summary-toggle=""
             aria-label={t('summary.toggle')}
             aria-pressed={summaryOpen}
             title={t('summary.title')}

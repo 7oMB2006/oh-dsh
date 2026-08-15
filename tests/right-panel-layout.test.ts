@@ -45,6 +45,9 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
     summary,
     /document\.addEventListener\('pointerdown', this\.#handleDocumentPointerDown\)/,
   )
+  assert.match(workspace, /data-oh-dsh-summary-toggle=""/)
+  assert.match(summary, /closest\('\[data-oh-dsh-summary-toggle\]'\)/)
+  assert.doesNotMatch(summary, /closest\('\.oh-dsh-panel-toolbar'\)/)
   assert.match(summary, /event\.key === 'Escape'/)
   assert.doesNotMatch(workspace, /aria-label="Toggle review panel"/)
   assert.match(workspace, /className="oh-dsh-review-view"/)

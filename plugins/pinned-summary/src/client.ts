@@ -261,7 +261,8 @@ class PinnedSummaryService implements PinnedSummary {
     if (!this.#open || this.#panel === undefined) return
     const target = event.target
     if (!(target instanceof Node) || this.#panel.contains(target)) return
-    if (target instanceof Element && target.closest('.oh-dsh-panel-toolbar') !== null) return
+    if (target instanceof Element
+      && target.closest('[data-oh-dsh-summary-toggle]') !== null) return
     this.setOpen(false)
   }
   readonly #handleDocumentKeyDown = (event: KeyboardEvent): void => {
