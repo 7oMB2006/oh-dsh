@@ -19,6 +19,10 @@ test('tagged releases build and upload both TUI archive formats', () => {
   assert.match(workflow, /fetch-depth: 0/)
   assert.match(workflow, /fetch-tags: true/)
   assert.match(workflow, /validate-release-tag\.mjs --tag/)
+  assert.match(workflow, /workflow_dispatch:/)
+  assert.match(workflow, /if: github\.event_name == 'push'/)
+  assert.match(workflow, /macOS signing credentials are incomplete; producing an ad-hoc-signed package/)
+  assert.match(workflow, /Windows signing credentials are incomplete; producing an unsigned installer/)
 })
 
 test('release tags must match a stable package version', () => {

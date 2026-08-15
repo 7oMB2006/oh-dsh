@@ -56,6 +56,9 @@ sudo apt install ./Oh-DSH-Desktop-*.deb
 运行 Release 中的 Windows 安装器并启动 **Oh-DSH Desktop**。统一 CLI 位于应用
 资源目录的 `bin\ohdsh.cmd`，可以将该目录加入 `PATH`。
 
+未签名安装器可能触发 Windows SmartScreen。确认文件来自项目 Release 后，选择
+“更多信息”再选择“仍要运行”；安装过程可能请求管理员授权。
+
 ### Desktop 在线更新
 
 在应用菜单中选择 **Oh-DSH Desktop -> 检查更新…**。更新窗口只检查
@@ -208,9 +211,15 @@ pnpm run dist:web       # Web-only 轻量版
 pnpm run dist:tui       # TUI-only 终端版
 ```
 
-发布带自动更新功能的 tag 还需要配置 GitHub Actions 的 macOS 签名/公证凭据和
-Windows Authenticode 凭据。工作流会在任意一个凭据、安装包、blockmap 或
-`latest*.yml` 缺失时停止发布。
+发布工作流在 GitHub Actions 的 macOS 签名/公证凭据和 Windows Authenticode
+凭据齐全时生成正式签名包。缺少任一组凭据时，工作流会明确警告并降级生成 macOS
+ad-hoc 签名包或 Windows 未签名安装器，而不会阻止 Web、TUI 和 Desktop 打包。
+降级产物仅支持上文所述的手动安装，不能视为支持自动更新。启用正式签名需要配置
+`MACOS_CSC_LINK`、`MACOS_CSC_KEY_PASSWORD`、`APPLE_ID`、
+`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`、`WINDOWS_CSC_LINK` 和
+`WINDOWS_CSC_KEY_PASSWORD`。安装包、内嵌或外置 blockmap、`latest*.yml` 元数据
+仍会被严格校验，缺失时停止发布。可从 Actions 手动运行 Release workflow 做四平台
+打包检查；手动运行只上传 workflow artifacts，不创建 GitHub Release。
 
 ## 数据与排错
 
