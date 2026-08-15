@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { resolve } from 'node:path'
+import { posix } from 'node:path'
 import { test } from 'node:test'
 import {
   desktopLaunchSpec,
@@ -129,7 +129,7 @@ test('macOS installed launches inherit the shared Oh-DSH state root', () => {
   }, 'darwin'), {
     args: [
       '--env',
-      `OH_DSH_HOME=${resolve('./relative-state')}`,
+      `OH_DSH_HOME=${posix.resolve('./relative-state')}`,
       '-a',
       'Oh-DSH Desktop',
     ],
