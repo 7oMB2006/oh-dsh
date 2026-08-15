@@ -4,14 +4,16 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  realpathSync,
   readdirSync,
   readlinkSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import type { Stats } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 /** Environment variable overriding the shared Oh-DSH state root. */
 export const OH_DSH_HOME_ENV = 'OH_DSH_HOME'
@@ -86,6 +88,23 @@ function stat(path: string): Stats | undefined {
   }
 }
 
+function followedStat(path: string): Stats | undefined {
+  try {
+    return statSync(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
+function containsPath(parent: string, candidate: string): boolean {
+  const path = relative(parent, candidate)
+  return path !== ''
+    && path !== '..'
+    && !path.startsWith(`..${sep}`)
+    && !isAbsolute(path)
+}
+
 function copyEntry(
   source: string,
   destination: string,
@@ -125,9 +144,13 @@ function copyDirectoryContents(
   destination: string,
   options: { exclude?: ReadonlySet<string> } = {},
 ): boolean {
-  const sourceStat = stat(source)
+  const sourceStat = followedStat(source)
   if (sourceStat === undefined || !sourceStat.isDirectory()) return false
   mkdirSync(destination, { recursive: true, mode: 0o700 })
+  const sourceRoot = realpathSync(source)
+  const destinationRoot = realpathSync(destination)
+  if (sourceRoot === destinationRoot) return true
+  if (containsPath(sourceRoot, destinationRoot)) return false
   for (const entry of readdirSync(source)) {
     if (options.exclude?.has(entry) === true) continue
     copyEntry(join(source, entry), join(destination, entry))
@@ -159,7 +182,9 @@ export function migrateLegacyDesktopState(input: {
   const legacyStat = stat(legacyRoot)
   if (legacyStat === undefined || !legacyStat.isDirectory()) return false
 
-  copyDirectoryContents(join(legacyRoot, 'dsh'), input.ohDshHome)
+  const legacyDshHome = join(legacyRoot, 'dsh')
+  if (stat(legacyDshHome) !== undefined
+    && !copyDirectoryContents(legacyDshHome, input.ohDshHome)) return false
   for (const entry of DESKTOP_SHARED_ENTRIES) {
     if (entry === 'dsh') continue
     copyEntry(join(legacyRoot, entry), join(input.ohDshHome, entry))

@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -123,4 +124,47 @@ test('legacy Web roots flatten once without replacing shared state', t => {
   }), false)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-flat.json')), false)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-default.json')), false)
+})
+
+test('legacy directory links are followed before migration completes', t => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'ohdsh-linked-migrate-'))
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }))
+
+  const appDataRoot = join(temporaryRoot, 'app-data')
+  const legacyDesktopRoot = join(appDataRoot, 'Oh-DSH-Desktop')
+  const desktopTarget = join(temporaryRoot, 'desktop-dsh')
+  const sharedDesktopRoot = join(temporaryRoot, 'shared-desktop')
+  write(join(desktopTarget, 'sessions', 'desktop.json'), 'desktop')
+  mkdirSync(legacyDesktopRoot, { recursive: true })
+  symlinkSync(
+    desktopTarget,
+    join(legacyDesktopRoot, 'dsh'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  )
+
+  assert.equal(migrateLegacyDesktopState({
+    appDataRoot,
+    env: {},
+    ohDshHome: sharedDesktopRoot,
+  }), true)
+  assert.equal(
+    readFileSync(join(sharedDesktopRoot, 'sessions', 'desktop.json'), 'utf8'),
+    'desktop',
+  )
+
+  const sharedWebRoot = join(temporaryRoot, 'shared-web')
+  const webTarget = join(temporaryRoot, 'web-dsh')
+  write(join(webTarget, 'sessions', 'web.json'), 'web')
+  mkdirSync(sharedWebRoot, { recursive: true })
+  symlinkSync(
+    webTarget,
+    join(sharedWebRoot, 'dsh'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  )
+
+  assert.equal(migrateLegacyWebState({ dataRoot: sharedWebRoot }), true)
+  assert.equal(
+    readFileSync(join(sharedWebRoot, 'sessions', 'web.json'), 'utf8'),
+    'web',
+  )
 })
