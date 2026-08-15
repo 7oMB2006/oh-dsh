@@ -60,13 +60,15 @@
                 <section class="hero" aria-labelledby="hero-title">
                     <div class="product-visual">
                         <div class="visual-glow" aria-hidden="true"></div>
-                        <img
-                            src="assets/oh-dsh-desktop-landing.png"
-                            alt="Oh-DSH Desktop 深色界面，包含工作区、对话和插件入口"
-                            data-i18n-alt="screenshotAlt"
-                            width="2560"
-                            height="1680"
-                        >
+                        <div class="product-frame">
+                            <img
+                                src="assets/oh-dsh-desktop-landing.png"
+                                alt="Oh-DSH Desktop 深色界面，包含工作区、对话和插件入口"
+                                data-i18n-alt="screenshotAlt"
+                                width="2560"
+                                height="1680"
+                            >
+                        </div>
                     </div>
 
                     <div class="hero-copy">
@@ -90,37 +92,20 @@
                                 下载最新版
                             </a>
                         </div>
-                    </div>
-                </section>
-
-                <section
-                    class="surface-support"
-                    aria-labelledby="surface-support-title"
-                >
-                    <div class="surface-heading">
-                        <p class="section-label" data-i18n="surfaceLabel">
-                            全端支持
-                        </p>
-                        <h2 id="surface-support-title" data-i18n="surfaceTitle">
-                            同一套 DSH，适配三种开发场景
-                        </h2>
-                    </div>
-                    <div class="surface-grid">
-                        <article class="surface-card">
-                            <span class="surface-index" aria-hidden="true">01</span>
-                            <h3>Desktop</h3>
-                            <p data-i18n="desktopDetail">完整的本地开发工作台</p>
-                        </article>
-                        <article class="surface-card">
-                            <span class="surface-index" aria-hidden="true">02</span>
-                            <h3>Web UI</h3>
-                            <p data-i18n="webDetail">随时从浏览器接入工作区</p>
-                        </article>
-                        <article class="surface-card">
-                            <span class="surface-index" aria-hidden="true">03</span>
-                            <h3>TUI</h3>
-                            <p data-i18n="tuiDetail">在终端里保持专注与速度</p>
-                        </article>
+                        <div class="surface-list">
+                            <article class="surface-card">
+                                <h2>Desktop</h2>
+                                <p data-i18n="desktopDetail">本地工作台</p>
+                            </article>
+                            <article class="surface-card">
+                                <h2>Web UI</h2>
+                                <p data-i18n="webDetail">浏览器即开</p>
+                            </article>
+                            <article class="surface-card">
+                                <h2>TUI</h2>
+                                <p data-i18n="tuiDetail">终端优先</p>
+                            </article>
+                        </div>
                     </div>
                 </section>
             </main>
