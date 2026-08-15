@@ -142,6 +142,11 @@
         ]
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "hust-open-atom-club",
+      "repo": "oh-dsh"
+    },
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
@@ -149,7 +154,6 @@
         "zip"
       ],
       "icon": "assets/Oh-DSH-Desktop.icns",
-      "identity": null,
       "darkModeSupport": true,
       "minimumSystemVersion": "12.0.0",
       "extendInfo": {
@@ -173,9 +177,15 @@
     },
     "win": {
       "target": [
-        "dir"
+        "nsis"
       ],
       "icon": "assets/icons/512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
     },
     "dmg": {
       "title": "Oh-DSH Desktop ${version}",
