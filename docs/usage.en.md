@@ -60,6 +60,10 @@ Run the Windows installer from the Release and start **Oh-DSH Desktop**. The uni
 `bin\ohdsh.cmd` under the application resources directory; add that directory
 to `PATH` if desired.
 
+An unsigned installer may trigger Windows SmartScreen. After verifying that it
+came from the project Release, choose **More info**, then **Run anyway**. The
+installer may request administrator approval.
+
 ### Desktop online updates
 
 Choose **Oh-DSH Desktop -> Check for Updates...** from the application menu.
@@ -224,10 +228,20 @@ pnpm run dist:web       # Web-only lightweight distribution
 pnpm run dist:tui       # TUI-only terminal distribution
 ```
 
-Publishing an auto-update tag also requires GitHub Actions secrets for macOS
-signing/notarization and Windows Authenticode signing. The workflow refuses to
-publish if credentials, an installer, a blockmap, or `latest*.yml` metadata is
-missing.
+The release workflow produces formally signed packages when all GitHub Actions
+secrets for macOS signing/notarization and Windows Authenticode signing are
+available. If either credential set is incomplete, the workflow emits an
+explicit warning and falls back to an ad-hoc-signed macOS package or an
+unsigned Windows installer without blocking Web, TUI, and Desktop packaging.
+Fallback artifacts support only the manual installation described above and
+must not be treated as supporting automatic updates. Formal signing requires
+`MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `WINDOWS_CSC_LINK`, and
+`WINDOWS_CSC_KEY_PASSWORD`. Installers, embedded or external blockmaps, and
+`latest*.yml` metadata remain strictly validated and stop the release when
+missing. Run the Release workflow manually from Actions for a four-platform
+packaging check; manual runs upload workflow artifacts without creating a
+GitHub Release.
 
 ## Data and troubleshooting
 
