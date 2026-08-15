@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import {
+  ComposerInputHistory,
+  submittedInputTexts,
+  type ComposerHistorySession,
+} from '../plugins/sidebar/src/client/composer-input-history.ts'
+
+test('reads only confirmed text user messages in chronological order', () => {
+  assert.deepEqual(submittedInputTexts([
+    { kind: 'command', content: [{ type: 'text', text: '/help' }] },
+    { kind: 'user', content: [{ type: 'image' }, { type: 'text', text: 'first' }] },
+    { kind: 'user', content: [{ type: 'text', text: 'second ' }, { type: 'text', text: 'part' }] },
+    { kind: 'user', content: [{ type: 'text', text: '' }] },
+  ]), ['first', 'second part'])
+})
+
+test('keeps histories isolated by session', () => {
+  const histories = new ComposerInputHistory()
+  histories.synchronize('one', { nodes: [{ kind: 'user', content: [{ type: 'text', text: 'one' }] }] })
+  histories.synchronize('two', { nodes: [{ kind: 'user', content: [{ type: 'text', text: 'two' }] }] })
+  assert.equal(histories.forSession('one').navigate('older', '').value, 'one')
+  assert.equal(histories.forSession('two').navigate('older', '').value, 'two')
+})
+
+test('loads one older page at a time only while capacity remains', async () => {
+  let resolveLoad: (() => void) | undefined
+  let loads = 0
+  const session: ComposerHistorySession = {
+    getSnapshot: () => ({ hasMore: true, loadingOlder: false }),
+    loadOlder: async () => {
+      loads += 1
+      await new Promise<void>(resolve => { resolveLoad = resolve })
+    },
+  }
+  const histories = new ComposerInputHistory(2)
+  assert.equal(histories.requestOlder('session', session), true)
+  assert.equal(histories.requestOlder('session', session), false)
+  assert.equal(loads, 1)
+  resolveLoad?.()
+  await new Promise(resolve => { setImmediate(resolve) })
+  assert.equal(histories.requestOlder('session', session), true)
+  histories.synchronize('session', {
+    nodes: [
+      { kind: 'user', content: [{ type: 'text', text: 'older' }] },
+      { kind: 'user', content: [{ type: 'text', text: 'newer' }] },
+    ],
+  })
+  assert.equal(histories.requestOlder('session', session), false)
+})
+

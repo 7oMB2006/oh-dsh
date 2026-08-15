@@ -39,6 +39,11 @@ import {
   type DesktopSidebar,
   type DesktopSidebarSnapshot,
 } from './sidebar-service.ts'
+import {
+  ComposerInputHistory,
+  type ComposerHistoryNode,
+  type ComposerHistorySnapshot,
+} from './composer-input-history.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 import {
   betterSidebarApi,
@@ -83,11 +88,16 @@ interface RunningToolCall {
 }
 
 interface ConversationSnapshot {
+  hasMore?: boolean
+  loadingOlder?: boolean
+  nodes?: readonly ComposerHistoryNode[]
   runningCalls?: readonly RunningToolCall[]
 }
 
 interface SessionBinding {
-  session: ObservableSnapshot<ConversationSnapshot>
+  session: ObservableSnapshot<ConversationSnapshot> & {
+    loadOlder?(): Promise<void>
+  }
 }
 
 interface SessionsService extends ReviewSessionsService {
@@ -1672,6 +1682,7 @@ export function apply(ctx: ClientContext): void {
     new HttpSidebarPreferencesStorage(fetch.bind(globalThis)),
   )
   const runtimeSettings = new SidebarRuntimeSettingsService()
+  const composerHistory = new ComposerInputHistory()
   const service = new WorkspaceToolsService(
     desktopSidebar,
     panels,
@@ -1719,8 +1730,27 @@ export function apply(ctx: ClientContext): void {
   })
   let settingsActions: BoundSidebarSettingsActions | undefined
   ctx.effect(() => {
+    let historySessionId: string | undefined
+    let stopHistory = (): void => {}
+    const synchronizeHistory = (): void => {
+      const nextSessionId = sessions.list.getSnapshot().current
+      if (nextSessionId === historySessionId) return
+      composerHistory.resetNavigation(historySessionId)
+      stopHistory()
+      historySessionId = undefined
+      if (nextSessionId === undefined) return
+      const binding = sessions.binding(nextSessionId)
+      if (binding === undefined) return
+      historySessionId = nextSessionId
+      const synchronize = (): void => {
+        composerHistory.synchronize(nextSessionId, binding.session.getSnapshot() as ComposerHistorySnapshot)
+      }
+      synchronize()
+      stopHistory = binding.session.subscribe(synchronize)
+    }
     const syncSession = (): void => {
       desktopSidebar.setSession(sessions.list.getSnapshot().current ?? null)
+      synchronizeHistory()
     }
     syncSession()
     const stopSessions = sessions.list.subscribe(syncSession)
@@ -1781,6 +1811,7 @@ export function apply(ctx: ClientContext): void {
     )
     const removeService = ctx.reflect.provide('workspaceTools', service, undefined)
     return () => {
+      stopHistory()
       stopSessions()
       stopSettings()
       stopRuntime()
