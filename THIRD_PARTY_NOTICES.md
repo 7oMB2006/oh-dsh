@@ -53,6 +53,19 @@ repository.
 Oh-DSH follows the ThemeService extension model while providing original
 skins, a desktop Settings interface, and Host-backed persistence.
 
+## dsh-vision
+
+- Project: <https://github.com/william-jin-cmu/dsh-vision>
+- Referenced revision: `72978aa176df8e01a685bf270a1b1d016660c492`
+- Declared license: BSD-3-Clause
+- Oh-DSH component: `@oh-dsh/vision`
+
+Oh-DSH adapts the upstream OpenAI-compatible vision bridge to the current DSH
+credentials, settings, tool-output, and cancellation contracts. The built-in
+Host is shared by Desktop, Web, and TUI, and local file resolution remains
+inside the active Session workspace. The upstream license is retained with the
+packaged plugin.
+
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>

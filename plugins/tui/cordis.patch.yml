@@ -12,6 +12,9 @@
   - id: oh-skins
     name: '@oh-dsh/skins'
 
+  - id: oh-vision
+    name: '@oh-dsh/vision'
+
   - id: oh-tui-renderer
     name: 'dsh-cc-tui'
     config:

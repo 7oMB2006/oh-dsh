@@ -19,6 +19,12 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
+  {
+    directory: 'vision',
+    id: '@oh-dsh/vision',
+    clientExternal: ['@deepseek-ai/*'],
+    external: ['@deepseek-ai/*'],
+  },
   { directory: 'tui', hostOnly: true },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
@@ -143,9 +149,9 @@ for (const plugin of pluginPackages) {
     outfile: join(output, 'index.js'),
     platform: 'node',
     format: 'esm',
-    external: plugin.directory === 'better-sidebar-runtime'
+    external: plugin.external ?? (plugin.directory === 'better-sidebar-runtime'
       ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
-      : [],
+      : []),
   }))
   if (plugin.hostOnly !== true) {
     builds.push(build({
@@ -160,6 +166,7 @@ for (const plugin of pluginPackages) {
       logLevel: 'info',
       loader: { '.css': 'text' },
       external: [
+        ...(plugin.clientExternal ?? []),
         'react',
         'react-dom/client',
         'react/jsx-runtime',
@@ -198,4 +205,8 @@ mkdirSync(join(dist, 'plugins', 'tui'), { recursive: true })
 copyFileSync(
   join(root, 'plugins', 'tui', 'cordis.patch.yml'),
   join(dist, 'plugins', 'tui', 'cordis.patch.yml'),
+)
+copyFileSync(
+  join(root, 'plugins', 'vision', 'LICENSE'),
+  join(dist, 'plugins', 'vision', 'LICENSE'),
 )

@@ -33,11 +33,12 @@ def main():
         "pinned-summary": os.path.join("plugins", "pinned-summary"),
         "plugin-marketplace": os.path.join("plugins", "plugin-marketplace"),
         "better-sidebar-runtime": os.path.join("plugins", "better-sidebar-runtime"),
+        "vision": os.path.join("plugins", "vision"),
     }
     selected = {
         "full": set(plugin_dirs) | {"tui-renderer"},
-        "web": {"web", "skins", "sidebar", "panel-controls", "pinned-summary", "better-sidebar-runtime"},
-        "tui": {"tui", "tui-renderer", "skins"},
+        "web": {"web", "skins", "sidebar", "panel-controls", "pinned-summary", "better-sidebar-runtime", "vision"},
+        "tui": {"tui", "tui-renderer", "skins", "vision"},
     }.get(surface)
     if selected is None:
         raise ValueError(f"unknown Oh-DSH surface: {surface}")

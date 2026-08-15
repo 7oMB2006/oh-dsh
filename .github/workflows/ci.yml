@@ -105,7 +105,7 @@ jobs:
         run: pnpm run build && pnpm run build:dsh && pnpm run stage:dsh
 
       - name: Smoke the web profile
-        run: pnpm run smoke:web
+        run: xvfb-run -a pnpm run smoke:web
 
       - name: Smoke the desktop profile
         run: xvfb-run -a pnpm run smoke:runtime

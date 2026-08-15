@@ -143,6 +143,85 @@ TUI 常用选项：
 | `--preset` | `standard` | 初始 Agent preset |
 | `--inline` | 关闭 | 保留终端 scrollback，不使用 alternate screen |
 
+## 图片识别
+
+Desktop、Web 和 TUI 都会加载内置的 `@oh-dsh/vision`。图片粘贴、缩略图、附件保存
+和提交全部使用 DSH 原生 attachment rail。DeepSeek V4 的模型元数据在 DSH 中仍标记
+为 text-only，插件只在 Host 的最终图片能力校验处为 V4 放行，不接管输入栏，也不
+创建第二套图片气泡或引用协议。Host 会先用配置的视觉后端描述这些原生图片附件，再
+交给固定的 text-only 适配器序列化同一轮请求。`view_image` 仍可对明确给出的 Workspace
+图片路径、HTTP(S) URL 或 image data URL 做 OCR、图表读取、物体计数、截图排错与布局分析。
+
+在 Desktop 或 Web UI 中，复制一张 PNG、JPEG、WebP 或 GIF，把焦点放到消息输入框并
+按 `⌘V`（macOS）或 `Ctrl+V`（Windows/Linux）。当前 DSH 输入栏会在输入框内部显示
+原生缩略图，并负责删除、拖放、大小限制和提交；插件不会拦截这条流程。TUI 没有图形
+化缩略图，直接在消息中提供 Workspace 内的图片路径或 HTTP(S) URL，即可调用同一个
+`view_image` 工具。
+
+默认后端使用智谱 `glm-4.6v-flash`。在原生的“设置 → 插件 → 插件配置 → Vision”卡片中，
+先确认云端接口地址，再点击“获取智谱 Key”打开智谱控制台；复制回来的 Key 会以密码
+输入框显示，并保存到共享数据根目录的凭据文件（默认 `~/.ohdsh/.credentials.yaml`）：
+
+```yaml
+ZHIPUAI_API_KEY: your-api-key
+```
+
+凭据文件应保持仅当前用户可读，例如在 macOS/Linux 上执行
+`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export ZHIPUAI_API_KEY=...`。
+旧版本使用的 `VISION_API_KEY` 仍会作为迁移回退读取。
+
+后端和模型可在共享的 `~/.ohdsh/settings.yaml` 中覆盖：
+
+```yaml
+oh-dsh-vision:
+  baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen3-vl-flash
+  apiKeyEnv: DASHSCOPE_API_KEY
+  maxTokens: 2048
+  timeoutMs: 60000
+maxImageBytes: 10485760
+```
+
+卡片只显示云端接口地址、云端模型和一个隐藏的智谱 Key 输入框；Key 不会回显到设置快照。
+重试、备用模型、超时、图片大小和本地 OCR/VLM 选项仍可由 Agent 或 `settings.yaml` 高级配置，
+不要求用户重复填写多个 Key。Claude/Anthropic Key 属于对应模型提供方，不会被当作智谱 Vision
+Key 使用。
+
+使用本地 Ollama 时不要求密钥：
+
+```yaml
+oh-dsh-vision:
+  baseURL: http://localhost:11434/v1
+  model: qwen3-vl:4b
+```
+
+插件始终优先使用云端凭据，并对云端备用模型进行有上限的重试。如果云端被限流、不可用
+或返回不兼容结果，会尝试配置的本地 OCR/VLM 模型；本地也失败后还会进行一次最终云端
+恢复，再提示你检查 Vision 卡片、换一把云端 Key 或安装本地模型。`localModel` 就是用户
+从本机 Ollama/LM Studio 兼容安装中选择的模型 ID；为空表示关闭本地回退。非本机端点才
+需要配置 `localApiKeyEnv`。
+
+```yaml
+oh-dsh-vision:
+  apiKeyEnv: ZHIPUAI_API_KEY
+  retryAttempts: 3
+  retryBackoffMs: 1000
+  localBaseURL: http://localhost:11434/v1
+  localModel: glm-ocr
+  localFallbackModels:
+    - qwen2.5-vl:7b
+```
+
+每个后端都会进行有上限的指数退避重试。两个后端都失败时，错误消息会提示用户检查
+云端 Key，或安装/配置本地 OpenAI-compatible OCR/VLM 模型。插件不会在仓库中内置或
+联网获取共享云端密钥；用户自己的授权凭据仍通过 DSH credentials 或配置的环境变量
+提供。
+
+本地图片路径只能位于当前 Session 的 Workspace 内，解析软链接后仍会检查边界；
+远程 URL 或本地图片内容只会在调用 `view_image` 时发送给所配置的视觉端点。浏览器
+附件按钮、粘贴和拖放都属于 DSH 原生图片输入；DeepSeek V4 的最终 admission check
+由插件放行，其他模型仍遵循各自的 image-input 元数据。
+
 ## Desktop 操作
 
 ### 对话输入历史
