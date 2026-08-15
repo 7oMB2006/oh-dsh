@@ -41,6 +41,7 @@ import {
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
 import { DesktopUpdateManager, detectPackageType } from './update-manager.ts'
+import { scheduleImmediateUpdateInstall, singleFlight } from './update-lifecycle.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
 const LEGACY_DATA_DIRECTORY = 'Oh-DSH-Desktop'
@@ -403,7 +404,7 @@ async function openUpdateWindow(): Promise<void> {
   void manager.check()
 }
 
-async function stopForApplicationQuit(): Promise<void> {
+const stopForApplicationQuit = singleFlight(async (): Promise<void> => {
   await Promise.allSettled([
     runtime?.stop() ?? Promise.resolve(),
     stopPreviewSurface(),
@@ -420,7 +421,7 @@ async function stopForApplicationQuit(): Promise<void> {
   runtimeOrigin = undefined
   marketplaceAgentGateway = undefined
   if (updateWindow !== undefined && !updateWindow.isDestroyed()) updateWindow.close()
-}
+})
 
 function normalizeWorkspacePaths(paths: readonly string[]): string[] {
   const normalized: string[] = []
@@ -795,16 +796,13 @@ function installIpc(): void {
     const installNow = command.type === 'install-now'
       && current.status === 'downloaded'
       && current.platform !== 'deb'
-    const result = await manager.command(command)
     if (installNow) {
-      if (result.status === 'error') {
-        quittingForUpdate = false
-      } else {
+      return await scheduleImmediateUpdateInstall(manager, () => {
         quittingForUpdate = true
-        await stopForApplicationQuit()
-      }
+        app.quit()
+      })
     }
-    return result
+    return await manager.command(command)
   })
   ipcMain.handle('desktop:get-info', event => {
     const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null
