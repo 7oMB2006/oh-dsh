@@ -76,10 +76,12 @@
     "dist:tui:quick": "pnpm run build && pnpm run stage:dsh && node scripts/build-tui.mjs"
   },
   "dependencies": {
-    "electron-updater": "6.8.9"
+    "electron-updater": "6.8.9",
+    "semver": "7.7.4"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",
+    "@types/semver": "7.8.0",
     "electron": "42.3.0",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.12",
