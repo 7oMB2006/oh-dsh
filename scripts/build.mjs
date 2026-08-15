@@ -10,6 +10,10 @@ const productVersion = resolveProductVersion(root)
 const versionDefine = {
   __OH_DSH_BUILD_VERSION__: JSON.stringify(productVersion),
 }
+const nodeEsmRequireBanner = [
+  "import { createRequire as __ohDshCreateRequire } from 'node:module';",
+  'const require = __ohDshCreateRequire(import.meta.url);',
+].join('\n')
 rmSync(dist, { recursive: true, force: true })
 mkdirSync(dist, { recursive: true })
 
@@ -39,6 +43,7 @@ const builds = [
     platform: 'node',
     format: 'esm',
     external: ['electron'],
+    banner: { js: nodeEsmRequireBanner },
   }),
   build({
     ...shared,
@@ -171,6 +176,12 @@ for (const plugin of pluginPackages) {
 }
 
 await Promise.all(builds)
+
+const mainBundle = readFileSync(join(dist, 'main.js'), 'utf8')
+if (mainBundle.includes('Dynamic require of')
+  && !mainBundle.includes('__ohDshCreateRequire(import.meta.url)')) {
+  throw new Error('desktop main bundle has dynamic requires without an ESM require bridge')
+}
 
 copyFileSync(join(root, 'src', 'splash.html'), join(dist, 'splash.html'))
 copyFileSync(join(root, 'src', 'update.html'), join(dist, 'update.html'))
