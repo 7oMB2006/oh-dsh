@@ -1794,9 +1794,10 @@ export function apply(ctx: ClientContext): void {
         return
       }
       const direction = historyDirectionForKey(event)
-      if (direction === null || !isAtHistoryBoundary(textarea, direction)) return
+      if (direction === null) return
       const history = composerHistory.forSession(sessionId)
       const state = history.snapshot()
+      if (!isAtHistoryBoundary(textarea, direction, state.cursor !== null)) return
       if (state.entries.length === 0 || (direction === 'newer' && state.cursor === null)) return
       const input = composerInputForSession(ctx, sessions, sessionId)
       if (input === undefined) return

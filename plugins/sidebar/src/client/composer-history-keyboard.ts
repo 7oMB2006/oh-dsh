@@ -22,12 +22,14 @@ export function historyDirectionForKey(event: ComposerHistoryKey): InputHistoryD
   return null
 }
 
-/** The browser retains normal multi-line navigation until the textual edge. */
+/** Manual drafts retain normal arrow-key behavior; recalled history can keep browsing at its edges. */
 export function isAtHistoryBoundary(
   input: ComposerCaret,
   direction: InputHistoryDirection,
+  browsingHistory = false,
 ): boolean {
   const { selectionStart, selectionEnd, value } = input
+  if (value !== '' && !browsingHistory) return false
   if (selectionStart === null || selectionEnd === null || selectionStart !== selectionEnd) return false
   return direction === 'older' ? selectionStart === 0 : selectionEnd === value.length
 }

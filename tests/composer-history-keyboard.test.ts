@@ -24,14 +24,24 @@ test('recognizes only unmodified non-IME history arrows', () => {
   assert.equal(historyDirectionForKey(key('ArrowDown', { isComposing: true })), null)
   assert.equal(historyDirectionForKey(key('Enter')), null)
 })
-test('limits history navigation to collapsed selection at textual boundaries', () => {
+test('uses history only from an empty draft or while browsing a recalled entry', () => {
   const multiline = 'first\nsecond\nthird'
-  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 0 }, 'older'), true)
+  assert.equal(isAtHistoryBoundary({ value: '', selectionStart: 0, selectionEnd: 0 }, 'older'), true)
   assert.equal(
-    isAtHistoryBoundary({ value: multiline, selectionStart: multiline.length, selectionEnd: multiline.length }, 'newer'),
+    isAtHistoryBoundary({ value: '', selectionStart: 0, selectionEnd: 0 }, 'newer'),
     true,
   )
-  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'older'), false)
-  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'newer'), false)
+  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 0 }, 'older'), false)
+  assert.equal(
+    isAtHistoryBoundary({ value: multiline, selectionStart: multiline.length, selectionEnd: multiline.length }, 'newer'),
+    false,
+  )
+  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 0 }, 'older', true), true)
+  assert.equal(
+    isAtHistoryBoundary({ value: multiline, selectionStart: multiline.length, selectionEnd: multiline.length }, 'newer', true),
+    true,
+  )
+  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'older', true), false)
+  assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'newer', true), false)
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 2 }, 'older'), false)
 })
