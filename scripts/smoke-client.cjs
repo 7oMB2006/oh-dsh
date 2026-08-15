@@ -99,21 +99,30 @@ void app.whenReady().then(async () => {
             const thumbnail = image.closest('button')
             const thumbnailRect = (thumbnail ?? image).getBoundingClientRect()
             const cardRect = card.getBoundingClientRect()
+            const removeButtons = [...card.querySelectorAll('button')]
+              .filter(button => /remove|移除|删除/i.test([
+                button.getAttribute('aria-label'),
+                button.getAttribute('title'),
+              ].filter(Boolean).join(' ')))
             window.__OH_DSH_SMOKE_VISION_FACTS__ = {
               bubbleBottom: thumbnailRect.bottom,
               cardTop: cardRect.top,
               imageWidth: image.naturalWidth,
+              removeLabel: removeButtons[0]?.getAttribute('aria-label') ?? null,
+              removeDisabled: removeButtons[0]?.disabled ?? null,
               status: 'ready',
             }
             window.__OH_DSH_SMOKE_VISION_SEEN__ = true
             if (window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ !== true) {
-              const remove = [...(card.querySelectorAll('button') ?? [])]
-                .find(button => /remove|移除|删除/i.test([
-                  button.getAttribute('aria-label'),
-                  button.getAttribute('title'),
-                ].filter(Boolean).join(' ')))
+              const remove = removeButtons[0]
               if (remove instanceof HTMLButtonElement) {
                 window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
+                remove.focus()
+                remove.dispatchEvent(new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                }))
                 remove.click()
               }
             }
