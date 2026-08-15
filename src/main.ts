@@ -10,6 +10,7 @@ import {
   shell,
   type MenuItemConstructorOptions,
 } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -28,7 +29,7 @@ import {
   withGitHubCredentials,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/protocol.ts'
-import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
+import type { DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot, DesktopUpdateCommand, DesktopUpdateState } from './contracts.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
@@ -39,6 +40,7 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
+import { DesktopUpdateManager, detectPackageType } from './update-manager.ts'
 
 const PRODUCT_NAME = 'Oh-DSH Desktop'
 const LEGACY_DATA_DIRECTORY = 'Oh-DSH-Desktop'
@@ -47,6 +49,8 @@ const currentDir = dirname(fileURLToPath(import.meta.url))
 const PRODUCT_VERSION = resolveProductVersion(join(currentDir, '..'))
 const splashPath = join(currentDir, 'splash.html')
 const preloadPath = join(currentDir, 'preload.cjs')
+const updateHtmlPath = join(currentDir, 'update.html')
+const updatePreloadPath = join(currentDir, 'update-preload.cjs')
 
 let mainWindow: BrowserWindow | undefined
 let runtime: DshRuntimeSupervisor | undefined
@@ -60,6 +64,8 @@ let previewIdentity: { pluginId: string; transactionId: string } | undefined
 let marketplace: PluginMarketplaceManager | undefined
 let marketplaceAgentGateway: MarketplaceAgentGateway | undefined
 let logStream: WriteStream | undefined
+let updateWindow: BrowserWindow | undefined
+let updateManager: DesktopUpdateManager | undefined
 let quitting = false
 let transitioning = false
 let queuedPaths: string[] = []
@@ -309,6 +315,93 @@ function sendCommand(command: DesktopCommand): void {
   mainWindow.webContents.send('desktop:command', command)
 }
 
+function sendUpdateState(state: DesktopUpdateState): void {
+  if (updateWindow === undefined || updateWindow.isDestroyed()) return
+  updateWindow.webContents.send('desktop:update:state', state)
+}
+
+async function syncUpdaterProxy(): Promise<void> {
+  const updaterSession = session.fromPartition('electron-updater', { cache: false })
+  const proxyRules = await session.defaultSession.resolveProxy('https://github.com')
+  await updaterSession.setProxy({ proxyRules })
+}
+
+async function getUpdateManager(): Promise<DesktopUpdateManager> {
+  if (updateManager !== undefined) return updateManager
+  const packageType = app.isPackaged
+    ? await detectPackageType(process.resourcesPath)
+    : 'unsupported'
+  const manager = new DesktopUpdateManager({
+    currentVersion: app.getVersion(),
+    appIsPackaged: app.isPackaged,
+    packageType,
+    ...(app.isPackaged ? { updater: autoUpdater } : {}),
+    syncProxy: syncUpdaterProxy,
+    onOpenRelease: async url => { await shell.openExternal(url) },
+    onOpenInstaller: async path => {
+      const error = await shell.openPath(path)
+      if (error !== '') throw new Error(error)
+    },
+    onLog: message => { appendLog('desktop', message) },
+  })
+  updateManager = manager
+  manager.subscribe(sendUpdateState)
+  return manager
+}
+
+function assertUpdateWindowSender(event: { sender: Electron.WebContents }): void {
+  if (updateWindow === undefined || updateWindow.isDestroyed() || event.sender !== updateWindow.webContents) {
+    throw new Error('update IPC is only available to the local update window')
+  }
+}
+
+function parseUpdateCommand(raw: unknown): DesktopUpdateCommand {
+  if (typeof raw !== 'object' || raw === null || !('type' in raw) || typeof raw.type !== 'string') {
+    throw new Error('invalid update command')
+  }
+  const type = raw.type
+  if (!['check', 'download', 'cancel', 'retry', 'install-now', 'install-on-quit', 'open-release'].includes(type)) {
+    throw new Error(`unsupported update command: ${type}`)
+  }
+  return { type } as DesktopUpdateCommand
+}
+
+async function openUpdateWindow(): Promise<void> {
+  const manager = await getUpdateManager()
+  if (updateWindow !== undefined && !updateWindow.isDestroyed()) {
+    updateWindow.show()
+    updateWindow.focus()
+    void manager.check()
+    return
+  }
+  const window = new BrowserWindow({
+    width: 720,
+    height: 620,
+    minWidth: 560,
+    minHeight: 480,
+    ...(mainWindow !== undefined && !mainWindow.isDestroyed() ? { parent: mainWindow } : {}),
+    modal: false,
+    show: false,
+    title: 'Software updates',
+    webPreferences: {
+      preload: updatePreloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  })
+  updateWindow = window
+  window.setMenuBarVisibility(false)
+  window.once('ready-to-show', () => { window.show() })
+  window.on('closed', () => {
+    if (updateWindow === window) updateWindow = undefined
+  })
+  window.webContents.on('will-navigate', event => { event.preventDefault() })
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  await window.loadFile(updateHtmlPath)
+  void manager.check()
+}
+
 function normalizeWorkspacePaths(paths: readonly string[]): string[] {
   const normalized: string[] = []
   for (const candidate of paths) {
@@ -523,6 +616,7 @@ function createPluginMarketplace(): PluginMarketplaceManager {
 function labels() {
   const zh = app.getLocale().toLowerCase().startsWith('zh')
   return zh ? {
+    checkUpdates: '检查更新…',
     dsh: 'DSH',
     focus: '聚焦输入框',
     installPlugin: '从文件夹安装插件…',
@@ -545,6 +639,7 @@ function labels() {
     sideChat: '侧边会话',
     trajectory: '轨迹',
   } : {
+    checkUpdates: 'Check for Updates...',
     dsh: 'DSH',
     focus: 'Focus Composer',
     installPlugin: 'Install Plugin from Folder…',
@@ -578,6 +673,8 @@ function buildMenu(): void {
       label: PRODUCT_NAME,
       submenu: [
         { role: 'about' },
+        { type: 'separator' },
+        { label: text.checkUpdates, click: () => { void openUpdateWindow() } },
         { type: 'separator' },
         { label: text.settings, accelerator: 'CmdOrCtrl+,', click: () => { sendCommand({ type: 'show-settings' }) } },
         ...(process.platform === 'darwin'
@@ -666,6 +763,14 @@ function buildMenu(): void {
 
 function installIpc(): void {
   ipcMain.handle('desktop:choose-workspace', async () => await selectWorkspacePaths())
+  ipcMain.handle('desktop:update:get-state', async event => {
+    assertUpdateWindowSender(event)
+    return (await getUpdateManager()).getState()
+  })
+  ipcMain.handle('desktop:update:command', async (event, raw: unknown) => {
+    assertUpdateWindowSender(event)
+    return await (await getUpdateManager()).command(parseUpdateCommand(raw))
+  })
   ipcMain.handle('desktop:get-info', event => {
     const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null
     return desktopInfo(preview)
@@ -727,6 +832,7 @@ async function bootstrap(): Promise<void> {
   mkdirSync(logsDir, { recursive: true })
   logStream = createWriteStream(join(logsDir, 'desktop.log'), { flags: 'a', mode: 0o600 })
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
+  await getUpdateManager()
   marketplace = createPluginMarketplace()
   marketplaceAgentGateway = await startMarketplaceAgentGateway(marketplace, {
     onError: error => { appendLog('desktop', `[marketplace-agent] ${String(error)}`) },

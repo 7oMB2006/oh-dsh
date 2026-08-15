@@ -103,6 +103,10 @@
     "files": [
       "dist/main.js",
       "dist/preload.cjs",
+      "dist/update-preload.cjs",
+      "dist/update-dialog.js",
+      "dist/update-dialog.js.map",
+      "dist/update.html",
       "dist/splash.html",
       "LICENSE",
       "THIRD_PARTY_NOTICES.md",
