@@ -4,8 +4,8 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs'
 import { createServer } from 'node:net'
@@ -259,7 +259,10 @@ try {
   const workspaceFacts = await workspaceFactsResponse.json()
   assert.equal(workspaceFactsResponse.status, 200)
   assert.equal(workspaceFacts.kind, 'repository')
-  assert.equal(realpathSync(workspaceFacts.root), realpathSync(smokeRoot))
+  const actualRoot = statSync(workspaceFacts.root)
+  const expectedRoot = statSync(smokeRoot)
+  assert.equal(actualRoot.dev, expectedRoot.dev)
+  assert.equal(actualRoot.ino, expectedRoot.ino)
 
   // The better-sidebar host serves session, Files, and Git through the same
   // /sidebar API the desktop distribution uses.
