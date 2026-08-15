@@ -66,6 +66,7 @@ let marketplaceAgentGateway: MarketplaceAgentGateway | undefined
 let logStream: WriteStream | undefined
 let updateWindow: BrowserWindow | undefined
 let updateManager: DesktopUpdateManager | undefined
+let quittingForUpdate = false
 let quitting = false
 let transitioning = false
 let queuedPaths: string[] = []
@@ -400,6 +401,25 @@ async function openUpdateWindow(): Promise<void> {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   await window.loadFile(updateHtmlPath)
   void manager.check()
+}
+
+async function stopForApplicationQuit(): Promise<void> {
+  await Promise.allSettled([
+    runtime?.stop() ?? Promise.resolve(),
+    stopPreviewSurface(),
+    marketplaceAgentGateway?.close() ?? Promise.resolve(),
+  ]).then(results => {
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        appendLog('desktop', result.reason instanceof Error ? result.reason.message : String(result.reason))
+      }
+    }
+  })
+  runtime = undefined
+  runtimeUrl = undefined
+  runtimeOrigin = undefined
+  marketplaceAgentGateway = undefined
+  if (updateWindow !== undefined && !updateWindow.isDestroyed()) updateWindow.close()
 }
 
 function normalizeWorkspacePaths(paths: readonly string[]): string[] {
@@ -769,7 +789,19 @@ function installIpc(): void {
   })
   ipcMain.handle('desktop:update:command', async (event, raw: unknown) => {
     assertUpdateWindowSender(event)
-    return await (await getUpdateManager()).command(parseUpdateCommand(raw))
+    const command = parseUpdateCommand(raw)
+    const manager = await getUpdateManager()
+    const current = manager.getState()
+    const installNow = command.type === 'install-now'
+      && current.status === 'downloaded'
+      && current.platform !== 'deb'
+    if (installNow) {
+      quittingForUpdate = true
+      await stopForApplicationQuit()
+    }
+    const result = await manager.command(command)
+    if (installNow && result.status === 'error') quittingForUpdate = false
+    return result
   })
   ipcMain.handle('desktop:get-info', event => {
     const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null
@@ -886,17 +918,8 @@ async function bootstrap(): Promise<void> {
     if (quitting) return
     event.preventDefault()
     quitting = true
-    void Promise.allSettled([
-      runtime?.stop() ?? Promise.resolve(),
-      stopPreviewSurface(),
-      marketplaceAgentGateway?.close() ?? Promise.resolve(),
-    ]).then(results => {
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          appendLog('desktop', result.reason instanceof Error ? result.reason.message : String(result.reason))
-        }
-      }
-    }).finally(() => {
+    appendLog('desktop', quittingForUpdate ? 'quitting to install desktop update' : 'quitting application')
+    void stopForApplicationQuit().finally(() => {
       logStream?.end()
       app.quit()
     })

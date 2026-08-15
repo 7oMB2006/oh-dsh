@@ -117,7 +117,7 @@ function errorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   return raw
     .replace(/authorization:\s*[^\s]+/gi, 'authorization: <redacted>')
-    .replace(/([?&](?:token|access_token|password|passwd|secret)=[^&\s]+)/gi, '$1'.replace(/=.*/, '=<redacted>'))
+    .replace(/([?&](?:token|access_token|password|passwd|secret))=[^&\s]*/gi, '$1=<redacted>')
     .slice(0, 1_000)
 }
 
@@ -398,6 +398,10 @@ export class DesktopUpdateManager {
     })
     bind('update-cancelled', () => {
       if (this.metadata !== undefined) this.publish({ status: 'cancelled', currentVersion: this.currentVersion, latestVersion: this.metadata.latestVersion })
+    })
+    bind('login', (_authInfo: unknown, callback: (username: string, password: string) => void) => {
+      callback('', '')
+      this.fail(Object.assign(new Error('The configured network proxy requires authentication.'), { code: 'PROXY_AUTH_REQUIRED' }), this.operation)
     })
     bind('error', (error: unknown) => {
       if (this.token?.cancelled) return

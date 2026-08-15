@@ -110,3 +110,16 @@ test('manager exposes actionable retryable errors', async () => {
     assert.match(state.message, /404/)
   }
 })
+
+test('manager turns proxy authentication into a redacted actionable error', () => {
+  const updater = new FakeUpdater()
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  updater.emit('login', {}, () => {})
+  const state = manager.getState()
+  assert.equal(state.status, 'error')
+  if (state.status === 'error') {
+    assert.equal(state.code, 'PROXY_AUTH_REQUIRED')
+    assert.equal(state.retryable, true)
+    assert.doesNotMatch(state.message, /password|token/i)
+  }
+})
