@@ -229,9 +229,9 @@ settings or in `~/.ohdsh/.env`.
 On first use of the shared root, Desktop imports sessions, credentials, plugins,
 and UI preferences from the old system `Oh-DSH-Desktop` application-data
 directory. Web imports the former `~/.oh-dsh-web/dsh` root and a nested `dsh/`
-inside the selected data directory. Migration copies only missing runtime data
-and leaves legacy directories in place for rollback; existing shared state is
-not replaced.
+inside the selected data directory, plus root-level skin and sidebar
+preferences. Migration copies only missing data and leaves legacy directories
+in place for rollback; existing shared state is not replaced.
 
 Troubleshooting order:
 

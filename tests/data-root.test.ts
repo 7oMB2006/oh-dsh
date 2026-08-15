@@ -97,6 +97,9 @@ test('legacy Web roots flatten once without replacing shared state', t => {
   write(join(sharedRoot, 'dsh', 'sessions', 'current.json'), 'legacy')
   write(join(sharedRoot, 'dsh', 'sessions', 'flat.json'), 'flat')
   write(join(legacyDefaultRoot, 'dsh', 'sessions', 'default.json'), 'default')
+  write(join(legacyDefaultRoot, 'skins.json'), 'legacy skin')
+  write(join(legacyDefaultRoot, 'sidebar.json'), 'legacy sidebar')
+  write(join(sharedRoot, 'skins.json'), 'current skin')
 
   assert.equal(migrateLegacyWebState({
     dataRoot: sharedRoot,
@@ -111,6 +114,11 @@ test('legacy Web roots flatten once without replacing shared state', t => {
     readFileSync(join(sharedRoot, 'sessions', 'default.json'), 'utf8'),
     'default',
   )
+  assert.equal(readFileSync(join(sharedRoot, 'skins.json'), 'utf8'), 'current skin')
+  assert.equal(
+    readFileSync(join(sharedRoot, 'sidebar.json'), 'utf8'),
+    'legacy sidebar',
+  )
   assert.equal(existsSync(join(sharedRoot, 'dsh', 'sessions', 'flat.json')), true)
   assert.equal(
     existsSync(join(legacyDefaultRoot, 'dsh', 'sessions', 'default.json')),
@@ -119,12 +127,17 @@ test('legacy Web roots flatten once without replacing shared state', t => {
 
   write(join(sharedRoot, 'dsh', 'sessions', 'late-flat.json'), 'late')
   write(join(legacyDefaultRoot, 'dsh', 'sessions', 'late-default.json'), 'late')
+  write(join(legacyDefaultRoot, 'sidebar.json'), 'late sidebar')
   assert.equal(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyDefaultRoot,
   }), false)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-flat.json')), false)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-default.json')), false)
+  assert.equal(
+    readFileSync(join(sharedRoot, 'sidebar.json'), 'utf8'),
+    'legacy sidebar',
+  )
 })
 
 test('legacy directory links are followed before migration completes', t => {

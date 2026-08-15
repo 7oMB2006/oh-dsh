@@ -40,6 +40,12 @@ const DESKTOP_SHARED_ENTRIES = new Set([
   'sidebar.json',
   'skins.json',
 ])
+const WEB_SHARED_ENTRIES = new Set([
+  'desktop-sidebar.json',
+  'desktop-skins.json',
+  'sidebar.json',
+  'skins.json',
+])
 
 /** Resolve the default Oh-DSH state root for one user account. */
 export function defaultOhDshHome(userHome: string = homedir()): string {
@@ -239,10 +245,22 @@ export function migrateLegacyWebState(input: {
   const defaultMarker = migrationMarker(input.dataRoot, WEB_DEFAULT_MIGRATION)
   if (legacyDefault !== undefined
     && resolve(legacyDefault) !== resolve(input.dataRoot)
-    && !existsSync(defaultMarker)
-    && copyDirectoryContents(join(legacyDefault, 'dsh'), input.dataRoot)) {
-    completeMigration(input.dataRoot, WEB_DEFAULT_MIGRATION)
-    migrated = true
+    && !existsSync(defaultMarker)) {
+    const legacyDshHome = join(legacyDefault, 'dsh')
+    const hasLegacyDshHome = stat(legacyDshHome) !== undefined
+    const copiedLegacyDshHome = !hasLegacyDshHome
+      || copyDirectoryContents(legacyDshHome, input.dataRoot)
+    let foundLegacyState = hasLegacyDshHome
+    for (const entry of WEB_SHARED_ENTRIES) {
+      const source = join(legacyDefault, entry)
+      if (stat(source) === undefined) continue
+      foundLegacyState = true
+      copyEntry(source, join(input.dataRoot, entry))
+    }
+    if (foundLegacyState && copiedLegacyDshHome) {
+      completeMigration(input.dataRoot, WEB_DEFAULT_MIGRATION)
+      migrated = true
+    }
   }
   return migrated
 }
