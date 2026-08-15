@@ -149,6 +149,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate stable release tag
+        run: node scripts/validate-release-tag.mjs --tag "$GITHUB_REF_NAME" --version "$(node -p "require('./package.json').version")"
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
