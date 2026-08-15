@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import {
+  chmodSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -76,6 +78,7 @@ export interface MarketplaceRuntime {
 export interface PluginMarketplaceOptions {
   appDataPath: string
   dshHome: string
+  onWarn?: (message: string) => void
   platform: MarketplacePlatform
   profile: string
   runtime: MarketplaceRuntime
@@ -460,9 +463,62 @@ function ensureWithin(parent: string, candidate: string): void {
   }
 }
 
-function removeWithin(parent: string, candidate: string): void {
+function defaultWarn(message: string): void {
+  console.warn(`plugin-marketplace: ${message}`)
+}
+
+/**
+ * Windows maps the read-only attribute to the owner write bit. Git packs and
+ * some cloned files are created read-only, so `rmSync` fails with EPERM before
+ * it can recurse into the tree. Clear that attribute before the retry while
+ * never following symlinks out of the disposable tree.
+ */
+function clearReadOnlyAttributes(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): void {
+  if (platform !== 'win32') return
+  try {
+    const stats = lstatSync(path)
+    if (stats.isDirectory()) {
+      chmodSync(path, stats.mode | 0o200)
+      for (const entry of readdirSync(path)) {
+        clearReadOnlyAttributes(join(path, entry), platform)
+      }
+    } else if (stats.isFile()) {
+      chmodSync(path, stats.mode | 0o200)
+    }
+  } catch {
+    // Best-effort attribute pass; the removal retry below reports the real failure.
+  }
+}
+
+function removeTree(
+  path: string,
+  onWarn: (message: string) => void = defaultWarn,
+  platform: NodeJS.Platform = process.platform,
+): void {
+  try {
+    rmSync(path, { force: true, recursive: true })
+    return
+  } catch {
+    if (platform === 'win32') clearReadOnlyAttributes(path, platform)
+  }
+  try {
+    rmSync(path, { force: true, recursive: true })
+  } catch (error) {
+    onWarn(`failed to clean plugin marketplace tree at ${path}: ${message(error)}`)
+  }
+}
+
+export function removeWithin(
+  parent: string,
+  candidate: string,
+  onWarn: (message: string) => void = defaultWarn,
+  platform: NodeJS.Platform = process.platform,
+): void {
   ensureWithin(parent, candidate)
-  rmSync(candidate, { force: true, recursive: true })
+  removeTree(candidate, onWarn, platform)
 }
 
 function copyDirectory(source: string, target: string): void {
@@ -532,15 +588,17 @@ export class PluginMarketplaceManager {
   #lastAction: string | null = null
   #plan: MarketplacePlan | null = null
   #rollback: RollbackState | null
+  readonly #warn: (message: string) => void
 
   constructor(options: PluginMarketplaceOptions) {
     this.#options = options
+    this.#warn = options.onWarn ?? defaultWarn
     this.#profileDir = join(options.dshHome, 'profiles', options.profile)
     this.#root = join(options.appDataPath, 'plugin-marketplace')
     this.#previewsRoot = join(this.#root, 'previews')
     this.#rollbacksRoot = join(this.#root, 'rollbacks')
     this.#rollbackStatePath = join(this.#rollbacksRoot, 'current.json')
-    rmSync(this.#previewsRoot, { force: true, recursive: true })
+    removeTree(this.#previewsRoot, this.#warn)
     mkdirSync(this.#previewsRoot, { recursive: true, mode: 0o700 })
     mkdirSync(this.#rollbacksRoot, { recursive: true, mode: 0o700 })
     this.#rollback = this.readRollback()
@@ -868,7 +926,7 @@ export class PluginMarketplaceManager {
           if (existsSync(sources)) {
             for (const entry of readdirSync(sources)) {
               if (entry.startsWith(`${plan.pluginId}-`)) {
-                removeWithin(sources, join(sources, entry))
+                removeWithin(sources, join(sources, entry), this.#warn)
               }
             }
           }
@@ -980,7 +1038,7 @@ export class PluginMarketplaceManager {
     } catch (error) {
       this.#active = null
       await this.#options.runtime.stopPreview().catch(() => {})
-      removeWithin(this.#previewsRoot, root)
+      removeWithin(this.#previewsRoot, root, this.#warn)
       throw error
     }
   }
@@ -1000,7 +1058,7 @@ export class PluginMarketplaceManager {
     const sources = join(candidateProfile, MANAGED_DIRECTORY, 'sources')
     if (!existsSync(sources)) return
     for (const entry of readdirSync(sources)) {
-      if (entry.startsWith(`${installed.pluginId}-`)) removeWithin(sources, join(sources, entry))
+      if (entry.startsWith(`${installed.pluginId}-`)) removeWithin(sources, join(sources, entry), this.#warn)
     }
   }
 
@@ -1011,7 +1069,7 @@ export class PluginMarketplaceManager {
       return
     }
     await this.#options.runtime.stopPreview()
-    removeWithin(this.#previewsRoot, active.root)
+    removeWithin(this.#previewsRoot, active.root, this.#warn)
     this.#active = null
     this.#plan = null
     this.#lastAction = `Discarded the ${active.preview.pluginId} preview without changing the desktop profile.`
@@ -1054,7 +1112,7 @@ export class PluginMarketplaceManager {
       transactionId: active.preview.transactionId,
     }
     writeJsonAtomic(this.#rollbackStatePath, this.#rollback)
-    removeWithin(this.#previewsRoot, active.root)
+    removeWithin(this.#previewsRoot, active.root, this.#warn)
     this.#active = null
     this.#plan = null
     this.#lastAction = `Applied ${active.preview.pluginId}; the previous profile remains available for Undo.`
@@ -1083,9 +1141,9 @@ export class PluginMarketplaceManager {
       await this.#options.runtime.startLive().catch(() => {})
       throw new Error(`failed to restore the previous plugin profile: ${message(error)}`)
     }
-    removeWithin(this.#rollbacksRoot, replacedProfile)
+    removeWithin(this.#rollbacksRoot, replacedProfile, this.#warn)
     rmSync(this.#rollbackStatePath, { force: true })
-    removeWithin(this.#rollbacksRoot, rollbackRoot)
+    removeWithin(this.#rollbacksRoot, rollbackRoot, this.#warn)
     this.#rollback = null
     this.#lastAction = `Restored the profile from before ${rollback.pluginId} was applied.`
     this.remapCatalogInstalled()
