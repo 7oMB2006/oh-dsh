@@ -691,7 +691,12 @@ export class PluginMarketplaceManager {
     } finally {
       this.#busy = false
     }
-    return this.getSnapshot()
+    const snapshot = this.getSnapshot()
+    // The snapshot above already reports this dispatch's outcome. Clear the
+    // error so later read-only snapshots (search/status polls) do not keep
+    // surfacing a stale failure from a previous dispatch.
+    this.#error = null
+    return snapshot
   }
 
   private async refresh(force = false): Promise<void> {
@@ -900,6 +905,17 @@ export class PluginMarketplaceManager {
     const candidateProfile = join(candidateHome, 'profiles', this.#options.profile)
     copyDirectory(this.#profileDir, candidateProfile)
     try {
+      // A live profile can carry a `node_modules` whose `.modules.yaml` points
+      // at a pnpm store that no longer exists: applying a preview deletes the
+      // preview root (and its store) while the applied profile keeps the
+      // store reference, so every later preview copy inherits a tree pnpm
+      // refuses with ERR_PNPM_UNEXPECTED_STORE. Drop the copied tree and
+      // lockfile for actions that run pnpm anyway, so pnpm rebuilds them
+      // against the preview's own store.
+      if (plan.action === 'install' || plan.action === 'update' || plan.action === 'uninstall') {
+        removeWithin(candidateProfile, join(candidateProfile, 'node_modules'), this.#warn)
+        rmSync(join(candidateProfile, 'pnpm-lock.yaml'), { force: true })
+      }
       const candidateState = readMarketplaceState(candidateProfile)
       const current = candidateState.entries
       const remaining = current.filter(entry => entry.pluginId !== plan.pluginId)
@@ -1093,6 +1109,24 @@ export class PluginMarketplaceManager {
         const liveCache = join(this.#options.dshHome, 'cache', 'repository-plugins')
         mkdirSync(dirname(liveCache), { recursive: true, mode: 0o700 })
         cpSync(candidateCache, liveCache, { recursive: true, preserveTimestamps: true })
+      }
+      // The applied profile's node_modules was linked from the preview's
+      // store, which is deleted with the preview root below. Re-home it
+      // against the persistent home store (unsandboxed) so the live profile
+      // never references a vanished store. Best effort: the hard links keep
+      // the tree usable even if this fails, and the dsh CLI self-heals the
+      // store reference on the next pnpm command.
+      try {
+        removeWithin(this.#profileDir, join(this.#profileDir, 'node_modules'), this.#warn)
+        rmSync(join(this.#profileDir, 'pnpm-lock.yaml'), { force: true })
+        await this.#options.platform.runDsh({
+          args: ['plugin', '--profile', this.#options.profile, 'install', '--ignore-scripts'],
+          dshHome: this.#options.dshHome,
+          sandboxRoot: this.#options.appDataPath,
+          sandboxed: false,
+        })
+      } catch (error) {
+        this.#options.onWarn?.(`applied profile store could not be re-homed: ${message(error)}`)
       }
       await this.#options.runtime.startLive()
     } catch (error) {

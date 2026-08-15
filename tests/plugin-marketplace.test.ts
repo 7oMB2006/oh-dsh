@@ -877,6 +877,46 @@ test('marketplace closes when an empty baseline activates a new session', () => 
   assert.deepEqual(transition.state, { current: 'new-session', ready: true })
 })
 
+test('preview strips a stale pnpm store reference from the copied profile', async () => {
+  const setup = fixture()
+  try {
+    // Simulate a live profile whose node_modules references a store that no
+    // longer exists (a previously applied preview deleted its store). pnpm
+    // refuses such trees with ERR_PNPM_UNEXPECTED_STORE.
+    const modulesDir = join(setup.profileDir, 'node_modules')
+    mkdirSync(modulesDir, { recursive: true })
+    writeFileSync(join(modulesDir, '.modules.yaml'), 'storeDir: "/deleted/preview/.pnpm-store/v11"\n')
+    writeFileSync(join(setup.profileDir, 'pnpm-lock.yaml'), 'lockfileVersion: "9.0"\n')
+
+    let snapshot = await setup.manager.dispatch({ type: 'refresh' })
+    assert.equal(snapshot.error, null)
+    snapshot = await setup.manager.dispatch({ type: 'inspect', action: 'install', pluginId: 'bundle-demo' })
+    assert.equal(snapshot.error, null)
+    snapshot = await setup.manager.dispatch({ type: 'preview', allowBuildScripts: true })
+    assert.equal(snapshot.error, null)
+
+    // The copied candidate must not keep the stale tree: the preview's pnpm
+    // commands would fail on it, and the applied profile would again
+    // reference a store deleted with the preview.
+    const candidate = join(
+      setup.appDataPath,
+      'plugin-marketplace',
+      'previews',
+      snapshot.preview?.transactionId ?? '',
+      'dsh',
+      'profiles',
+      'desktop',
+    )
+    assert.equal(existsSync(join(candidate, 'node_modules')), false)
+    assert.equal(existsSync(join(candidate, 'pnpm-lock.yaml')), false)
+    // The live profile keeps its (stale) tree untouched — only the copy is
+    // stripped for rebuild.
+    assert.equal(existsSync(join(setup.profileDir, 'node_modules')), true)
+  } finally {
+    setup.cleanup()
+  }
+})
+
 test('bundle preview remains isolated until apply and supports undo', async () => {
   const setup = fixture()
   try {
@@ -920,8 +960,14 @@ test('bundle preview remains isolated until apply and supports undo', async () =
       liveAfter.dependencies['@example/bundle-demo'],
       /plugin-marketplace\/previews/,
     )
-    assert.equal(setup.platform.commands.length, 2)
+    assert.equal(setup.platform.commands.length, 3)
     assert.deepEqual(setup.platform.commands[1]?.args.slice(-2), ['install', '--ignore-scripts'])
+    // After apply, the live profile's node_modules is re-homed against the
+    // persistent store: an unsandboxed install on the live profile, so the
+    // profile never keeps referencing the preview store deleted below.
+    assert.deepEqual(setup.platform.commands[2]?.args.slice(-2), ['install', '--ignore-scripts'])
+    assert.equal(setup.platform.commands[2]?.sandboxed, false)
+    assert.equal(setup.platform.commands[2]?.dshHome, setup.dshHome)
     assert.equal(setup.runtime.liveStops, 1)
     assert.equal(setup.runtime.liveStarts, 1)
 
