@@ -238,7 +238,49 @@ test('preview tree cleanup clears Windows read-only attributes before retrying',
   }
 })
 
-test('marketplace startup survives a previews tree that cannot be removed', () => {
+test('marketplace startup clears read-only Git pack files on Windows', {
+  skip: process.platform !== 'win32' ? 'requires Windows read-only attribute semantics' : false,
+}, () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-windows-'))
+  const dshHome = join(appDataPath, 'dsh')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  const previews = join(appDataPath, 'plugin-marketplace', 'previews')
+  const pack = join(previews, 'stale', '.git', 'objects', 'pack')
+  try {
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+      name: 'desktop',
+      private: true,
+      dependencies: {},
+      dsh: { profile: { bundles: ['@oh-dsh/desktop'] } },
+    }, undefined, 2) + '\n')
+    mkdirSync(pack, { recursive: true })
+    writeFileSync(join(pack, 'pack-demo.pack'), 'pack')
+    writeFileSync(join(pack, 'pack-demo.idx'), 'idx')
+    chmodSync(join(pack, 'pack-demo.pack'), 0o444)
+    chmodSync(join(pack, 'pack-demo.idx'), 0o444)
+    const warnings: string[] = []
+    const manager = new PluginMarketplaceManager({
+      appDataPath,
+      dshHome,
+      onWarn: message => { warnings.push(message) },
+      platform: new FakePlatform(),
+      profile: 'desktop',
+      runtime: new FakeRuntime(),
+    })
+    assert.deepEqual(warnings, [])
+    assert.equal(existsSync(join(previews, 'stale')), false)
+    assert.deepEqual(manager.getSnapshot().installed, [])
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('marketplace startup survives a previews tree that cannot be removed', {
+  skip: process.platform === 'win32'
+    ? 'Windows directory read-only attributes do not block recursive removal'
+    : false,
+}, () => {
   const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-startup-'))
   const dshHome = join(appDataPath, 'dsh')
   const profileDir = join(dshHome, 'profiles', 'desktop')
