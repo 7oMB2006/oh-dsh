@@ -57,7 +57,7 @@ test('vision plugin registers one shared tool and prompt section', () => {
   assert.equal(toolName, 'view_image')
   assert.match(prompt, /active Session workspace/)
   assert.match(prompt, /native image attachment/)
-  assert.match(prompt, /configured vision endpoint/)
+  assert.match(prompt, /configured vision backend/)
 })
 
 test('local image resolution stays inside the active workspace', async () => {

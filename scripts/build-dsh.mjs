@@ -61,11 +61,40 @@ function withVisionSettingsNamespace(build) {
   if (!source.includes(original)) {
     throw new Error('pinned DSH API proxy settings allowlist changed; Vision patch needs review')
   }
-  writeFileSync(path, source.replace(original, replacement))
+  let restored = false
+  const restore = () => {
+    if (restored) return
+    restored = true
+    writeFileSync(path, source)
+  }
+  const signals = process.platform === 'win32'
+    ? ['SIGINT', 'SIGTERM']
+    : ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT']
+  const handlers = new Map()
+  const handleSignal = (signal) => {
+    try {
+      restore()
+    } finally {
+      // A signal listener suppresses Node's default termination. Restore the
+      // checkout first, then re-raise the same signal so the build still
+      // exits with the expected status.
+      process.removeListener('exit', restore)
+      process.kill(process.pid, signal)
+    }
+  }
+  process.once('exit', restore)
+  for (const signal of signals) {
+    const handler = () => { handleSignal(signal) }
+    handlers.set(signal, handler)
+    process.once(signal, handler)
+  }
   try {
+    writeFileSync(path, source.replace(original, replacement))
     return build()
   } finally {
-    writeFileSync(path, source)
+    restore()
+    process.removeListener('exit', restore)
+    for (const [signal, handler] of handlers) process.removeListener(signal, handler)
   }
 }
 

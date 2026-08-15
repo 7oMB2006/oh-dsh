@@ -1,7 +1,15 @@
 /** Cross-surface image understanding through an OpenAI-compatible VLM. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import type {
+  ContentBlock,
+  GenerateOptions,
+  LlmResolvedModelInfo,
+  Message,
+  StreamChunk,
+} from '@deepseek-ai/dsh-llm'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -196,9 +204,26 @@ export function resolveVisionConfig(config: Config): ResolvedVisionConfig {
   }
 }
 
+function endpointHost(baseURL: string): string {
+  return new URL(baseURL).hostname.toLowerCase()
+}
+
 function isLocalEndpoint(baseURL: string): boolean {
-  const hostname = new URL(baseURL).hostname
+  const hostname = endpointHost(baseURL)
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+}
+
+function isProviderEndpoint(baseURL: string, providerHost: string): boolean {
+  const hostname = endpointHost(baseURL)
+  return hostname === providerHost || hostname.endsWith(`.${providerHost}`)
+}
+
+function isZhipuEndpoint(baseURL: string): boolean {
+  return isProviderEndpoint(baseURL, 'bigmodel.cn')
+}
+
+function isDashScopeEndpoint(baseURL: string): boolean {
+  return isProviderEndpoint(baseURL, 'dashscope.aliyuncs.com')
 }
 
 interface VisionBackend {
@@ -210,47 +235,8 @@ interface VisionBackend {
   model: string
 }
 
-interface VisionModelInfo {
-  provider: string
-  id: string
-  inputModalities?: readonly string[]
-  [key: string]: unknown
-}
-
-interface VisionAttachment {
-  attachmentId: string
-  mediaType: string
-  bytes?: number
-  name?: string
-}
-
-interface StoredVisionAttachment {
-  ref: VisionAttachment
-  data: Uint8Array
-}
-
 interface VisionAttachmentStore {
-  readImage(ref: VisionAttachment, signal?: AbortSignal): Promise<StoredVisionAttachment>
-}
-
-interface VisionContent {
-  type: string
-  attachment?: VisionAttachment
-  content?: readonly VisionContent[]
-  [key: string]: unknown
-}
-
-interface VisionMessage {
-  content: readonly VisionContent[]
-  [key: string]: unknown
-}
-
-interface VisionStreamOptions {
-  provider: string
-  model: string
-  messages: readonly VisionMessage[]
-  signal?: AbortSignal
-  [key: string]: unknown
+  readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<StoredImageAttachment>
 }
 
 interface VisionLlm {
@@ -258,8 +244,8 @@ interface VisionLlm {
     provider: string,
     model: string,
     signal?: AbortSignal,
-  ): Promise<VisionModelInfo>
-  stream(options: VisionStreamOptions): AsyncIterable<unknown>
+  ): Promise<LlmResolvedModelInfo>
+  stream(options: GenerateOptions): AsyncIterable<StreamChunk>
 }
 
 function cloudBackend(config: ResolvedVisionConfig): VisionBackend {
@@ -288,21 +274,26 @@ function localBackend(config: ResolvedVisionConfig): VisionBackend | undefined {
 async function resolveApiKey(
   ctx: Context,
   backend: VisionBackend,
-  options: { cloud?: boolean } = {},
 ): Promise<string | undefined> {
   if (backend.apiKey !== '') return backend.apiKey
-  const references = options.cloud === true
-    ? [
-      backend.apiKeyEnv,
-      'ZHIPUAI_API_KEY',
-      'DSH_VISION_API_KEY',
-      // Keep the first release's name as a migration fallback. New installs
-      // use the provider's canonical key above so the settings card does not
-      // create a second copy of the same Zhipu credential.
-      'VISION_API_KEY',
-      'DASHSCOPE_API_KEY',
+  const references = backend.kind === 'local'
+    ? [backend.apiKeyEnv, 'DSH_LOCAL_VISION_API_KEY']
+    : [
+      // A custom endpoint must name its own credential explicitly. The
+      // default Zhipu reference is only implicit for a Zhipu endpoint.
+      ...(backend.apiKeyEnv !== DEFAULT_VISION_API_KEY_REF || isZhipuEndpoint(backend.baseURL)
+        ? [backend.apiKeyEnv]
+        : []),
+      ...(isZhipuEndpoint(backend.baseURL)
+        ? [
+          DEFAULT_VISION_API_KEY_REF,
+          'DSH_VISION_API_KEY',
+          // Keep the first release's name as a migration fallback.
+          'VISION_API_KEY',
+        ]
+        : []),
+      ...(isDashScopeEndpoint(backend.baseURL) ? ['DASHSCOPE_API_KEY'] : []),
     ]
-    : [backend.apiKeyEnv, 'DSH_LOCAL_VISION_API_KEY']
   for (const reference of new Set(references)) {
     const resolved = await ctx.credentials.resolve(credentialRef(reference))
     if (resolved !== undefined) return resolved.value
@@ -357,7 +348,7 @@ function installDeepSeekV4ImageAdmission(ctx: Context): void {
     provider: string,
     model: string,
     signal?: AbortSignal,
-  ): Promise<VisionModelInfo> {
+  ): Promise<LlmResolvedModelInfo> {
     const info = await original.call(llm, provider, model, signal)
     if (!isDeepSeekV4Model(provider, model)
       || info.inputModalities === undefined
@@ -372,16 +363,16 @@ function installDeepSeekV4ImageAdmission(ctx: Context): void {
   }, 'oh-dsh-vision: native DeepSeek V4 image admission')
 }
 
-function hasImageContent(blocks: readonly VisionContent[]): boolean {
+function hasImageContent(blocks: readonly ContentBlock[]): boolean {
   return blocks.some(block => block.type === 'image'
-    || block.content !== undefined && hasImageContent(block.content))
+    || block.type === 'tool-result' && hasImageContent(block.content))
 }
 
-function attachmentDataUrl(ref: VisionAttachment, data: Uint8Array): string {
+function attachmentDataUrl(ref: ImageAttachmentRef, data: Uint8Array): string {
   return `data:${ref.mediaType};base64,${Buffer.from(data).toString('base64')}`
 }
 
-function descriptionCacheKey(ref: VisionAttachment, config: ResolvedVisionConfig): string {
+function descriptionCacheKey(ref: ImageAttachmentRef, config: ResolvedVisionConfig): string {
   return [
     ref.attachmentId,
     config.baseURL,
@@ -407,7 +398,7 @@ function installDeepSeekV4ImagePreprocessor(
 
   const descriptions = new Map<string, Promise<string>>()
   const describe = async (
-    ref: VisionAttachment,
+    ref: ImageAttachmentRef,
     signal: AbortSignal,
   ): Promise<string> => {
     const config = resolveVisionConfig(getConfig())
@@ -432,10 +423,10 @@ function installDeepSeekV4ImagePreprocessor(
   }
 
   const rewriteContent = async (
-    blocks: readonly VisionContent[],
+    blocks: readonly ContentBlock[],
     signal: AbortSignal,
-  ): Promise<VisionContent[]> => {
-    const rewritten: VisionContent[] = []
+  ): Promise<ContentBlock[]> => {
+    const rewritten: ContentBlock[] = []
     for (const block of blocks) {
       if (block.type === 'image') {
         if (block.attachment === undefined) {
@@ -451,7 +442,7 @@ function installDeepSeekV4ImagePreprocessor(
         })
         continue
       }
-      if (block.content !== undefined) {
+      if (block.type === 'tool-result') {
         rewritten.push({
           ...block,
           content: await rewriteContent(block.content, signal),
@@ -463,15 +454,15 @@ function installDeepSeekV4ImagePreprocessor(
     return rewritten
   }
 
-  ctx.on('llm/stream', (options: VisionStreamOptions, next) => {
+  ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
     if (!isDeepSeekV4Model(options.provider, options.model)
       || !options.messages.some(message => hasImageContent(message.content))) {
       return next()
     }
 
-    return (async function* (): AsyncIterable<unknown> {
+    return (async function* (): AsyncIterable<StreamChunk> {
       const signal = options.signal ?? new AbortController().signal
-      const messages: VisionMessage[] = []
+      const messages: Message[] = []
       for (const message of options.messages) {
         messages.push({
           ...message,
@@ -511,7 +502,7 @@ async function attemptBackend(
 ): Promise<VisionAttemptResult> {
   let apiKey: string | undefined
   try {
-    apiKey = await resolveApiKey(ctx, backend, { cloud: backend.kind === 'cloud' })
+    apiKey = await resolveApiKey(ctx, backend)
   } catch (error) {
     return { available: false, error }
   }
@@ -538,7 +529,9 @@ async function attemptBackend(
           question: request.question,
           signal: request.signal,
           source: request.source,
-          workspaceRoot: request.workspaceRoot,
+          ...(request.workspaceRoot === undefined
+            ? {}
+            : { workspaceRoot: request.workspaceRoot }),
         }),
       }
     } catch (error) {

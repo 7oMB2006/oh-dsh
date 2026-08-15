@@ -296,11 +296,16 @@ class VisionCardController {
     this.failed = false
     this.publish()
     let landed = true
-    for (const write of plan) landed = await write.run!() && landed
-    if (landed) this.staged.clear()
-    this.saving = false
-    this.failed = !landed
-    this.publish()
+    try {
+      for (const write of plan) landed = await write.run!() && landed
+    } catch {
+      landed = false
+    } finally {
+      if (landed) this.staged.clear()
+      this.saving = false
+      this.failed = !landed
+      this.publish()
+    }
   }
 
   private async storeValue(field: VisionFieldName, value: unknown): Promise<boolean> {
@@ -557,7 +562,7 @@ type VisionCardProps =
   & InjectFace<CardFace>
 
 function VisionCard(props: VisionCardProps) {
-  const state = props.useVisionCard(snapshot => snapshot)
+  const state = props.useVisionCard((snapshot: CardState) => snapshot)
   const [open, setOpen] = useState(false)
   if (!state.available) return null
   const disabled = !state.writable || state.saving
@@ -569,11 +574,15 @@ function VisionCard(props: VisionCardProps) {
       hint={props.t(hint)}
       state={state.fields[name]}
       disabled={disabled}
-      actionLabel={actionLabel === undefined ? undefined : props.t(actionLabel)}
       t={props.t}
       onEdit={text => { props.edit(name, text) }}
       onReset={() => { props.resetField(name) }}
-      onAction={actionLabel === undefined ? undefined : () => { void openExternal(ZHIPU_CONSOLE_URL) }}
+      {...(actionLabel === undefined
+        ? {}
+        : {
+          actionLabel: props.t(actionLabel),
+          onAction: () => { void openExternal(ZHIPU_CONSOLE_URL) },
+        })}
     />
   )
   return (
@@ -601,7 +610,7 @@ function VisionCard(props: VisionCardProps) {
             label={props.t('apiKey')}
             hint={props.t(state.cloudKeyWritable ? 'apiKeyHint' : 'credentialReadOnly')}
             text={state.cloudKeyText}
-            placeholder={state.cloudKeyConfigured ? '••••••••••••' : undefined}
+            {...(state.cloudKeyConfigured ? { placeholder: '••••••••••••' } : {})}
             configured={state.cloudKeyConfigured}
             disabled={state.saving}
             stateLabel={props.t(state.cloudKeyConfigured ? 'apiKeySet' : 'apiKeyUnset')}
@@ -631,7 +640,7 @@ export function apply(ctx: ClientContext): void {
     api,
   )
   ctx.effect(
-    () => ctx.remote.$on('credentials/updated', ref => { controller.refreshCredential(ref) }),
+    () => ctx.remote.$on('credentials/updated', (ref: string) => { controller.refreshCredential(ref) }),
     'oh-dsh-vision: credential invalidations',
   )
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
