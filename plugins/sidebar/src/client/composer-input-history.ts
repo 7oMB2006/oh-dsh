@@ -1,4 +1,8 @@
-import { DEFAULT_INPUT_HISTORY_LIMIT, InputHistory } from './input-history.ts'
+import {
+  DEFAULT_INPUT_HISTORY_LIMIT,
+  type InputHistoryEntry,
+  InputHistory,
+} from './input-history.ts'
 
 export interface ComposerHistoryContentBlock {
   readonly text?: unknown
@@ -8,6 +12,7 @@ export interface ComposerHistoryContentBlock {
 export interface ComposerHistoryNode {
   readonly content?: unknown
   readonly kind?: unknown
+  readonly seq?: unknown
 }
 
 export interface ComposerHistorySnapshot {
@@ -22,11 +27,14 @@ export interface ComposerHistorySession {
 }
 
 /** Extract only durable text user messages, in their session order. */
-export function submittedInputTexts(nodes: readonly ComposerHistoryNode[] | undefined): string[] {
+export function submittedInputEntries(
+  nodes: readonly ComposerHistoryNode[] | undefined,
+): InputHistoryEntry[] {
   if (nodes === undefined) return []
-  const texts: string[] = []
+  const entries: InputHistoryEntry[] = []
   for (const node of nodes) {
-    if ((node.kind !== 'user' && node.kind !== 'steering') || !Array.isArray(node.content)) continue
+    if ((node.kind !== 'user' && node.kind !== 'steering')
+      || !Array.isArray(node.content) || typeof node.seq !== 'number') continue
     const text = node.content
       .filter((block): block is ComposerHistoryContentBlock =>
         typeof block === 'object' && block !== null
@@ -34,9 +42,9 @@ export function submittedInputTexts(nodes: readonly ComposerHistoryNode[] | unde
         && typeof (block as ComposerHistoryContentBlock).text === 'string')
       .map(block => block.text as string)
       .join('')
-    if (text !== '') texts.push(text)
+    if (text !== '') entries.push({ id: String(node.seq), value: text })
   }
-  return texts
+  return entries
 }
 
 /**
@@ -62,7 +70,7 @@ export class ComposerInputHistory {
   }
 
   synchronize(sessionId: string, snapshot: ComposerHistorySnapshot): void {
-    this.forSession(sessionId).synchronize(submittedInputTexts(snapshot.nodes))
+    this.forSession(sessionId).synchronize(submittedInputEntries(snapshot.nodes))
   }
 
   resetNavigation(sessionId: string | undefined): void {

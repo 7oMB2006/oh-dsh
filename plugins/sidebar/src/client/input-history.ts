@@ -2,6 +2,11 @@
 
 export const DEFAULT_INPUT_HISTORY_LIMIT = 100
 
+export interface InputHistoryEntry {
+  readonly id: string
+  readonly value: string
+}
+
 export interface InputHistoryState {
   readonly entries: readonly string[]
   readonly cursor: number | null
@@ -21,10 +26,11 @@ export interface InputHistoryResult {
  * cursor is an entry index while browsing and null while editing the draft.
  */
 export class InputHistory {
-  private entries: string[] = []
+  private entries: InputHistoryEntry[] = []
   private cursor: number | null = null
   private draft: string | null = null
   private readonly limit: number
+  private nextLocalEntryId = 0
 
   constructor(limit = DEFAULT_INPUT_HISTORY_LIMIT) {
     if (!Number.isInteger(limit) || limit < 1) {
@@ -35,7 +41,7 @@ export class InputHistory {
 
   snapshot(): InputHistoryState {
     return {
-      entries: this.entries,
+      entries: this.entries.map(entry => entry.value),
       cursor: this.cursor,
       draft: this.draft,
     }
@@ -54,7 +60,9 @@ export class InputHistory {
   record(value: string): void {
     if (value.trim() === '') return
     const previous = this.entries.at(-1)
-    if (previous !== value) this.entries.push(value)
+    if (previous?.value !== value) {
+      this.entries.push({ id: `local:${String(this.nextLocalEntryId++)}`, value })
+    }
     if (this.entries.length > this.limit) this.entries.splice(0, this.entries.length - this.limit)
     this.resetNavigation()
   }
@@ -64,22 +72,22 @@ export class InputHistory {
   }
 
   /** Replace entries from the authoritative session window without losing a selected item. */
-  synchronize(values: readonly string[]): void {
-    const selected = this.cursor === null ? null : this.entries[this.cursor]
+  synchronize(entries: readonly InputHistoryEntry[]): void {
+    const selectedId = this.cursor === null ? null : this.entries[this.cursor]?.id
     const draft = this.draft
-    const next: string[] = []
-    for (const value of values) {
-      if (value.trim() === '' || next.at(-1) === value) continue
-      next.push(value)
+    const next: InputHistoryEntry[] = []
+    for (const entry of entries) {
+      if (entry.value.trim() === '' || next.at(-1)?.value === entry.value) continue
+      next.push(entry)
     }
     if (next.length > this.limit) next.splice(0, next.length - this.limit)
     this.entries = next
-    if (selected === null) return
-    if (selected === undefined) {
+    if (selectedId === null) return
+    if (selectedId === undefined) {
       this.resetNavigation()
       return
     }
-    const cursor = next.lastIndexOf(selected)
+    const cursor = next.findIndex(entry => entry.id === selectedId)
     if (cursor === -1) {
       this.resetNavigation()
       return
@@ -106,6 +114,6 @@ export class InputHistory {
       return { state: this.snapshot(), value: null, changed: false }
     }
     this.cursor = next
-    return { state: this.snapshot(), value: this.entries[next] ?? '', changed: true }
+    return { state: this.snapshot(), value: this.entries[next]?.value ?? '', changed: true }
   }
 }

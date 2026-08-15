@@ -2,23 +2,27 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   ComposerInputHistory,
-  submittedInputTexts,
+  submittedInputEntries,
   type ComposerHistorySession,
 } from '../plugins/sidebar/src/client/composer-input-history.ts'
 
 test('reads only confirmed text user messages in chronological order', () => {
-  assert.deepEqual(submittedInputTexts([
-    { kind: 'command', content: [{ type: 'text', text: '/help' }] },
-    { kind: 'user', content: [{ type: 'image' }, { type: 'text', text: 'first' }] },
-    { kind: 'user', content: [{ type: 'text', text: 'second ' }, { type: 'text', text: 'part' }] },
-    { kind: 'steering', content: [{ type: 'text', text: 'follow up' }] },
-    { kind: 'user', content: [{ type: 'text', text: '' }] },
-  ]), ['first', 'second part', 'follow up'])
+  assert.deepEqual(submittedInputEntries([
+    { kind: 'command', seq: 1, content: [{ type: 'text', text: '/help' }] },
+    { kind: 'user', seq: 2, content: [{ type: 'image' }, { type: 'text', text: 'first' }] },
+    { kind: 'user', seq: 3, content: [{ type: 'text', text: 'second ' }, { type: 'text', text: 'part' }] },
+    { kind: 'steering', seq: 4, content: [{ type: 'text', text: 'follow up' }] },
+    { kind: 'user', seq: 5, content: [{ type: 'text', text: '' }] },
+  ]), [
+    { id: '2', value: 'first' },
+    { id: '3', value: 'second part' },
+    { id: '4', value: 'follow up' },
+  ])
 })
 test('keeps histories isolated by session', () => {
   const histories = new ComposerInputHistory()
-  histories.synchronize('one', { nodes: [{ kind: 'user', content: [{ type: 'text', text: 'one' }] }] })
-  histories.synchronize('two', { nodes: [{ kind: 'user', content: [{ type: 'text', text: 'two' }] }] })
+  histories.synchronize('one', { nodes: [{ kind: 'user', seq: 1, content: [{ type: 'text', text: 'one' }] }] })
+  histories.synchronize('two', { nodes: [{ kind: 'user', seq: 2, content: [{ type: 'text', text: 'two' }] }] })
   assert.equal(histories.forSession('one').navigate('older', '').value, 'one')
   assert.equal(histories.forSession('two').navigate('older', '').value, 'two')
 })
@@ -42,8 +46,8 @@ test('loads one older page at a time only while capacity remains', async () => {
   assert.equal(histories.requestOlder('session', session), true)
   histories.synchronize('session', {
     nodes: [
-      { kind: 'user', content: [{ type: 'text', text: 'older' }] },
-      { kind: 'user', content: [{ type: 'text', text: 'newer' }] },
+      { kind: 'user', seq: 1, content: [{ type: 'text', text: 'older' }] },
+      { kind: 'user', seq: 2, content: [{ type: 'text', text: 'newer' }] },
     ],
   })
   assert.equal(histories.requestOlder('session', session), false)
