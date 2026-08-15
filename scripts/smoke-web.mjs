@@ -16,6 +16,7 @@ import { ensureWebProfile, WEB_PROFILE } from '../src/profile.ts'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
 import { resolveProductVersion } from '../src/version.ts'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
+import electronBinary from 'electron'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -96,6 +97,7 @@ assert.equal(dump.status, 0, dump.stderr || dump.stdout)
 for (const row of [
   'oh-web',
   'oh-better-sidebar-runtime',
+  'oh-vision',
   'oh-skins',
   'oh-pinned-summary',
   'oh-sidebar',
@@ -166,6 +168,7 @@ try {
   const loaded = []
   for (const pluginId of [
     '@oh-dsh/web',
+    '@oh-dsh/vision',
     '@oh-dsh/skins',
     '@oh-dsh/pinned-summary',
     '@oh-dsh/sidebar',
@@ -334,6 +337,25 @@ try {
     })
   })
 
+  const browserClient = spawnSync(electronBinary, [
+    '--no-sandbox',
+    join(root, 'scripts', 'smoke-client.cjs'),
+  ], {
+    cwd: root,
+    encoding: 'utf8',
+    env: {
+      ...runtimeEnvironment,
+      DSH_SMOKE_RUNTIME_URL: base.href,
+      DSH_SMOKE_SURFACE: 'web',
+    },
+    timeout: 30_000,
+  })
+  assert.equal(
+    browserClient.status,
+    0,
+    browserClient.error?.message || browserClient.stderr || browserClient.stdout,
+  )
+
   console.log(`Oh-DSH Web profile ready: ${base.href}`)
   console.log(`Web composition verified: ${dump.stdout.split('\n').length} dump lines`)
   for (const plugin of loaded) {
@@ -345,6 +367,7 @@ try {
   console.log('Sidebar workspace Git API: ready, repository facts verified')
   console.log('Better Sidebar Host API: ready, session/files/Git verified on the web surface')
   console.log('Better Sidebar terminal PTY: ready, command execution verified on the web surface')
+  console.log('Web pasted-image thumbnail: ready, upload and removal verified')
 } finally {
   if (child.exitCode === null) {
     child.kill('SIGTERM')

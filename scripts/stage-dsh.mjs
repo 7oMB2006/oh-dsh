@@ -783,6 +783,15 @@ function installDesktopPackages() {
         ],
       ],
     },
+    {
+      manifest: join(root, 'plugins', 'vision', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'vision', 'index.js'), 'dist/index.js'],
+        [join(root, 'dist', 'plugins', 'vision', 'client.js'), 'dist/client.js'],
+        [join(root, 'dist', 'plugins', 'vision', 'client.js.map'), 'dist/client.js.map'],
+        [join(root, 'dist', 'plugins', 'vision', 'LICENSE'), 'dist/LICENSE'],
+      ],
+    },
     ...[
       'skins',
       'sidebar',
@@ -930,6 +939,10 @@ for (const required of [
   'web/client.js.map',
   'web/cordis.patch.yml',
   'plugins/better-sidebar-runtime/index.js',
+  'plugins/vision/index.js',
+  'plugins/vision/client.js',
+  'plugins/vision/client.js.map',
+  'plugins/vision/LICENSE',
   'plugins/skins/index.js',
   'plugins/skins/client.js',
   'plugins/sidebar/index.js',

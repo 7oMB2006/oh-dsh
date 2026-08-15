@@ -155,6 +155,68 @@ Common TUI options:
 | `--preset` | `standard` | Initial Agent preset |
 | `--inline` | Off | Preserve terminal scrollback instead of alternate screen |
 
+## Image recognition
+
+Desktop, Web, and TUI all load the bundled `@oh-dsh/vision` plugin. When a
+text-only model encounters an image path, URL, or pasted-image reference, it
+can call `view_image`; the configured OpenAI-compatible vision model performs
+OCR, chart reading, object counting, screenshot diagnosis, or layout
+inspection and returns text to the active model.
+
+In Desktop or Web UI, copy a PNG, JPEG, WebP, or GIF, focus the message
+composer, and press `⌘V` on macOS or `Ctrl+V` on Windows/Linux. A bubble with
+an image thumbnail appears immediately above the composer. Click its `×` to
+remove it before sending. An activity marker remains while upload is in
+progress; a failed upload changes the bubble to an error state and prevents
+that reference from being sent.
+
+The pasted image is saved through DSH's attachment store and serialized into
+an opaque `view_image` reference bound to the current Session. The message
+therefore remains text input, so the default DeepSeek text-only model does not
+need to declare native image-input support. TUI has no graphical thumbnail;
+provide a workspace-local image path or HTTP(S) URL in the prompt to use the
+same tool.
+
+The default backend uses Zhipu `glm-4.6v-flash`. Store its key in the shared
+data root's credential file (`~/.ohdsh/.credentials.yaml` by default) so all
+three surfaces can use it:
+
+```yaml
+VISION_API_KEY: your-api-key
+```
+
+Keep the credential file owner-readable only, for example with
+`chmod 600 ~/.ohdsh/.credentials.yaml` on macOS/Linux. Exporting
+`VISION_API_KEY` before launch is also supported.
+
+Override the backend and model in the shared `~/.ohdsh/settings.yaml`:
+
+```yaml
+oh-dsh-vision:
+  baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen3-vl-flash
+  apiKeyEnv: DASHSCOPE_API_KEY
+  maxTokens: 2048
+  timeoutMs: 60000
+  maxImageBytes: 10485760
+```
+
+A local Ollama endpoint needs no key:
+
+```yaml
+oh-dsh-vision:
+  baseURL: http://localhost:11434/v1
+  model: qwen3-vl:4b
+```
+
+Local image paths must remain inside the active Session workspace, including
+after symlink resolution. Remote URLs, local image bytes, and pasted-image
+bytes are sent to the configured vision endpoint only when `view_image` is
+called. A pasted reference cannot be used from another Session. The browser's
+attachment button and drag-and-drop remain native DSH image input and require
+the selected model to declare image support; with a text-only model, use the
+paste bubble described above, a workspace path, or an HTTP(S) URL.
+
 ## Desktop operations
 
 ### Conversation input history

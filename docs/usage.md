@@ -143,6 +143,58 @@ TUI 常用选项：
 | `--preset` | `standard` | 初始 Agent preset |
 | `--inline` | 关闭 | 保留终端 scrollback，不使用 alternate screen |
 
+## 图片识别
+
+Desktop、Web 和 TUI 都会加载内置的 `@oh-dsh/vision`。纯文本模型遇到图片路径、
+URL 或粘贴图片引用时会调用 `view_image`，由配置的 OpenAI-compatible 视觉模型
+完成 OCR、图表读取、物体计数、截图排错与界面布局分析，再把文本结果交回当前模型。
+
+在 Desktop 或 Web UI 中，先复制一张 PNG、JPEG、WebP 或 GIF，再把焦点放到消息
+输入框并按 `⌘V`（macOS）或 `Ctrl+V`（Windows/Linux）。输入栏上方会立即出现一
+个带图片缩略图的气泡；点击右上角 `×` 可在发送前移除。上传期间会显示进度标记，
+失败时气泡会变为错误状态并阻止该引用被发送。
+
+粘贴图片保存到 DSH 自带的 attachment store，并在消息中序列化为只对当前 Session
+有效的不透明 `view_image` 引用。这条桥接保持消息本身为文本输入，所以默认的
+DeepSeek 文本模型不需要声明原生 image-input 能力。TUI 没有图形化缩略图，直接在
+消息中提供 Workspace 内的图片路径或 HTTP(S) URL 即可使用同一个工具。
+
+默认后端使用智谱 `glm-4.6v-flash`。把密钥写入共享数据根目录的凭据文件（默认
+`~/.ohdsh/.credentials.yaml`），三端即可共同使用：
+
+```yaml
+VISION_API_KEY: your-api-key
+```
+
+凭据文件应保持仅当前用户可读，例如在 macOS/Linux 上执行
+`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export VISION_API_KEY=...`。
+
+后端和模型可在共享的 `~/.ohdsh/settings.yaml` 中覆盖：
+
+```yaml
+oh-dsh-vision:
+  baseURL: https://dashscope.aliyuncs.com/compatible-mode/v1
+  model: qwen3-vl-flash
+  apiKeyEnv: DASHSCOPE_API_KEY
+  maxTokens: 2048
+  timeoutMs: 60000
+  maxImageBytes: 10485760
+```
+
+使用本地 Ollama 时不要求密钥：
+
+```yaml
+oh-dsh-vision:
+  baseURL: http://localhost:11434/v1
+  model: qwen3-vl:4b
+```
+
+本地图片路径只能位于当前 Session 的 Workspace 内，解析软链接后仍会检查边界；
+远程 URL、本地图片内容或粘贴图片内容只会在调用 `view_image` 时发送给所配置的
+视觉端点。粘贴引用不能跨 Session 使用。浏览器附件按钮和拖放仍属于 DSH 原生图片
+输入，受当前模型声明的 image-input 能力限制；面向纯文本模型时请使用上述粘贴气泡、
+Workspace 图片路径或 HTTP(S) URL。
+
 ## Desktop 操作
 
 ### 对话输入历史

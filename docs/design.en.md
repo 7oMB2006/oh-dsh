@@ -64,6 +64,7 @@ the smallest supported distribution.
 | `@oh-dsh/pinned-summary` | Native | Session summary, half-height card, and content-gutter management |
 | `@oh-dsh/plugin-marketplace` | Adopts lifecycle ideas from `plugin-registry` and `dsh-hub` | One Loader, isolated preview, risk approval, TOFU source lock, and recovery |
 | `@oh-dsh/skins` | Downstream implementation of the `dsh-skins` ThemeService model | One skin id set, Host persistence, Web/Desktop CSS, and TUI palette adapters |
+| `@oh-dsh/vision` | Adapts [`dsh-vision`](https://github.com/william-jin-cmu/dsh-vision) | Cross-surface `view_image` Host tool plus the Desktop/Web pasted-image thumbnail Client; reuses DSH credentials, settings, attachments, and input triggers |
 | `dsh-cc-tui` | Pins [`dsh-TUI`](https://github.com/ccch1mneyyy/dsh-TUI) | Upstream owns terminal rendering, session interaction, commands, and terminal compatibility |
 | `@oh-dsh/tui` | Downstream Profile adapter for `dsh-TUI` | Unified `ohdsh tui`, Oh-DSH TUI identity, defaults, packaging, and DSH data boundary |
 
@@ -102,6 +103,11 @@ same transaction and risk approval and cannot bypass the Loader.
 
 - Web binds to loopback by default; LAN exposure requires trusted authorities.
 - Files, PTY, and Git requests are bound to the active Session and Workspace.
+- Local `view_image` reads are bound to the active Session workspace; remote
+  vision requests go only to the user-configured endpoint.
+- Desktop/Web pasted images enter the DSH attachment store and reach
+  `view_image` through random, opaque, Session-bound references. Reference
+  records live under the unified data root and cannot resolve across Sessions.
 - Marketplace candidate, current, and previous states remain separate.
 - A source receives a TOFU lock on first use; later commit changes need review.
 - The Electron bridge exists only on Desktop; Web does not emulate its rights.

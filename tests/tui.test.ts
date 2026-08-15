@@ -157,8 +157,9 @@ test('TUI bundle mounts its surface and skins before the upstream renderer', () 
   assert.match(patch, /- id: cc-tui\n  disabled: true/)
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
+  const vision = patch.indexOf("name: '@oh-dsh/vision'")
   const renderer = patch.indexOf("name: 'dsh-cc-tui'")
-  assert.ok(surface >= 0 && surface < skins && skins < renderer)
+  assert.ok(surface >= 0 && surface < skins && skins < vision && vision < renderer)
 })
 
 test('TUI upstream adapter removes legacy terminal branding and scopes storage', () => {
