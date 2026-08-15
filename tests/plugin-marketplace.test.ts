@@ -489,6 +489,43 @@ test('catalog cache survives restarts, revalidates with ETags, and expires after
   }
 })
 
+test('catalog cache rejects unsupported documents before reuse', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-invalid-cache-'))
+  const command = join(appDataPath, 'api')
+  const cachePath = join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')
+  let document: unknown = { schema: 'unsupported/v1' }
+  let requests = 0
+  const createPlatform = (): ProductionMarketplacePlatform => new ProductionMarketplacePlatform({
+    cliEntry: '/unused/dsh.mjs',
+    cwd: appDataPath,
+    env: {
+      DSH_DESKTOP_APP_DATA: appDataPath,
+      DSH_DESKTOP_GH_PATH: process.execPath,
+      OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+      PATH: '',
+    },
+    fetch: async (): Promise<Response> => {
+      requests += 1
+      return new Response(JSON.stringify(document), { status: 200 })
+    },
+    nodeBinary: process.execPath,
+    now: () => 1_000,
+    pnpmEntry: '/unused/pnpm.mjs',
+  })
+
+  try {
+    writeFileSync(command, 'process.exit(1)\n')
+    await assert.rejects(createPlatform().loadCatalog(), /unsupported plugin catalog/)
+    assert.equal(existsSync(cachePath), false)
+
+    document = catalogDocument()
+    assert.deepEqual(await createPlatform().loadCatalog(), catalogDocument())
+    assert.equal(requests, 2)
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
 test('GitHub CLI fallback reads raw catalogs larger than one megabyte', async () => {
   const root = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-gh-raw-'))
   const command = join(root, 'api')

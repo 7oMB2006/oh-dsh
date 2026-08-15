@@ -20,6 +20,7 @@ import {
   sep,
   win32,
 } from 'node:path'
+import { parseMarketplaceCatalog } from '../catalog.ts'
 import type { MarketplaceAuthStatus } from '../protocol.ts'
 import {
   MARKETPLACE_CATALOG_PATH,
@@ -137,6 +138,7 @@ function readCatalogCache(path: string | null, locator: string): CatalogCache | 
       || !Object.hasOwn(value, 'document')) {
       return null
     }
+    parseMarketplaceCatalog(value.document)
     return {
       document: value.document,
       etag: value.etag as string | null,
@@ -493,6 +495,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       }
       if (!response.ok) throw new Error(`GitHub Raw catalog request failed with HTTP ${String(response.status)}`)
       const document = JSON.parse(await response.text()) as unknown
+      parseMarketplaceCatalog(document)
       save(document, response.headers.get('etag'))
       return document
     } catch (error) {
@@ -507,6 +510,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
           'Accept: application/vnd.github.raw+json',
         ], { cwd: this.#options.cwd, env: this.#options.env, timeoutMs: 30_000 })
         const document = JSON.parse(result.stdout) as unknown
+        parseMarketplaceCatalog(document)
         save(document, null)
         return document
       } catch (authenticatedError) {
