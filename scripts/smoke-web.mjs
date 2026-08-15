@@ -360,5 +360,10 @@ try {
       })
     })
   }
-  rmSync(smokeRoot, { recursive: true, force: true })
+  rmSync(smokeRoot, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 250,
+  })
 }
