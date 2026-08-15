@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#080b12">
+        <meta
+            name="description"
+            content="Oh-DSH Desktop 是构建在 DeepSeek Harness 之上的可安装、可扩展桌面工作台。"
+        >
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="Oh-DSH Desktop">
+        <meta
+            property="og:description"
+            content="把 Chat、终端、文件、代码审查和插件带到同一个桌面工作台。"
+        >
+        <meta property="og:url" content="https://dsh.openatom.club/">
+        <meta
+            property="og:image"
+            content="https://dsh.openatom.club/assets/oh-dsh-desktop-landing.png"
+        >
+        <meta name="twitter:card" content="summary_large_image">
+        <title>Oh-DSH Desktop</title>
+        <link rel="stylesheet" href="site.css">
+        <script src="site.js" defer></script>
+    </head>
+    <body>
+        <div class="page-shell">
+            <header class="site-header">
+                <a class="brand" href="./" aria-label="Oh-DSH home">
+                    <span>Oh-DSH</span>
+                </a>
+                <nav class="site-nav" aria-label="Primary navigation">
+                    <a
+                        class="github-star"
+                        href="https://github.com/hust-open-atom-club/oh-dsh"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"
+                            ></path>
+                        </svg>
+                        <span data-i18n="star">星标</span>
+                        <span class="star-count" data-star-count hidden></span>
+                    </a>
+                    <button
+                        class="language-toggle"
+                        type="button"
+                        data-language-toggle
+                        aria-label="Switch to English"
+                    >
+                        EN
+                    </button>
+                </nav>
+            </header>
+
+            <main>
+                <section class="hero" aria-labelledby="hero-title">
+                    <div class="product-visual">
+                        <div class="visual-glow" aria-hidden="true"></div>
+                        <img
+                            src="assets/oh-dsh-desktop-landing.png"
+                            alt="Oh-DSH Desktop 深色界面，包含工作区、对话和插件入口"
+                            data-i18n-alt="screenshotAlt"
+                            width="2560"
+                            height="1680"
+                        >
+                    </div>
+
+                    <div class="hero-copy">
+                        <h1 id="hero-title" data-i18n="title">
+                            让 Harness 成为你的桌面工作流
+                        </h1>
+                        <div class="hero-actions">
+                            <a
+                                class="download-button"
+                                href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
+                                data-download-trigger
+                                data-i18n="downloadLatest"
+                            >
+                                下载最新版
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer class="site-footer">
+                <span>Oh-DSH</span>
+                <span data-i18n="footer">开放、可组合的 DeepSeek Harness 工作台</span>
+            </footer>
+        </div>
+
+        <dialog
+            class="download-dialog"
+            aria-labelledby="download-dialog-title"
+            aria-describedby="download-dialog-description"
+            data-download-dialog
+        >
+            <button
+                class="dialog-close"
+                type="button"
+                aria-label="关闭 / Close"
+                data-dialog-close
+            >
+                ×
+            </button>
+            <p class="dialog-kicker" data-i18n="downloadReady">准备下载</p>
+            <h2 id="download-dialog-title" data-i18n="downloadTitle">
+                下载前，顺手点亮一颗 Star？
+            </h2>
+            <p
+                id="download-dialog-description"
+                class="dialog-description"
+                data-i18n="downloadDescription"
+            >
+                Oh-DSH 完全开源。你的 Star 会帮助更多开发者发现它，随后我们会继续下载。
+            </p>
+            <p class="detected-platform">
+                <span data-i18n="detectedPlatform">已识别当前平台</span>
+                <strong data-platform-label>当前设备</strong>
+            </p>
+            <div class="dialog-actions">
+                <a
+                    class="dialog-primary"
+                    href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
+                    data-star-download
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"
+                        ></path>
+                    </svg>
+                    <span data-i18n="starAndDownload">去 GitHub Star，并继续下载</span>
+                </a>
+                <a
+                    class="dialog-secondary"
+                    href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
+                    data-direct-download
+                    data-i18n="directDownload"
+                >
+                    直接下载
+                </a>
+            </div>
+        </dialog>
+    </body>
+</html>

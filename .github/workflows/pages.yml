@@ -1,0 +1,52 @@
+name: GitHub Pages
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - '.github/workflows/pages.yml'
+            - 'assets/oh-dsh-desktop-landing.png'
+            - 'scripts/build-pages.mjs'
+            - 'website/**'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+concurrency:
+    group: pages
+    cancel-in-progress: false
+
+jobs:
+    build:
+        name: Build site
+        runs-on: ubuntu-24.04
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v6
+
+            - name: Configure GitHub Pages
+              uses: actions/configure-pages@v6
+
+            - name: Build landing page
+              run: node scripts/build-pages.mjs
+
+            - name: Upload Pages artifact
+              uses: actions/upload-pages-artifact@v5
+              with:
+                  path: .stage/pages
+
+    deploy:
+        name: Deploy site
+        needs: build
+        runs-on: ubuntu-24.04
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v5
