@@ -47,6 +47,22 @@ const WEB_SHARED_ENTRIES = new Set([
   'skins.json',
 ])
 
+/** Outcome of a legacy-state migration attempt. */
+export interface LegacyStateMigrationResult {
+  complete: boolean
+  migrated: boolean
+}
+
+const NO_MIGRATION: LegacyStateMigrationResult = {
+  complete: true,
+  migrated: false,
+}
+
+const INCOMPLETE_MIGRATION: LegacyStateMigrationResult = {
+  complete: false,
+  migrated: false,
+}
+
 /** Resolve the default Oh-DSH state root for one user account. */
 export function defaultOhDshHome(userHome: string = homedir()): string {
   return join(userHome, DEFAULT_OH_DSH_HOME_DIRECTORY)
@@ -250,17 +266,21 @@ export function migrateLegacyDesktopState(input: {
   appDataRoot: string
   env?: NodeJS.ProcessEnv
   ohDshHome: string
-}): boolean {
-  if (hasOhDshHomeOverride(input.env ?? process.env)) return false
-  if (existsSync(migrationMarker(input.ohDshHome, DESKTOP_MIGRATION))) return false
+}): LegacyStateMigrationResult {
+  if (hasOhDshHomeOverride(input.env ?? process.env)) return NO_MIGRATION
+  if (existsSync(migrationMarker(input.ohDshHome, DESKTOP_MIGRATION))) {
+    return NO_MIGRATION
+  }
 
   const legacyRoot = join(input.appDataRoot, LEGACY_DESKTOP_DATA_DIRECTORY)
   const legacyStat = followedStat(legacyRoot)
-  if (legacyStat === undefined || !legacyStat.isDirectory()) return false
+  if (legacyStat === undefined || !legacyStat.isDirectory()) return NO_MIGRATION
 
   const legacyDshHome = join(legacyRoot, 'dsh')
   if (stat(legacyDshHome) !== undefined
-    && !copyDirectoryContents(legacyDshHome, input.ohDshHome)) return false
+    && !copyDirectoryContents(legacyDshHome, input.ohDshHome)) {
+    return INCOMPLETE_MIGRATION
+  }
   let copiedSharedEntries = true
   for (const entry of DESKTOP_SHARED_ENTRIES) {
     if (entry === 'dsh') continue
@@ -269,14 +289,14 @@ export function migrateLegacyDesktopState(input: {
       join(input.ohDshHome, entry),
     ) && copiedSharedEntries
   }
-  if (!copiedSharedEntries) return false
+  if (!copiedSharedEntries) return INCOMPLETE_MIGRATION
   if (!copyDirectoryContents(
     legacyRoot,
     desktopElectronDataRoot(input.ohDshHome),
     { exclude: DESKTOP_SHARED_ENTRIES },
-  )) return false
+  )) return INCOMPLETE_MIGRATION
   completeMigration(input.ohDshHome, DESKTOP_MIGRATION)
-  return true
+  return { complete: true, migrated: true }
 }
 
 /**
@@ -286,13 +306,15 @@ export function migrateLegacyDesktopState(input: {
 export function migrateLegacyWebState(input: {
   dataRoot: string
   legacyDefaultDataRoot?: string
-}): boolean {
+}): LegacyStateMigrationResult {
   let migrated = false
   const flatMarker = migrationMarker(input.dataRoot, WEB_FLAT_MIGRATION)
   if (!existsSync(flatMarker)) {
     const flatSource = join(input.dataRoot, 'dsh')
     if (stat(flatSource) !== undefined) {
-      if (!copyDirectoryContents(flatSource, input.dataRoot)) return false
+      if (!copyDirectoryContents(flatSource, input.dataRoot)) {
+        return { complete: false, migrated }
+      }
       completeMigration(input.dataRoot, WEB_FLAT_MIGRATION)
       migrated = true
     }
@@ -307,7 +329,7 @@ export function migrateLegacyWebState(input: {
     const hasLegacyDshHome = stat(legacyDshHome) !== undefined
     const copiedLegacyDshHome = !hasLegacyDshHome
       || copyDirectoryContents(legacyDshHome, input.dataRoot)
-    if (!copiedLegacyDshHome) return migrated
+    if (!copiedLegacyDshHome) return { complete: false, migrated }
     let foundLegacyState = hasLegacyDshHome
     let copiedSharedEntries = true
     for (const entry of WEB_SHARED_ENTRIES) {
@@ -319,10 +341,11 @@ export function migrateLegacyWebState(input: {
         join(input.dataRoot, entry),
       ) && copiedSharedEntries
     }
+    if (!copiedSharedEntries) return { complete: false, migrated }
     if (foundLegacyState && copiedSharedEntries) {
       completeMigration(input.dataRoot, WEB_DEFAULT_MIGRATION)
       migrated = true
     }
   }
-  return migrated
+  return { complete: true, migrated }
 }

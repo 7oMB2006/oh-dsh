@@ -20,6 +20,10 @@ import {
   resolveOhDshHome,
 } from '../src/data-root.ts'
 
+const MIGRATED = { complete: true, migrated: true }
+const NO_MIGRATION = { complete: true, migrated: false }
+const INCOMPLETE_MIGRATION = { complete: false, migrated: false }
+
 function write(path: string, value: string): void {
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, value)
@@ -54,11 +58,11 @@ test('legacy Desktop state migrates once without replacing shared state', t => {
   write(join(legacyRoot, 'Local Storage', 'leveldb', 'state'), 'legacy ui')
   write(join(sharedRoot, 'desktop', 'Local Storage', 'leveldb', 'state'), 'new ui')
 
-  assert.equal(migrateLegacyDesktopState({
+  assert.deepEqual(migrateLegacyDesktopState({
     appDataRoot,
     env: {},
     ohDshHome: sharedRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedRoot, 'sessions', 'legacy.json'), 'utf8'),
     'legacy',
@@ -79,11 +83,11 @@ test('legacy Desktop state migrates once without replacing shared state', t => {
   assert.equal(existsSync(join(legacyRoot, 'dsh', 'sessions', 'legacy.json')), true)
 
   write(join(legacyRoot, 'dsh', 'sessions', 'late.json'), 'late')
-  assert.equal(migrateLegacyDesktopState({
+  assert.deepEqual(migrateLegacyDesktopState({
     appDataRoot,
     env: {},
     ohDshHome: sharedRoot,
-  }), false)
+  }), NO_MIGRATION)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late.json')), false)
 })
 
@@ -101,10 +105,10 @@ test('legacy Web roots flatten once without replacing shared state', t => {
   write(join(legacyDefaultRoot, 'sidebar.json'), 'legacy sidebar')
   write(join(sharedRoot, 'skins.json'), 'current skin')
 
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyDefaultRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedRoot, 'sessions', 'current.json'), 'utf8'),
     'current',
@@ -128,10 +132,10 @@ test('legacy Web roots flatten once without replacing shared state', t => {
   write(join(sharedRoot, 'dsh', 'sessions', 'late-flat.json'), 'late')
   write(join(legacyDefaultRoot, 'dsh', 'sessions', 'late-default.json'), 'late')
   write(join(legacyDefaultRoot, 'sidebar.json'), 'late sidebar')
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyDefaultRoot,
-  }), false)
+  }), NO_MIGRATION)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-flat.json')), false)
   assert.equal(existsSync(join(sharedRoot, 'sessions', 'late-default.json')), false)
   assert.equal(
@@ -174,11 +178,11 @@ test('legacy directory links are followed before migration completes', t => {
     process.platform === 'win32' ? 'junction' : 'dir',
   )
 
-  assert.equal(migrateLegacyDesktopState({
+  assert.deepEqual(migrateLegacyDesktopState({
     appDataRoot,
     env: {},
     ohDshHome: sharedDesktopRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedDesktopRoot, 'sessions', 'desktop.json'), 'utf8'),
     'desktop',
@@ -205,7 +209,10 @@ test('legacy directory links are followed before migration completes', t => {
     process.platform === 'win32' ? 'junction' : 'dir',
   )
 
-  assert.equal(migrateLegacyWebState({ dataRoot: sharedWebRoot }), true)
+  assert.deepEqual(
+    migrateLegacyWebState({ dataRoot: sharedWebRoot }),
+    MIGRATED,
+  )
   assert.equal(
     readFileSync(join(sharedWebRoot, 'sessions', 'web.json'), 'utf8'),
     'web',
@@ -229,18 +236,18 @@ test('unavailable Windows junctions keep migration retryable', t => {
   mkdirSync(dirname(dependencyLink), { recursive: true })
   symlinkSync(dependencyTarget, dependencyLink, 'junction')
 
-  assert.equal(migrateLegacyDesktopState({
+  assert.deepEqual(migrateLegacyDesktopState({
     appDataRoot,
     env: {},
     ohDshHome: sharedRoot,
-  }), false)
+  }), INCOMPLETE_MIGRATION)
 
   write(join(dependencyTarget, 'package.json'), '{"name":"linked"}\n')
-  assert.equal(migrateLegacyDesktopState({
+  assert.deepEqual(migrateLegacyDesktopState({
     appDataRoot,
     env: {},
     ohDshHome: sharedRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedRoot, 'node_modules', 'linked', 'package.json'), 'utf8'),
     '{"name":"linked"}\n',
@@ -267,17 +274,17 @@ test('incomplete Web flattening blocks lower-priority imports', t => {
     '{"name":"lower-priority"}\n',
   )
 
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyRoot,
-  }), false)
+  }), INCOMPLETE_MIGRATION)
   assert.equal(existsSync(join(sharedRoot, 'node_modules', 'linked')), false)
 
   write(join(dependencyTarget, 'package.json'), '{"name":"preferred"}\n')
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedRoot, 'node_modules', 'linked', 'package.json'), 'utf8'),
     '{"name":"preferred"}\n',
@@ -301,17 +308,17 @@ test('incomplete legacy Web DSH blocks top-level preference imports', t => {
   symlinkSync(preferenceTarget, preferenceLink, 'junction')
   write(join(legacyRoot, 'sidebar.json', 'value'), 'lower-priority')
 
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyRoot,
-  }), false)
+  }), INCOMPLETE_MIGRATION)
   assert.equal(existsSync(join(sharedRoot, 'sidebar.json')), false)
 
   write(join(preferenceTarget, 'value'), 'preferred')
-  assert.equal(migrateLegacyWebState({
+  assert.deepEqual(migrateLegacyWebState({
     dataRoot: sharedRoot,
     legacyDefaultDataRoot: legacyRoot,
-  }), true)
+  }), MIGRATED)
   assert.equal(
     readFileSync(join(sharedRoot, 'sidebar.json', 'value'), 'utf8'),
     'preferred',
