@@ -1,10 +1,8 @@
 /** Native Plugins settings card for the built-in Vision host plugin. */
 
 import type { ConnectionHandle, IApiClient } from '@deepseek-ai/dsh-client-connection/client'
-import type {
-  ClientContext, SettingsScope, SettingsScopeSnapshot, SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context } from '@deepseek-ai/cordis'
+import * as clientRuntime from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DesktopBridge } from '../../../../src/contracts.ts'
 // These imports contribute only Cordis/client type merges. Runtime
@@ -44,6 +42,37 @@ interface VisionSettings {
   retryAttempts?: number
   retryBackoffMs?: number
   timeoutMs?: number
+}
+
+/**
+ * The rc.6 runtime barrel currently publishes `.ts` re-exports without the
+ * matching source files, so NodeNext drops those names during type checking.
+ * Keep the client-facing contracts structural while runtime behavior still
+ * comes from DSH's native services and store implementation.
+ */
+interface SettingsScopeSnapshot<T> {
+  status: 'loading' | 'ready' | 'unavailable'
+  value: T | undefined
+  base: unknown
+  user: unknown
+  writable: boolean
+}
+
+interface SettingsScope<T> {
+  getSnapshot(): SettingsScopeSnapshot<T>
+  subscribe(listener: () => void): () => void
+  set(field: string, value: unknown): Promise<void>
+  unset(field: string): Promise<void>
+}
+
+interface SnapshotStore<T> {
+  getSnapshot(): T
+  subscribe(listener: () => void): () => void
+  set(next: T): void
+}
+
+const clientRuntimeApi = clientRuntime as unknown as {
+  createSnapshotStore<T>(initial: T): SnapshotStore<T>
 }
 
 /** The card intentionally exposes only the two settings most users need. */
@@ -172,7 +201,7 @@ class VisionCardController {
     private readonly scope: SettingsScope<VisionSettings>,
     private readonly api: Pick<IApiClient, 'credentials'>,
   ) {
-    this.store = createSnapshotStore(this.project())
+    this.store = clientRuntimeApi.createSnapshotStore(this.project())
     scope.subscribe(() => {
       this.publish()
       void this.refreshCredentials()
@@ -562,7 +591,7 @@ type VisionCardProps =
   & InjectFace<CardFace>
 
 function VisionCard(props: VisionCardProps) {
-  const state = props.useVisionCard((snapshot: CardState) => snapshot)
+  const state = props.useVisionCard(snapshot => snapshot as CardState)
   const [open, setOpen] = useState(false)
   if (!state.available) return null
   const disabled = !state.writable || state.saving
@@ -631,7 +660,7 @@ function VisionCard(props: VisionCardProps) {
   )
 }
 
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   const { api } = ctx.get('connection') as ConnectionHandle
   const t = ctx.locale.bind('oh-dsh-vision')
   ctx.effect(() => ctx.locale.register('oh-dsh-vision', { zh, en }), 'oh-dsh-vision: dictionaries')
