@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { posix, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { OH_DSH_HOME_ENV } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { main as runTui } from './tui.ts'
 import { main as runWeb } from './web.ts'
@@ -78,6 +79,13 @@ function sourceElectron(
   )
 }
 
+function macOpenEnvironment(env: NodeJS.ProcessEnv): string[] {
+  const ohDshHome = env[OH_DSH_HOME_ENV]
+  return ohDshHome === undefined || ohDshHome === ''
+    ? []
+    : ['--env', `${OH_DSH_HOME_ENV}=${ohDshHome}`]
+}
+
 /** Resolve one desktop launch without starting a process. */
 export function desktopLaunchSpec(
   args: readonly string[],
@@ -90,7 +98,11 @@ export function desktopLaunchSpec(
   if (explicitApp !== undefined && explicitApp !== '') {
     if (platform === 'darwin') {
       return {
-        args: [paths.resolve(explicitApp), ...(args.length === 0 ? [] : ['--args', ...args])],
+        args: [
+          ...macOpenEnvironment(env),
+          paths.resolve(explicitApp),
+          ...(args.length === 0 ? [] : ['--args', ...args]),
+        ],
         command: '/usr/bin/open',
       }
     }
@@ -112,7 +124,12 @@ export function desktopLaunchSpec(
 
   if (platform === 'darwin') {
     return {
-      args: ['-a', 'Oh-DSH Desktop', ...(args.length === 0 ? [] : ['--args', ...args])],
+      args: [
+        ...macOpenEnvironment(env),
+        '-a',
+        'Oh-DSH Desktop',
+        ...(args.length === 0 ? [] : ['--args', ...args]),
+      ],
       command: '/usr/bin/open',
     }
   }

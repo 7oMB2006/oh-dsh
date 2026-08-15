@@ -95,12 +95,13 @@ bin\ohdsh.cmd web
 | --- | --- | --- |
 | `--host` | `127.0.0.1` | 监听地址 |
 | `--port` | `3080` | 监听端口；`0` 使用随机端口 |
-| `--data` | `~/.oh-dsh-web` | Web 可写数据根目录 |
+| `--data` | `~/.ohdsh` | 三端共享的 Oh-DSH 数据根目录 |
 | `--no-open` | 关闭 | 不自动打开浏览器 |
 | `--trusted-host` | 无 | 增加可信 authority，可重复 |
 
 等价环境变量包括 `DSH_OH_WEB_HOST`、`DSH_OH_WEB_PORT`、
-`DSH_OH_WEB_HOME` 和 `DSH_OH_WEB_OPEN`。按 `Ctrl+C` 优雅退出。
+`DSH_OH_WEB_HOME` 和 `DSH_OH_WEB_OPEN`。`OH_DSH_HOME` 可以统一覆盖
+Desktop、Web 和 TUI 的数据根目录。按 `Ctrl+C` 优雅退出。
 
 不要在未配置访问边界时直接监听 `0.0.0.0`。对局域网开放时，应同时配置
 `--trusted-host`，并由可信反向代理提供鉴权和 TLS。
@@ -133,7 +134,7 @@ TUI 常用选项：
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
 | `--cwd` | 当前目录 | Workspace |
-| `--data` | `~/.ohdsh` | Oh-DSH TUI Profile、会话和配置目录 |
+| `--data` | `~/.ohdsh` | 三端共享的 Oh-DSH 数据根目录 |
 | `--resume` | 新会话 | 恢复指定 Session id |
 | `--lang` | 上游设置 | `zh` 或 `en` |
 | `--preset` | `standard` | 初始 Agent preset |
@@ -213,10 +214,18 @@ Windows Authenticode 凭据。工作流会在任意一个凭据、安装包、bl
 
 ## 数据与排错
 
-Desktop 保留既有内部数据目录，以保证更名升级兼容。Web 默认数据目录是
-`~/.oh-dsh-web`，TUI 使用独立的 `~/.ohdsh`，不会加载 `~/.dsh` 中的全局
-插件配置。DeepSeek API key 可以在 Models 设置中配置，也可以放入对应
-DSH 数据目录的 `.env`。
+Desktop、Web 和 TUI 默认共同使用 `~/.ohdsh`，且不会加载 `~/.dsh` 中的
+全局插件配置。三端分别使用 `profiles/desktop`、`profiles/web` 和
+`profiles/tui`，但共享会话、凭据、皮肤和插件缓存；Electron 自身的数据
+位于 `~/.ohdsh/desktop`。可用 `OH_DSH_HOME` 全局覆盖，也可用 Web/TUI 的
+`--data` 临时隔离。DeepSeek API key 可以在 Models 设置中配置，或写入
+`~/.ohdsh/.env`。
+
+首次使用共享目录时，Desktop 会从系统应用数据目录中的旧
+`Oh-DSH-Desktop` 状态导入会话、凭据、插件与界面设置；Web 会导入旧
+`~/.oh-dsh-web/dsh`、根级皮肤与侧栏偏好，以及当前数据目录下的 `dsh/`。
+迁移只复制共享目录中缺失的数据，并保留旧目录用于回滚；已存在的新状态
+不会被覆盖。
 
 排查顺序：
 

@@ -58,6 +58,11 @@ test('TUI arguments keep environment defaults behind explicit flags', () => {
     sessionId: 'session-from-env',
   })
 
+  assert.equal(
+    parseTuiArgs([], { OH_DSH_HOME: '/shared/home' }).dataRoot,
+    '/shared/home',
+  )
+
   const flags = parseTuiArgs([
     '--cwd', '/flag/workspace',
     '--data=/flag/home',
@@ -125,6 +130,7 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
     assert.equal(launch.options.stdio, 'inherit')
     const childEnv = launch.options.env
     assert.equal(childEnv?.DSH_HOME, dataRoot)
+    assert.equal(childEnv?.OH_DSH_HOME, dataRoot)
     assert.equal(childEnv?.OH_DSH_TUI_FULLSCREEN, '0')
     assert.equal(childEnv?.OH_DSH_TUI_LANG, 'en')
     assert.equal(childEnv?.DSH_OH_TUI_VERSION, '1.2.3')

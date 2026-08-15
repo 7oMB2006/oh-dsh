@@ -74,6 +74,7 @@ test('packaged web distribution exposes the unified ohdsh command', () => {
   assert.match(build, /join\(packageDir, 'bin', 'ohdsh'\)/)
   assert.match(build, /join\(packageDir, 'lib', 'oh-dsh', 'cli\.js'\)/)
   assert.match(build, /exec "\$ROOT\/bin\/ohdsh" web "\$@"/)
+  assert.match(build, /数据默认保存在 \\`~\/\.ohdsh\\`/)
 })
 
 test('full and web-only distributions expose the same release version', () => {
@@ -226,8 +227,9 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     assert.equal(code, 1)
     assert.ok(runtime)
     assert.equal(runtime.plan.cwd, join(dataRoot, 'state'))
-    assert.equal(runtime.plan.env.DSH_HOME, join(dataRoot, 'state', 'dsh'))
+    assert.equal(runtime.plan.env.DSH_HOME, join(dataRoot, 'state'))
     assert.equal(runtime.plan.env.DSH_OH_WEB_DATA, join(dataRoot, 'state'))
+    assert.equal(runtime.plan.env.OH_DSH_HOME, join(dataRoot, 'state'))
   } finally {
     process.chdir(previous)
     rmSync(temp, { recursive: true, force: true })

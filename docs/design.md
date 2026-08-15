@@ -101,10 +101,11 @@ stateDiagram-v2
 - Electron bridge 只存在于 Desktop；Web 不模拟桌面权限。
 - TUI 只在真实 TTY 中启动，并继续使用 DSH Profile 的 sandbox 与 approval。
 
-## 名称与数据兼容
+## 名称与数据目录
 
 面向用户的名称是 **Oh-DSH Desktop**、**Oh-DSH Web** 和
-**Oh-DSH TUI**。内部 package id、bundle id 和既有数据目录保持稳定，
-避免升级后丢失会话、配置或凭据。
+**Oh-DSH TUI**。内部 package id 与 bundle id 保持稳定。三个界面共同使用
+`~/.ohdsh`，通过独立 Profile 隔离组合，并共享会话、凭据、皮肤与插件缓存。
+`OH_DSH_HOME` 是统一覆盖入口；Web 与 TUI 的 `--data` 只覆盖当前进程。
 
 相关操作见[安装、操作与排错](./usage.md)。
