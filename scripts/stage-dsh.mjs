@@ -64,10 +64,10 @@ function run(command, args, options = {}) {
   }
 }
 
-/** Create a portable link: POSIX symlinks, copied trees on Windows, copies for files. */
+/** Create a portable link without allowing directory links in a Windows stage. */
 function portableSymlink(target, link) {
   rmSync(link, { recursive: true, force: true })
-  if (process.platform !== 'win32') {
+  if (!isWindowsNode) {
     symlinkSync(target, link)
     return
   }
@@ -76,15 +76,7 @@ function portableSymlink(target, link) {
     copyFileSync(resolved, link)
     return
   }
-  // Do not emit Windows junctions. The staged runtime is later consumed by
-  // electron-builder, whose archive walk follows junctions and can re-enter
-  // pnpm workspace cycles. Materializing the already-resolved target keeps the
-  // installer tree self-contained and finite.
-  cpSync(resolved, link, {
-    recursive: true,
-    dereference: true,
-    preserveTimestamps: true,
-  })
+  throw new Error(`Windows runtime contains an unexpected directory link: ${link} -> ${target}`)
 }
 
 function download(url, target) {
@@ -230,6 +222,49 @@ function dependencyNames(manifest) {
     ...Object.keys(manifest.optionalDependencies ?? {}).map(name => [name, true]),
     ...Object.keys(manifest.dependencies ?? {}).map(name => [name, false]),
   ])
+}
+
+function ensureWindowsWorkspacePackages() {
+  const packages = discoverSourcePackages()
+  const visited = new Set()
+  const materialized = []
+
+  const ensurePackage = name => {
+    if (visited.has(name)) return
+    visited.add(name)
+    const source = packages.get(name)
+    if (source === undefined) return
+    const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+    const target = runtimePackageDirectory(name)
+    if (!packageMatches(target, manifest)) {
+      const vendor = isWithin(join(dshSource, 'vendor'), source)
+      rmSync(target, { recursive: true, force: true })
+      mkdirSync(dirname(target), { recursive: true })
+      cpSync(source, target, {
+        recursive: true,
+        preserveTimestamps: true,
+        filter: candidate => {
+          const rel = relative(source, candidate)
+          if (rel === '') return true
+          if (rel.split(sep)[0] === 'node_modules') return false
+          return vendor || shouldCopyWorkspaceEntry(source, candidate)
+        },
+      })
+      materialized.push(name)
+    }
+    for (const dependency of dependencyNames(manifest).keys()) {
+      if (packages.has(dependency)) ensurePackage(dependency)
+    }
+  }
+
+  const rootManifest = JSON.parse(readFileSync(join(dshSource, 'package.json'), 'utf8'))
+  for (const dependency of dependencyNames(rootManifest).keys()) {
+    if (packages.has(dependency)) ensurePackage(dependency)
+  }
+  for (const name of packages.keys()) {
+    if (existsSync(runtimePackageDirectory(name))) ensurePackage(name)
+  }
+  console.log(`Windows workspace audit: materialized ${String(materialized.length)} missing packages`)
 }
 
 function findDeployedPackage(sourceTarget) {
@@ -396,10 +431,13 @@ function replaceDeprecatedDomExceptionShim() {
   const store = join(runtime, 'node_modules', '.pnpm')
   const dependency = 'node-domexception'
   const importPattern = /^import DOMException from ['"]node-domexception['"]\r?\n/m
+  const packageDirs = isWindowsNode
+    ? [runtimePackageDirectory('fetch-blob')]
+    : readdirSync(store, { withFileTypes: true })
+      .filter(entry => entry.isDirectory() && entry.name.startsWith('fetch-blob@'))
+      .map(entry => join(store, entry.name, 'node_modules', 'fetch-blob'))
 
-  for (const entry of readdirSync(store, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !entry.name.startsWith('fetch-blob@')) continue
-    const packageDir = join(store, entry.name, 'node_modules', 'fetch-blob')
+  for (const packageDir of packageDirs) {
     const sourcePath = join(packageDir, 'from.js')
     const manifestPath = join(packageDir, 'package.json')
     if (!existsSync(sourcePath) || !existsSync(manifestPath)) continue
@@ -419,7 +457,9 @@ function replaceDeprecatedDomExceptionShim() {
     })
   }
 
-  const hoisted = join(store, 'node_modules', dependency)
+  const hoisted = isWindowsNode
+    ? runtimePackageDirectory(dependency)
+    : join(store, 'node_modules', dependency)
   const consumers = []
   walk(runtime, path => {
     if (basename(path) === dependency && path !== hoisted) consumers.push(path)
@@ -437,17 +477,24 @@ function replaceDeprecatedDomExceptionShim() {
 
 function assertDeprecatedLockBranchesAreNotShipped() {
   const store = join(runtime, 'node_modules', '.pnpm')
-  const forbidden = new Set([
-    'glob@10.5.0',
-    'glob@11.1.0',
-    'node-domexception@1.0.0',
-    'tsconfck@3.1.6',
-  ])
-  const shipped = readdirSync(store, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && forbidden.has(entry.name))
-    .map(entry => entry.name)
-  if (shipped.length > 0) {
-    throw new Error(`deprecated dependencies remain in the staged runtime: ${shipped.join(', ')}`)
+  const forbidden = [
+    ['glob', '10.5.0'],
+    ['glob', '11.1.0'],
+    ['node-domexception', '1.0.0'],
+    ['tsconfck', '3.1.6'],
+  ]
+  const identities = new Set(forbidden.map(([name, version]) => `${name}@${version}`))
+  const shipped = new Set(readdirSync(store, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && identities.has(entry.name))
+    .map(entry => entry.name))
+  for (const [name, version] of forbidden) {
+    const manifestPath = join(runtimePackageDirectory(name), 'package.json')
+    if (!existsSync(manifestPath)) continue
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.name === name && manifest.version === version) shipped.add(`${name}@${version}`)
+  }
+  if (shipped.size > 0) {
+    throw new Error(`deprecated dependencies remain in the staged runtime: ${[...shipped].join(', ')}`)
   }
   console.log('Dependency audit: deprecated packages from the shared lock are not shipped')
 }
@@ -469,7 +516,7 @@ function normalizeRuntimeLinks() {
       // targets that over-walk past the runtime root resolve back into this
       // build's `.stage` once the tree is copied into a package.
       const canonical = relative(dirname(link), logical)
-      if (raw !== canonical) portableSymlink(canonical, link)
+      if (raw !== canonical || isWindowsNode) portableSymlink(canonical, link)
       continue
     }
     if (!existsSync(logical)) continue
@@ -495,7 +542,7 @@ function rewriteWorkspaceLinks() {
     const logicalTarget = resolve(dirname(link), raw)
     if (logicalTarget === runtime || logicalTarget.startsWith(runtime + sep)) {
       const canonical = relative(dirname(link), logicalTarget)
-      if (raw !== canonical) portableSymlink(canonical, link)
+      if (raw !== canonical || isWindowsNode) portableSymlink(canonical, link)
       continue
     }
     if (logicalTarget === dshSource || logicalTarget.startsWith(dshSource + sep)) {
@@ -526,6 +573,10 @@ function relinkInstallationWorkspacePackages() {
 function assertSelfContained(rootPath, label) {
   const failures = []
   walk(rootPath, link => {
+    if (isWindowsNode) {
+      failures.push(`${link} -> ${readlinkSync(link)} (link in Windows stage)`)
+      return
+    }
     const target = resolve(dirname(link), readlinkSync(link))
     if (!existsSync(target)) {
       failures.push(`${link} -> ${readlinkSync(link)} (dangling)`)
@@ -562,7 +613,55 @@ function resolveDependencyManifest(requireFromPackage, dependency) {
   }
 }
 
+function packageMatches(directory, expected) {
+  const manifestPath = join(directory, 'package.json')
+  if (!existsSync(manifestPath)) return false
+  const actual = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  return actual.name === expected.name && actual.version === expected.version
+}
+
+function installWindowsPackageDependencies(sourceManifestPath, packageDir) {
+  const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
+  if (dependencyNames(manifest).size === 0) return
+  const deployment = join(
+    stage,
+    'windows-dependencies',
+    manifest.name.replace(/[^A-Za-z0-9._-]/g, '_'),
+  )
+  rmSync(deployment, { recursive: true, force: true })
+  run(process.execPath, [
+    join(root, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs'),
+    '--reporter=silent',
+    '--config.package-import-method=copy',
+    '--config.node-linker=hoisted',
+    '--config.inject-workspace-packages=true',
+    '--ignore-scripts',
+    '--filter', manifest.name,
+    'deploy', '--prod', deployment,
+  ], { cwd: root, env: process.env })
+
+  const source = join(deployment, 'node_modules')
+  if (!existsSync(source)) {
+    throw new Error(`pnpm did not deploy runtime dependencies for ${manifest.name}`)
+  }
+  const target = join(packageDir, 'node_modules')
+  mkdirSync(target, { recursive: true })
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    if (entry.name === '.bin' || entry.name === '.pnpm' || entry.name === '.modules.yaml') continue
+    cpSync(join(source, entry.name), join(target, entry.name), {
+      dereference: true,
+      preserveTimestamps: true,
+      recursive: true,
+    })
+  }
+  rmSync(deployment, { recursive: true, force: true })
+}
+
 function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
+  if (isWindowsNode) {
+    installWindowsPackageDependencies(sourceManifestPath, packageDir)
+    return
+  }
   const installRoot = join(packageDir, 'node_modules')
   const storeRoot = join(installRoot, '.oh-dsh-store')
   const installed = new Map()
@@ -649,6 +748,13 @@ function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) 
     const source = sourcePackages.get(dependency)
     if (source === undefined) {
       throw new Error(`${manifest.name} cannot resolve DSH peer ${dependency}`)
+    }
+    if (isWindowsNode) {
+      const expected = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+      if (!packageMatches(runtimePackageDirectory(dependency), expected)) {
+        throw new Error(`${manifest.name} cannot resolve staged DSH peer ${dependency}`)
+      }
+      continue
     }
     const target = stageWorkspaceTarget(source)
     const link = join(packageDir, 'node_modules', ...dependency.split('/'))
@@ -845,14 +951,18 @@ for (const required of [
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 const pnpm = resolvePinnedPnpm(dshSource)
-console.log('Deploying pinned DSH runtime (copy import mode)')
+console.log(`Deploying pinned DSH runtime (${isWindowsNode ? 'hoisted copy' : 'copy import'} mode)`)
 run(process.execPath, [
   pnpm.cliEntry,
   '--reporter=silent',
   '--config.package-import-method=copy',
+  ...(isWindowsNode ? [
+    '--config.node-linker=hoisted',
+    '--config.inject-workspace-packages=true',
+  ] : []),
   '--ignore-scripts',
   '--filter', '@deepseek-ai/dsh',
-  'deploy', '--prod', '--legacy', runtime,
+  'deploy', '--prod', ...(isWindowsNode ? [] : ['--legacy']), runtime,
 ], {
   cwd: dshSource,
   env: {
@@ -861,6 +971,7 @@ run(process.execPath, [
   },
 })
 
+if (isWindowsNode) ensureWindowsWorkspacePackages()
 replaceDeprecatedDomExceptionShim()
 assertDeprecatedLockBranchesAreNotShipped()
 console.log('Relinking workspace packages')
