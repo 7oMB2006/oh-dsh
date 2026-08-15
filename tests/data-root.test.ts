@@ -246,3 +246,40 @@ test('unavailable Windows junctions keep migration retryable', t => {
     '{"name":"linked"}\n',
   )
 })
+
+test('incomplete Web flattening blocks lower-priority imports', t => {
+  if (process.platform !== 'win32') {
+    t.skip('Windows junction behavior')
+    return
+  }
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'ohdsh-web-retry-'))
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }))
+
+  const sharedRoot = join(temporaryRoot, 'shared')
+  const legacyRoot = join(temporaryRoot, 'legacy-web')
+  const dependencyTarget = join(temporaryRoot, 'dependency')
+  const dependencyLink = join(sharedRoot, 'dsh', 'node_modules', 'linked')
+  mkdirSync(dirname(dependencyLink), { recursive: true })
+  symlinkSync(dependencyTarget, dependencyLink, 'junction')
+  write(
+    join(legacyRoot, 'dsh', 'node_modules', 'linked', 'package.json'),
+    '{"name":"lower-priority"}\n',
+  )
+
+  assert.equal(migrateLegacyWebState({
+    dataRoot: sharedRoot,
+    legacyDefaultDataRoot: legacyRoot,
+  }), false)
+  assert.equal(existsSync(join(sharedRoot, 'node_modules', 'linked')), false)
+
+  write(join(dependencyTarget, 'package.json'), '{"name":"preferred"}\n')
+  assert.equal(migrateLegacyWebState({
+    dataRoot: sharedRoot,
+    legacyDefaultDataRoot: legacyRoot,
+  }), true)
+  assert.equal(
+    readFileSync(join(sharedRoot, 'node_modules', 'linked', 'package.json'), 'utf8'),
+    '{"name":"preferred"}\n',
+  )
+})

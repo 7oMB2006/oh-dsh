@@ -289,10 +289,13 @@ export function migrateLegacyWebState(input: {
 }): boolean {
   let migrated = false
   const flatMarker = migrationMarker(input.dataRoot, WEB_FLAT_MIGRATION)
-  if (!existsSync(flatMarker)
-    && copyDirectoryContents(join(input.dataRoot, 'dsh'), input.dataRoot)) {
-    completeMigration(input.dataRoot, WEB_FLAT_MIGRATION)
-    migrated = true
+  if (!existsSync(flatMarker)) {
+    const flatSource = join(input.dataRoot, 'dsh')
+    if (stat(flatSource) !== undefined) {
+      if (!copyDirectoryContents(flatSource, input.dataRoot)) return false
+      completeMigration(input.dataRoot, WEB_FLAT_MIGRATION)
+      migrated = true
+    }
   }
 
   const legacyDefault = input.legacyDefaultDataRoot
