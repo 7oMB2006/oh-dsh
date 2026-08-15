@@ -40,7 +40,7 @@ test('Nix dependency collector preserves transitive peer resolution', async () =
       encoding: 'utf8',
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.equal(readlinkSync(join(output, '@fixture', 'root', 'node_modules')), '../..')
+    assert.equal(readlinkSync(join(output, '@fixture', 'root', 'node_modules')), join('..', '..'))
 
     // Runtime-generated fixture path: this assertion exercises Node's real ESM resolver.
     const collected = await import(pathToFileURL(join(output, '@fixture', 'root', 'index.js')).href)
