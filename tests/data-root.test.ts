@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -134,8 +135,16 @@ test('legacy directory links are followed before migration completes', t => {
   const legacyDesktopRoot = join(appDataRoot, 'Oh-DSH-Desktop')
   const legacyDesktopTarget = join(temporaryRoot, 'legacy-desktop')
   const desktopTarget = join(temporaryRoot, 'desktop-dsh')
+  const dependencyTarget = join(temporaryRoot, 'dependency')
   const sharedDesktopRoot = join(temporaryRoot, 'shared-desktop')
   write(join(desktopTarget, 'sessions', 'desktop.json'), 'desktop')
+  write(join(dependencyTarget, 'package.json'), '{"name":"linked"}\n')
+  mkdirSync(join(desktopTarget, 'node_modules'), { recursive: true })
+  symlinkSync(
+    dependencyTarget,
+    join(desktopTarget, 'node_modules', 'linked'),
+    process.platform === 'win32' ? 'junction' : 'dir',
+  )
   mkdirSync(legacyDesktopTarget, { recursive: true })
   symlinkSync(
     desktopTarget,
@@ -157,6 +166,17 @@ test('legacy directory links are followed before migration completes', t => {
   assert.equal(
     readFileSync(join(sharedDesktopRoot, 'sessions', 'desktop.json'), 'utf8'),
     'desktop',
+  )
+  assert.equal(
+    lstatSync(join(sharedDesktopRoot, 'node_modules', 'linked')).isSymbolicLink(),
+    true,
+  )
+  assert.equal(
+    readFileSync(
+      join(sharedDesktopRoot, 'node_modules', 'linked', 'package.json'),
+      'utf8',
+    ),
+    '{"name":"linked"}\n',
   )
 
   const sharedWebRoot = join(temporaryRoot, 'shared-web')

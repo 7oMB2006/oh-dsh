@@ -136,7 +136,28 @@ function copyEntry(
 
   if (!sourceStat.isSymbolicLink() || destinationStat !== undefined) return
   mkdirSync(dirname(destination), { recursive: true, mode: 0o700 })
-  symlinkSync(readlinkSync(source), destination)
+  const targetStat = followedStat(source)
+  if (process.platform === 'win32') {
+    if (targetStat?.isDirectory() === true) {
+      symlinkSync(realpathSync(source), destination, 'junction')
+    } else if (targetStat?.isFile() === true) {
+      try {
+        copyFileSync(source, destination, fsConstants.COPYFILE_EXCL)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      }
+    }
+    return
+  }
+  try {
+    symlinkSync(
+      readlinkSync(source),
+      destination,
+      targetStat?.isDirectory() === true ? 'dir' : 'file',
+    )
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  }
 }
 
 function copyDirectoryContents(
