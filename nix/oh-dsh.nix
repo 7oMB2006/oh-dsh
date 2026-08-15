@@ -2,7 +2,8 @@
 #
 # dshSource selects where the pinned DeepSeek Harness runtime comes from:
 #   "llm-agents"  (default) — numtide/llm-agents.nix, pre-built npm package
-#   "pinned"                — this repo's dsh-source.json revision, built from source
+#   "pinned"                — this repo's dsh-source.json npm release, with its
+#                             committed pnpm dependency lock
 #   "nixpkgs"               — pkgs.deepseek-harness (kept as a placeholder; the
 #                             nixpkgs PR is not yet merged, so this throws)
 
