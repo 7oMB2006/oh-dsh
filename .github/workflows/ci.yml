@@ -43,7 +43,30 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          submodules: recursive
+
+      - name: Initialize submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempts=5
+          backoff=5
+          for ((attempt = 1; attempt <= attempts; attempt++)); do
+            echo "::group::Submodule checkout attempt ${attempt}/${attempts}"
+            if git submodule sync --recursive \
+              && git -c protocol.version=2 submodule update --init --force --recursive; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Submodule checkout attempt ${attempt}/${attempts} failed"
+            git submodule deinit --force --all >/dev/null 2>&1 || true
+            git clean -ffd -- upstream >/dev/null 2>&1 || true
+            if (( attempt < attempts )); then
+              sleep "$((attempt * backoff))"
+            fi
+          done
+          echo "::error::Submodule checkout failed after ${attempts} attempts"
+          exit 1
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -81,7 +104,30 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          submodules: recursive
+
+      - name: Initialize submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          attempts=5
+          backoff=5
+          for ((attempt = 1; attempt <= attempts; attempt++)); do
+            echo "::group::Submodule checkout attempt ${attempt}/${attempts}"
+            if git submodule sync --recursive \
+              && git -c protocol.version=2 submodule update --init --force --recursive; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "::warning::Submodule checkout attempt ${attempt}/${attempts} failed"
+            git submodule deinit --force --all >/dev/null 2>&1 || true
+            git clean -ffd -- upstream >/dev/null 2>&1 || true
+            if (( attempt < attempts )); then
+              sleep "$((attempt * backoff))"
+            fi
+          done
+          echo "::error::Submodule checkout failed after ${attempts} attempts"
+          exit 1
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
