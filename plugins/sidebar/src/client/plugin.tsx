@@ -48,6 +48,7 @@ import {
   historyDirectionForKey,
   isAtHistoryBoundary,
 } from './composer-history-keyboard.ts'
+import { composerInputForSession } from './composer-history-bridge.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 import {
   betterSidebarApi,
@@ -58,7 +59,6 @@ import {
 import {
   nextReviewCommentId,
   ReviewCommentsService,
-  type ReviewAgentContext,
   type ReviewCommentSide,
   type ReviewSessionsService,
   type ReviewInputTriggersService,
@@ -127,16 +127,6 @@ interface ClientContext {
   get(name: string): unknown
   reflect: {
     provide(name: string, value: unknown, options?: unknown): (() => Promise<void> | void) | void
-  }
-}
-
-interface ComposerInput {
-  setDraft(text: string): void
-}
-
-interface ConversationInputService {
-  input: {
-    for(context: ReviewAgentContext): ComposerInput
   }
 }
 
@@ -1669,21 +1659,6 @@ function pathBelongsToActiveWorkspace(
   const normalizedPath = path.replaceAll('\\', '/').replace(/\/+$/, '')
   return normalizedPath === normalizedRoot
     || normalizedPath.startsWith(`${normalizedRoot}/`)
-}
-
-function composerInputForSession(
-  ctx: ClientContext,
-  sessions: SessionsService,
-  sessionId: string,
-): ComposerInput | undefined {
-  const scope = sessions.scope?.(sessionId)
-  if (scope === undefined) return undefined
-  try {
-    const conversation = ctx.get('conversation') as ConversationInputService | undefined
-    return conversation?.input.for(scope)
-  } catch {
-    return undefined
-  }
 }
 
 function isComposerTextarea(target: EventTarget | null): target is HTMLTextAreaElement {
