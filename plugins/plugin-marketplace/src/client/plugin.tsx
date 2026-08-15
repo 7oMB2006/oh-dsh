@@ -706,7 +706,7 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
   const t = useTranslate(locale, translate)
   const viewState = useSyncExternalStore(view.subscribe, view.getSnapshot)
   const [snapshot, setSnapshot] = useState<MarketplaceSnapshot | null>(null)
-  const [pending, setPending] = useState(false)
+  const [pending, setPending] = useState(true)
   const [localError, setLocalError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<
@@ -729,6 +729,8 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
 
   useEffect(() => {
     let alive = true
+    setPending(true)
+    setLocalError(null)
     void bridge.pluginMarketplace.getSnapshot().then(initial => {
       if (!alive) return
       setSnapshot(initial)
@@ -737,6 +739,8 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
       if (alive && refreshed !== undefined) setSnapshot(refreshed)
     }).catch((error: unknown) => {
       if (alive) setLocalError(error instanceof Error ? error.message : String(error))
+    }).finally(() => {
+      if (alive) setPending(false)
     })
     return () => { alive = false }
   }, [bridge])

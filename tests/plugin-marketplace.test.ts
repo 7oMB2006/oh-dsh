@@ -812,6 +812,16 @@ test('marketplace navigation preserves the Settings footer geometry', () => {
   assert.doesNotMatch(client, /parent\.insertBefore\(this\.#entry, settings\)/)
 })
 
+test('marketplace startup disables manual refresh until refresh settles', () => {
+  const client = readFileSync(new URL(
+    '../plugins/plugin-marketplace/src/client/plugin.tsx',
+    import.meta.url,
+  ), 'utf8')
+  assert.match(client, /const \[pending, setPending\] = useState\(true\)/)
+  assert.match(client, /\.finally\(\(\) => \{\s*if \(alive\) setPending\(false\)\s*\}\)/)
+  assert.match(client, /disabled=\{pending\}[\s\S]{0,160}type: 'refresh', force: true/)
+})
+
 test('marketplace closes after ready session navigation, not during startup', () => {
   let state = initialSessionNavigationState()
   let transition = transitionSessionNavigation(state, {
