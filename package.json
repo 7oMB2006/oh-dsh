@@ -86,7 +86,8 @@
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.12",
     "pnpm": "11.20.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "yaml": "2.8.1"
   },
   "engines": {
     "node": ">=24"

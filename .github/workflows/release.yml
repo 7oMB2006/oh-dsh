@@ -23,28 +23,37 @@ jobs:
             dist_script: dist:mac
             node_platform: darwin
             node_arch: arm64
+            update_platform: mac-arm64
           - name: macOS x64
             id: macos-x64
             os: macos-15-intel
             dist_script: dist:mac:x64
             node_platform: darwin
             node_arch: x64
+            update_platform: mac-x64
           - name: Linux x64
             id: linux-x64
             os: ubuntu-24.04
             dist_script: dist:linux
             node_platform: linux
             node_arch: x64
-          # Windows is build-verified in the CI matrix, but the pinned DSH
-          # runtime is not portable on Windows yet: pnpm's junction-based
-          # workspace layout contains cycles that packaging tools follow
-          # until Windows path limits fail. Re-add this job once staging
-          # produces a junction-free runtime on Windows.
+            update_platform: linux-x64
+          - name: Windows x64
+            id: windows-x64
+            os: windows-2025
+            dist_script: dist:win
+            node_platform: win
+            node_arch: x64
+            update_platform: win-x64
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
       DSH_DESKTOP_NODE_PLATFORM: ${{ matrix.node_platform }}
       npm_config_pm_on_fail: 'ignore'
+      CSC_LINK: ${{ matrix.node_platform == 'win' && secrets.WINDOWS_CSC_LINK || secrets.MACOS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ matrix.node_platform == 'win' && secrets.WINDOWS_CSC_KEY_PASSWORD || secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
     steps:
       - name: Check out repository
@@ -70,6 +79,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Validate macOS signing credentials
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+          test -n "$APPLE_ID"
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
+          test -n "$APPLE_TEAM_ID"
+
+      - name: Validate Windows signing credentials
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          test -n "$CSC_LINK"
+          test -n "$CSC_KEY_PASSWORD"
+
       - name: Package desktop distribution
         run: pnpm run ${{ matrix.dist_script }}
 
@@ -78,6 +104,13 @@ jobs:
 
       - name: Package Oh-DSH TUI distribution
         run: node scripts/build-tui.mjs
+
+      - name: Verify updater metadata
+        shell: bash
+        run: node scripts/verify-update-metadata.mjs --dir release --version "$(node -p "require('./package.json').version")" --platform "${{ matrix.update_platform }}"
+
+      - name: Separate updater metadata by platform
+        run: node scripts/collect-update-metadata.mjs --dir release --id ${{ matrix.id }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -90,6 +123,7 @@ jobs:
             release/oh-dsh-web-*.zip
             release/oh-dsh-tui-*.tar.gz
             release/oh-dsh-tui-*.zip
+            release/updater-metadata/**
           if-no-files-found: error
 
   publish:
@@ -100,13 +134,49 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      - name: Prepare and validate updater metadata
+        run: node scripts/prepare-release-update-metadata.mjs --dir artifacts --version "$(node -p "require('./package.json').version")"
+
+      - name: Verify release asset set before publishing
+        run: |
+          find artifacts -maxdepth 1 -type f -print | sed 's#^.*/##' | sort > local-assets.txt
+          test -s local-assets.txt
+          grep -qx 'latest.yml' local-assets.txt
+          grep -qx 'latest-linux.yml' local-assets.txt
+          grep -qx 'latest-mac.yml' local-assets.txt
+
       - name: Publish release
-        run: gh release create "${{ github.ref_name }}" artifacts/* --generate-notes
+        run: |
+          mapfile -t assets < <(find artifacts -maxdepth 1 -type f -print | sort)
+          gh release create "${{ github.ref_name }}" "${assets[@]}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Verify published release asset set
+        run: |
+          find artifacts -maxdepth 1 -type f -print | sed 's#^.*/##' | sort > local-assets.txt
+          gh release view "${{ github.ref_name }}" --json assets --jq '.assets[].name' | sort > remote-assets.txt
+          diff -u local-assets.txt remote-assets.txt
         env:
           GH_TOKEN: ${{ github.token }}
