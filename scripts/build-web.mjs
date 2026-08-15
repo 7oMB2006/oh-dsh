@@ -95,7 +95,7 @@ if (isWindowsTarget) {
 writeFileSync(join(packageDir, 'README.md'), `# Oh-DSH Web
 
 Oh-DSH 的轻量浏览器发行版，不包含 Electron。它携带 Web runtime、Node.js
-和 Web 可用的内置插件，数据默认保存在 \`~/.oh-dsh-web\`。
+和 Web 可用的内置插件，数据默认保存在 \`~/.ohdsh\`。
 
 ## 启动
 

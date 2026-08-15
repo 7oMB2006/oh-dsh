@@ -74,6 +74,7 @@ test('packaged web distribution exposes the unified ohdsh command', () => {
   assert.match(build, /join\(packageDir, 'bin', 'ohdsh'\)/)
   assert.match(build, /join\(packageDir, 'lib', 'oh-dsh', 'cli\.js'\)/)
   assert.match(build, /exec "\$ROOT\/bin\/ohdsh" web "\$@"/)
+  assert.match(build, /数据默认保存在 \\`~\/\.ohdsh\\`/)
 })
 
 test('full and web-only distributions expose the same release version', () => {
