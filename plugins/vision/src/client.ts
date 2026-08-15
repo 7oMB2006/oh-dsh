@@ -1,1 +1,1 @@
-export { apply, inject } from './client/plugin.tsx'
+export { apply, inject } from './client/index.tsx'

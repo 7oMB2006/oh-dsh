@@ -121,12 +121,14 @@ ohdsh tui              # 启动 Oh-DSH TUI
 设置 `OH_DSH_HOME` 可以统一更换数据目录；运行 `ohdsh web --help` 或
 `ohdsh tui --help` 可以查看界面专属选项。
 
-内置的 `@oh-dsh/vision` 为三端提供同一个 `view_image` 工具，让纯文本模型可对
-Workspace 内的本地图片、HTTP(S) 图片或 image data URL 做 OCR、读图与界面诊断。
-在 Desktop 或 Web UI 中复制并粘贴图片时，输入栏上方会立即出现可删除的缩略图
-气泡；图片会转换为当前 Session 专用的 `view_image` 引用，因此默认纯文本模型也
-能识别。TUI 通过 Workspace 图片路径或 URL 使用同一能力。
-凭据与后端配置见[图片识别使用说明](./docs/usage.md#图片识别)。
+内置的 `@oh-dsh/vision` 为三端提供同一个 `view_image` 工具，让用户对 Workspace
+内的本地图片、HTTP(S) 图片或 image data URL 做 OCR、读图与界面诊断。图片复制、
+粘贴、缩略图和提交继续由 DSH 原生 attachment rail 负责；插件在 Host 的最终图片
+能力校验处放行 DeepSeek V4，并在固定的 text-only 适配器序列化同一轮请求前，通过
+配置的视觉后端描述原生附件。不另加输入栏气泡或引用协议。TUI 通过 Workspace
+图片路径或 URL 使用同一能力。
+凭据与后端配置见[图片识别使用说明](./docs/usage.md#图片识别)；云端/本地 Key 与 Vision
+设置也可以在原生“设置 → 插件 → 插件配置 → Vision”卡片中修改。
 
 <details>
 <summary><strong>从源码运行</strong></summary>

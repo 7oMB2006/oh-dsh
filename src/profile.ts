@@ -13,17 +13,18 @@ export const TUI_PROFILE = 'tui'
 /** Plugins that enroll a browser-side entry in the desktop client graph. */
 export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
   '@oh-dsh/desktop',
-  '@oh-dsh/vision',
   '@oh-dsh/skins',
   '@oh-dsh/sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/pinned-summary',
   '@oh-dsh/plugin-marketplace',
+  '@oh-dsh/vision',
 ] as const
 
 /** Host-only capability providers shipped inside the desktop runtime. */
 export const BUNDLED_DESKTOP_HOST_PLUGINS = [
   '@oh-dsh/better-sidebar-runtime',
+  '@oh-dsh/vision',
 ] as const
 
 /** Every protected plugin shipped inside the desktop distribution. */

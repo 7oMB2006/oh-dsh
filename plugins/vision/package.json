@@ -10,18 +10,6 @@
     "./client": "./dist/client.js",
     "./package.json": "./package.json"
   },
-  "dsh": {
-    "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-input-trigger",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ],
-      "platform": "web",
-      "immediately": true
-    }
-  },
   "files": [
     "dist/index.js",
     "dist/client.js",
@@ -52,6 +40,21 @@
       "name": "dsh-vision",
       "repository": "https://github.com/william-jin-cmu/dsh-vision",
       "revision": "72978aa176df8e01a685bf270a1b1d016660c492"
+    }
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web",
+      "immediately": true
     }
   }
 }

@@ -124,14 +124,18 @@ data root. Run `ohdsh web --help` or `ohdsh tui --help` for surface-specific
 options.
 
 The bundled `@oh-dsh/vision` plugin exposes one `view_image` tool on every
-surface, allowing text-only models to perform OCR, image inspection, and UI
-diagnosis on workspace-local files, HTTP(S) images, or image data URLs.
-Desktop and Web UI also turn a copied-and-pasted image into a removable
-thumbnail bubble above the composer and a Session-bound `view_image` reference,
-so the default text-only model can inspect it. TUI uses the same capability
-through workspace image paths or URLs. See the
+surface, allowing users to perform OCR, image inspection, and UI diagnosis on
+workspace-local files, HTTP(S) images, or image data URLs. DSH's native
+attachment rail continues to own image copy, paste, thumbnails, and submission;
+the plugin admits DeepSeek V4 at the Host's final image-capability check and
+describes its native attachments through the configured vision backend before
+the pinned text-only adapter serializes the same turn. It does not add a second
+composer bubble or reference protocol. TUI uses the same capability through
+workspace image paths or URLs. See the
 [image recognition guide](./docs/usage.en.md#image-recognition) for credentials
-and backend configuration.
+and backend configuration. The cloud/local keys and Vision settings are also
+available in the native Settings → Plugins → Plugin configuration → Vision
+card.
 
 <details>
 <summary><strong>Run from source</strong></summary>

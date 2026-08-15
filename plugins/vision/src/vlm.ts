@@ -12,6 +12,8 @@ export interface VisionRequest {
   maxTokens: number
   model: string
   question: string
+  retryAttempts?: number
+  retryBackoffMs?: number
   signal?: AbortSignal
   source: string
   timeoutMs: number
@@ -32,8 +34,16 @@ const MIME_BY_EXTENSION: Readonly<Record<string, string>> = Object.freeze({
 
 const IMAGE_MIME_TYPES = new Set(Object.values(MIME_BY_EXTENSION))
 
+/** Failure returned by a configured vision backend. */
+export class VisionBackendError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VisionBackendError'
+  }
+}
+
 /** HTTP failure with a stable status classifier for model fallback. */
-export class VisionHttpError extends Error {
+export class VisionHttpError extends VisionBackendError {
   readonly status: number
 
   constructor(message: string, status: number) {
@@ -43,10 +53,28 @@ export class VisionHttpError extends Error {
   }
 }
 
+/** Network or timeout failure that may be recovered by retry or another backend. */
+export class VisionNetworkError extends VisionBackendError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'VisionNetworkError'
+  }
+}
+
+/** Whether an error came from a configured backend rather than image input validation. */
+export function isVisionBackendError(error: unknown): error is VisionBackendError {
+  return error instanceof VisionBackendError
+}
+
 /** Whether another configured model may recover from this response. */
 export function isRetriableVisionError(error: unknown): boolean {
-  return error instanceof VisionHttpError
-    && (error.status === 404 || error.status === 429 || error.status >= 500)
+  return error instanceof VisionNetworkError
+    || error instanceof VisionHttpError
+      && (error.status === 404
+        || error.status === 408
+        || error.status === 425
+        || error.status === 429
+        || error.status >= 500)
 }
 
 function isWithin(root: string, candidate: string): boolean {
@@ -159,6 +187,23 @@ function stripThinking(text: string): string {
   return text.trim()
 }
 
+function retryDelay(signal: AbortSignal | undefined, delayMs: number): Promise<void> {
+  if (delayMs <= 0) return Promise.resolve()
+  return new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const abort = (): void => {
+      if (timer !== undefined) clearTimeout(timer)
+      reject(signal?.reason ?? new Error('vision request aborted'))
+    }
+    timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, delayMs)
+    if (signal?.aborted === true) abort()
+    else signal?.addEventListener('abort', abort, { once: true })
+  })
+}
+
 /** Ask one OpenAI-compatible VLM a question about an image. */
 export async function visionChat(request: VisionRequest): Promise<string> {
   const imageUrl = await toImageUrl(
@@ -168,60 +213,101 @@ export async function visionChat(request: VisionRequest): Promise<string> {
     request.signal,
   )
   const url = `${request.baseURL.replace(/\/+$/, '')}/chat/completions`
-  const signals = request.signal === undefined
-    ? [AbortSignal.timeout(request.timeoutMs)]
-    : [request.signal, AbortSignal.timeout(request.timeoutMs)]
   const redact = (text: string): string => request.apiKey === ''
     ? text
     : text.replaceAll(request.apiKey, '***')
 
-  let response: Response
-  try {
-    response = await (request.fetch ?? fetch)(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(request.apiKey === '' ? {} : { authorization: `Bearer ${request.apiKey}` }),
-      },
-      body: JSON.stringify({
-        model: request.model,
-        max_tokens: request.maxTokens,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: imageUrl } },
-            { type: 'text', text: request.question },
-          ],
-        }],
-      }),
-      signal: AbortSignal.any(signals),
-    })
-  } catch (error) {
-    request.signal?.throwIfAborted()
-    const reason = error instanceof Error ? error.message : String(error)
-    throw new Error(redact(`view_image: request to ${url} failed: ${reason}`))
+  const retryAttempts = request.retryAttempts ?? 0
+  const retryBackoffMs = request.retryBackoffMs ?? 1_000
+  const bodyPayload = JSON.stringify({
+    model: request.model,
+    max_tokens: request.maxTokens,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image_url', image_url: { url: imageUrl } },
+        { type: 'text', text: request.question },
+      ],
+    }],
+  })
+
+  for (let attempt = 0; attempt <= retryAttempts; attempt += 1) {
+    const attemptSignals = request.signal === undefined
+      ? [AbortSignal.timeout(request.timeoutMs)]
+      : [request.signal, AbortSignal.timeout(request.timeoutMs)]
+    let response: Response
+    try {
+      response = await (request.fetch ?? fetch)(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(request.apiKey === '' ? {} : { authorization: `Bearer ${request.apiKey}` }),
+        },
+        body: bodyPayload,
+        signal: AbortSignal.any(attemptSignals),
+      })
+    } catch (error) {
+      request.signal?.throwIfAborted()
+      const reason = error instanceof Error ? error.message : String(error)
+      const wrapped = new VisionNetworkError(
+        redact(`view_image: request to ${url} failed: ${reason}`),
+      )
+      if (attempt < retryAttempts) {
+        await retryDelay(request.signal, Math.min(retryBackoffMs * 2 ** attempt, 60_000))
+        continue
+      }
+      throw wrapped
+    }
+
+    let body: string
+    try {
+      body = await response.text()
+    } catch (error) {
+      request.signal?.throwIfAborted()
+      const reason = error instanceof Error ? error.message : String(error)
+      const wrapped = new VisionNetworkError(
+        redact(`view_image: reading ${url} failed: ${reason}`),
+      )
+      if (attempt < retryAttempts) {
+        await retryDelay(request.signal, Math.min(retryBackoffMs * 2 ** attempt, 60_000))
+        continue
+      }
+      throw wrapped
+    }
+
+    if (!response.ok) {
+      const failure = new VisionHttpError(
+        redact(`view_image: ${url} returned ${response.status}: ${body.slice(0, 500)}`),
+        response.status,
+      )
+      if (attempt < retryAttempts && isRetriableVisionError(failure)) {
+        await retryDelay(request.signal, Math.min(retryBackoffMs * 2 ** attempt, 60_000))
+        continue
+      }
+      throw failure
+    }
+    let payload: unknown
+    try {
+      payload = JSON.parse(body)
+    } catch {
+      throw new VisionBackendError(
+        redact(`view_image: ${url} returned non-JSON body: ${body.slice(0, 200)}`),
+      )
+    }
+    const text = extractText(payload)
+    if (text === undefined) {
+      throw new VisionBackendError(
+        redact(`view_image: no assistant text in response: ${body.slice(0, 300)}`),
+      )
+    }
+    const cleaned = stripThinking(text)
+    if (cleaned === '') {
+      throw new VisionBackendError(
+        'view_image: model returned only reasoning and no answer (try raising maxTokens)',
+      )
+    }
+    return cleaned
   }
 
-  const body = await response.text()
-  if (!response.ok) {
-    throw new VisionHttpError(
-      redact(`view_image: ${url} returned ${response.status}: ${body.slice(0, 500)}`),
-      response.status,
-    )
-  }
-  let payload: unknown
-  try {
-    payload = JSON.parse(body)
-  } catch {
-    throw new Error(redact(`view_image: ${url} returned non-JSON body: ${body.slice(0, 200)}`))
-  }
-  const text = extractText(payload)
-  if (text === undefined) {
-    throw new Error(redact(`view_image: no assistant text in response: ${body.slice(0, 300)}`))
-  }
-  const cleaned = stripThinking(text)
-  if (cleaned === '') {
-    throw new Error('view_image: model returned only reasoning and no answer (try raising maxTokens)')
-  }
-  return cleaned
+  throw new VisionBackendError('view_image: vision request exhausted its retry budget')
 }

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
 
@@ -39,9 +39,36 @@ function run(args) {
     stdio: 'inherit',
   })
   if (result.error !== undefined) throw result.error
-  if (result.status !== 0) process.exit(result.status ?? 1)
+  if (result.status !== 0) {
+    throw new Error(`${pnpm.cliEntry} ${args.join(' ')} failed with status ${String(result.status)}`)
+  }
+}
+
+/**
+ * Expose the built-in Vision settings section through DSH's existing
+ * configuration-client boundary. The pinned release keeps a fixed allowlist;
+ * patch only the checkout used for this build and restore the tracked source
+ * immediately afterwards so the upstream checkout remains pristine.
+ */
+function withVisionSettingsNamespace(build) {
+  const path = join(
+    dshSource,
+    'packages', 'host', 'apiproxy', 'src', 'api-proxy.ts',
+  )
+  const source = readFileSync(path, 'utf8')
+  const original = "  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',\n"
+  const replacement = `${original}  'oh-dsh-vision',\n`
+  if (!source.includes(original)) {
+    throw new Error('pinned DSH API proxy settings allowlist changed; Vision patch needs review')
+  }
+  writeFileSync(path, source.replace(original, replacement))
+  try {
+    return build()
+  } finally {
+    writeFileSync(path, source)
+  }
 }
 
 run(['install', '--frozen-lockfile'])
 pinInnerPnpm()
-run(['run', 'build'])
+withVisionSettingsNamespace(() => run(['run', 'build']))

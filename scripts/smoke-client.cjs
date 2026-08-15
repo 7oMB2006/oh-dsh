@@ -17,7 +17,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling')
 
 function finish(window, error) {
   if (error === undefined) {
-    process.stdout.write(`DSH ${smokeSurface} client graph and pasted-image thumbnail: ready\n`)
+    process.stdout.write(`DSH ${smokeSurface} client graph and native image attachment: ready\n`)
   } else {
     process.stderr.write(`${error.stack ?? error.message}\n`)
   }
@@ -88,27 +88,28 @@ void app.whenReady().then(async () => {
         return {
         body: document.body?.innerText ?? '',
         vision: (() => {
-          const bubble = document.querySelector('[data-oh-dsh-vision-draft]')
-          const image = bubble?.querySelector('img')
+          const image = [...document.querySelectorAll('[data-composer-card] img')]
+            .find(candidate => candidate instanceof HTMLImageElement
+              && candidate.getClientRects().length > 0)
           const card = document.querySelector('[data-composer-card]')
-          if (bubble instanceof HTMLElement
-            && image instanceof HTMLImageElement
+          if (image instanceof HTMLImageElement
             && card instanceof HTMLElement
-            && bubble.dataset.status === 'ready'
             && image.complete
             && image.naturalWidth > 0) {
-            const bubbleRect = bubble.getBoundingClientRect()
+            const thumbnail = image.closest('button')
+            const thumbnailRect = (thumbnail ?? image).getBoundingClientRect()
             const cardRect = card.getBoundingClientRect()
             window.__OH_DSH_SMOKE_VISION_FACTS__ = {
-              bubbleBottom: bubbleRect.bottom,
+              bubbleBottom: thumbnailRect.bottom,
               cardTop: cardRect.top,
               imageWidth: image.naturalWidth,
-              status: bubble.dataset.status,
+              status: 'ready',
             }
             window.__OH_DSH_SMOKE_VISION_SEEN__ = true
             if (window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ !== true) {
               window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
-              bubble.querySelector('.ohVisionDraftRemove')?.click()
+              const item = thumbnail?.parentElement
+              item?.querySelector('button[aria-label*="Remove"], button[aria-label*="移除"], button[aria-label*="删除"]')?.click()
             }
           }
           if (window.__OH_DSH_SMOKE_VISION_REQUESTED__ !== true) {
@@ -163,9 +164,11 @@ void app.whenReady().then(async () => {
               }
             }
           }
-          const current = document.querySelector('[data-oh-dsh-vision-draft]')
+          const current = [...document.querySelectorAll('[data-composer-card] img')]
+            .find(candidate => candidate instanceof HTMLImageElement
+              && candidate.getClientRects().length > 0)
           return {
-            error: current?.dataset.status === 'error' ? current.title : null,
+            error: null,
             facts: window.__OH_DSH_SMOKE_VISION_FACTS__ ?? null,
             removed: window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ === true
               && current === null,

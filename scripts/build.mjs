@@ -19,7 +19,12 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
-  { directory: 'vision', id: '@oh-dsh/vision', external: ['@deepseek-ai/*'] },
+  {
+    directory: 'vision',
+    id: '@oh-dsh/vision',
+    clientExternal: ['@deepseek-ai/*'],
+    external: ['@deepseek-ai/*'],
+  },
   { directory: 'tui', hostOnly: true },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
@@ -161,6 +166,7 @@ for (const plugin of pluginPackages) {
       logLevel: 'info',
       loader: { '.css': 'text' },
       external: [
+        ...(plugin.clientExternal ?? []),
         'react',
         'react-dom/client',
         'react/jsx-runtime',

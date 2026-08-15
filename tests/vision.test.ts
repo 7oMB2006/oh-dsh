@@ -8,13 +8,6 @@ import {
   DEFAULT_FREE_FALLBACKS,
   resolveVisionConfig,
 } from '../plugins/vision/src/index.ts'
-import { VisionAttachmentRegistry } from '../plugins/vision/src/attachment-registry.ts'
-import { decodeVisionAttachmentUpload } from '../plugins/vision/src/attachment-server.ts'
-import { VisionDraftStore } from '../plugins/vision/src/client/draft-store.ts'
-import {
-  visionAttachmentToken,
-  visionModelReference,
-} from '../plugins/vision/src/protocol.ts'
 import {
   isRetriableVisionError,
   toImageUrl,
@@ -63,77 +56,8 @@ test('vision plugin registers one shared tool and prompt section', () => {
 
   assert.equal(toolName, 'view_image')
   assert.match(prompt, /active Session workspace/)
-  assert.match(prompt, /browser-pasted image reference/)
+  assert.match(prompt, /native image attachment/)
   assert.match(prompt, /configured vision endpoint/)
-})
-
-test('pasted attachment references are durable and bound to one Session', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'oh-dsh-vision-registry-'))
-  try {
-    const registry = new VisionAttachmentRegistry(root)
-    const attachment = {
-      attachmentId: 'sha256-test' as never,
-      bytes: 128,
-      height: 10,
-      mediaType: 'image/png' as const,
-      name: 'shot.png',
-      width: 20,
-    }
-    const source = await registry.register('session-a', attachment)
-    assert.ok(visionAttachmentToken(source))
-    assert.deepEqual(await new VisionAttachmentRegistry(root).resolve(source, 'session-a'), attachment)
-    await assert.rejects(registry.resolve(source, 'session-b'), /another Session/)
-    assert.match(visionModelReference(source), /view_image tool/)
-    assert.match(visionModelReference(source), new RegExp(source))
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('pasted image uploads validate canonical data, media type, and name', () => {
-  assert.deepEqual(decodeVisionAttachmentUpload({
-    data: 'AAAA',
-    mediaType: 'image/png',
-    name: '../screens\\shot.png',
-    sessionId: 'session-a',
-  }, 8), {
-    data: new Uint8Array([0, 0, 0]),
-    mediaType: 'image/png',
-    name: 'shot.png',
-    sessionId: 'session-a',
-  })
-  assert.throws(() => decodeVisionAttachmentUpload({
-    data: 'A===',
-    mediaType: 'image/png',
-    sessionId: 'session-a',
-  }, 8), /invalid or too large/)
-  assert.throws(() => decodeVisionAttachmentUpload({
-    data: 'AAAA',
-    mediaType: 'image/svg+xml',
-    sessionId: 'session-a',
-  }, 8), /unsupported/)
-})
-
-test('pasted image draft lifetime follows its input reference', async () => {
-  let finishUpload: ((source: string) => void) | undefined
-  const revoked: string[] = []
-  const store = new VisionDraftStore({
-    createPreview: () => 'blob:preview',
-    revokePreview: value => { revoked.push(value) },
-    upload: async () => await new Promise(resolve => { finishUpload = resolve }),
-  })
-  const file = { name: 'shot.png', type: 'image/png' } as File
-  store.add('session-a', 'draft-a', file)
-  assert.equal(store.list('session-a')[0]?.status, 'uploading')
-
-  const source = 'oh-dsh-attachment:00000000-0000-4000-8000-000000000000'
-  finishUpload?.(source)
-  assert.equal(await store.serialize('draft-a', new AbortController().signal), source)
-  assert.equal(store.list('session-a')[0]?.status, 'ready')
-
-  store.prune('session-a', new Set())
-  assert.deepEqual(store.list('session-a'), [])
-  assert.deepEqual(revoked, ['blob:preview'])
 })
 
 test('local image resolution stays inside the active workspace', async () => {

@@ -157,25 +157,22 @@ Common TUI options:
 
 ## Image recognition
 
-Desktop, Web, and TUI all load the bundled `@oh-dsh/vision` plugin. When a
-text-only model encounters an image path, URL, or pasted-image reference, it
-can call `view_image`; the configured OpenAI-compatible vision model performs
-OCR, chart reading, object counting, screenshot diagnosis, or layout
-inspection and returns text to the active model.
+Desktop, Web, and TUI all load the bundled `@oh-dsh/vision` plugin. DSH owns
+image paste, thumbnails, attachment storage, and submission through its native
+attachment rail. DeepSeek V4 is still described as text-only by the pinned DSH
+metadata; the plugin only admits V4 at the Host's final image-capability check.
+The Host then describes each native image attachment through the configured
+vision backend before the pinned text-only adapter serializes the same turn. It
+does not intercept the composer or create a second thumbnail/reference path.
+The `view_image` tool remains available for explicit workspace-local paths,
+HTTP(S) URLs, and image data URLs.
 
 In Desktop or Web UI, copy a PNG, JPEG, WebP, or GIF, focus the message
-composer, and press `⌘V` on macOS or `Ctrl+V` on Windows/Linux. A bubble with
-an image thumbnail appears immediately above the composer. Click its `×` to
-remove it before sending. An activity marker remains while upload is in
-progress; a failed upload changes the bubble to an error state and prevents
-that reference from being sent.
-
-The pasted image is saved through DSH's attachment store and serialized into
-an opaque `view_image` reference bound to the current Session. The message
-therefore remains text input, so the default DeepSeek text-only model does not
-need to declare native image-input support. TUI has no graphical thumbnail;
-provide a workspace-local image path or HTTP(S) URL in the prompt to use the
-same tool.
+composer, and press `⌘V` on macOS or `Ctrl+V` on Windows/Linux. DSH's native
+composer displays the thumbnail inside the input card and owns remove, drag/drop,
+size limits, and submission. The plugin does not intercept this flow. TUI has
+no graphical thumbnail; provide a workspace-local image path or HTTP(S) URL in
+the prompt to use the same `view_image` tool.
 
 The default backend uses Zhipu `glm-4.6v-flash`. Store its key in the shared
 data root's credential file (`~/.ohdsh/.credentials.yaml` by default) so all
@@ -198,8 +195,14 @@ oh-dsh-vision:
   apiKeyEnv: DASHSCOPE_API_KEY
   maxTokens: 2048
   timeoutMs: 60000
-  maxImageBytes: 10485760
+maxImageBytes: 10485760
 ```
+
+The same fields are available in the native `Settings → Plugins → Plugin
+configuration → Vision` card. Cloud and local API keys are write-only controls
+backed by the DSH credentials store; they are never returned in the settings
+snapshot. The card also exposes endpoint, model, fallback, retry, timeout, and
+image-size settings, so you do not need to edit YAML for normal configuration.
 
 A local Ollama endpoint needs no key:
 
@@ -209,13 +212,38 @@ oh-dsh-vision:
   model: qwen3-vl:4b
 ```
 
+Cloud credentials are attempted first with bounded retries and configured cloud
+fallback models. If the cloud request is rate-limited, unavailable, or returns
+an incompatible response, a configured local OCR/VLM model is tried. If that
+path also fails, one final cloud recovery is attempted before the error points
+you to the Vision card, a new cloud key, or a local model. `localModel` is the
+model ID you choose from your local Ollama/LM Studio-compatible installation;
+an empty value disables the local fallback. `localApiKeyEnv` is only needed for
+a non-local endpoint.
+
+```yaml
+oh-dsh-vision:
+  apiKeyEnv: VISION_API_KEY
+  retryAttempts: 3
+  retryBackoffMs: 1000
+  localBaseURL: http://localhost:11434/v1
+  localModel: glm-ocr
+  localFallbackModels:
+    - qwen2.5-vl:7b
+```
+
+Each backend has a bounded exponential retry. When both backends fail, the
+error tells the user to check the cloud key or install/configure a local
+OpenAI-compatible OCR/VLM model. The plugin does not embed or fetch a shared
+cloud secret; the user's authorized key remains in DSH credentials or the
+configured environment variable.
+
 Local image paths must remain inside the active Session workspace, including
-after symlink resolution. Remote URLs, local image bytes, and pasted-image
-bytes are sent to the configured vision endpoint only when `view_image` is
-called. A pasted reference cannot be used from another Session. The browser's
-attachment button and drag-and-drop remain native DSH image input and require
-the selected model to declare image support; with a text-only model, use the
-paste bubble described above, a workspace path, or an HTTP(S) URL.
+after symlink resolution. Remote URLs or local image bytes are sent to the
+configured vision endpoint only when `view_image` is called. The browser's
+attachment button, paste, and drag-and-drop remain native DSH image input;
+DeepSeek V4 is admitted by the plugin's final check, while other models keep
+their declared image-input behavior.
 
 ## Desktop operations
 
