@@ -307,6 +307,7 @@ export function migrateLegacyWebState(input: {
     const hasLegacyDshHome = stat(legacyDshHome) !== undefined
     const copiedLegacyDshHome = !hasLegacyDshHome
       || copyDirectoryContents(legacyDshHome, input.dataRoot)
+    if (!copiedLegacyDshHome) return migrated
     let foundLegacyState = hasLegacyDshHome
     let copiedSharedEntries = true
     for (const entry of WEB_SHARED_ENTRIES) {
@@ -318,7 +319,7 @@ export function migrateLegacyWebState(input: {
         join(input.dataRoot, entry),
       ) && copiedSharedEntries
     }
-    if (foundLegacyState && copiedLegacyDshHome && copiedSharedEntries) {
+    if (foundLegacyState && copiedSharedEntries) {
       completeMigration(input.dataRoot, WEB_DEFAULT_MIGRATION)
       migrated = true
     }

@@ -283,3 +283,37 @@ test('incomplete Web flattening blocks lower-priority imports', t => {
     '{"name":"preferred"}\n',
   )
 })
+
+test('incomplete legacy Web DSH blocks top-level preference imports', t => {
+  if (process.platform !== 'win32') {
+    t.skip('Windows junction behavior')
+    return
+  }
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'ohdsh-web-default-retry-'))
+  t.after(() => rmSync(temporaryRoot, { recursive: true, force: true }))
+
+  const sharedRoot = join(temporaryRoot, 'shared')
+  const legacyRoot = join(temporaryRoot, 'legacy-web')
+  const preferenceTarget = join(temporaryRoot, 'preferred-sidebar')
+  const preferenceLink = join(legacyRoot, 'dsh', 'sidebar.json')
+  mkdirSync(dirname(preferenceLink), { recursive: true })
+  symlinkSync(preferenceTarget, preferenceLink, 'junction')
+  write(join(legacyRoot, 'sidebar.json', 'value'), 'lower-priority')
+
+  assert.equal(migrateLegacyWebState({
+    dataRoot: sharedRoot,
+    legacyDefaultDataRoot: legacyRoot,
+  }), false)
+  assert.equal(existsSync(join(sharedRoot, 'sidebar.json')), false)
+
+  write(join(preferenceTarget, 'value'), 'preferred')
+  assert.equal(migrateLegacyWebState({
+    dataRoot: sharedRoot,
+    legacyDefaultDataRoot: legacyRoot,
+  }), true)
+  assert.equal(
+    readFileSync(join(sharedRoot, 'sidebar.json', 'value'), 'utf8'),
+    'preferred',
+  )
+})
