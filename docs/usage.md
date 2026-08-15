@@ -53,8 +53,27 @@ sudo apt install ./Oh-DSH-Desktop-*.deb
 
 ### Windows
 
-解压 Release 中的 Windows 包并启动 **Oh-DSH Desktop**。统一 CLI 位于应用
+运行 Release 中的 Windows 安装器并启动 **Oh-DSH Desktop**。统一 CLI 位于应用
 资源目录的 `bin\ohdsh.cmd`，可以将该目录加入 `PATH`。
+
+### Desktop 在线更新
+
+在应用菜单中选择 **Oh-DSH Desktop -> 检查更新…**。更新窗口只检查
+`hust-open-atom-club/oh-dsh` 的 stable GitHub Release，不需要 GitHub 登录或
+token。
+
+- macOS、Windows 和 Linux AppImage 在下载并校验后可选择立即重启安装，或在
+  下次退出时安装。
+- `.deb` 会下载并打开系统的软件包安装器，不会绕过系统权限执行 `sudo`、`apt`
+  或 `dpkg`。
+- 更新器会使用系统代理设置；离线、代理认证、404、磁盘不足、校验失败、取消和
+  重试都会在窗口中显示可恢复状态。校验失败时不会替换现有安装。
+- 更新只替换应用程序，现有 DSH 数据、工作区设置、会话、已安装插件和 marketplace
+  receipts 保留在原有数据目录中。
+
+仅限签名的打包 Desktop 可自动更新。首次带更新器的 Release 之前安装的版本仍需
+手动安装一次；本地开发构建和缺少当前平台安装包的 Release 会提供官方 Release
+页面作为回退。
 
 ## 安装 Web-only
 
@@ -177,6 +196,10 @@ pnpm run dist:win       # Windows 完整版
 pnpm run dist:web       # Web-only 轻量版
 pnpm run dist:tui       # TUI-only 终端版
 ```
+
+发布带自动更新功能的 tag 还需要配置 GitHub Actions 的 macOS 签名/公证凭据和
+Windows Authenticode 凭据。工作流会在任意一个凭据、安装包、blockmap 或
+`latest*.yml` 缺失时停止发布。
 
 ## 数据与排错
 
