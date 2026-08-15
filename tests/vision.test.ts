@@ -20,7 +20,7 @@ const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 test('vision defaults preserve the upstream free-model fallback chain', () => {
   const defaults = resolveVisionConfig({})
   assert.equal(defaults.model, 'glm-4.6v-flash')
-  assert.equal(defaults.apiKeyEnv, 'VISION_API_KEY')
+  assert.equal(defaults.apiKeyEnv, 'ZHIPUAI_API_KEY')
   assert.deepEqual(defaults.fallbackModels, DEFAULT_FREE_FALLBACKS)
 
   const local = resolveVisionConfig({

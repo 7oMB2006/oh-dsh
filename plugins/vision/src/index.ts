@@ -17,7 +17,8 @@ export const inject = ['attachments', 'credentials', 'llm', 'systemPrompt', 'too
 
 export const DEFAULT_VISION_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
 export const DEFAULT_VISION_MODEL = 'glm-4.6v-flash'
-export const DEFAULT_VISION_API_KEY_REF = 'VISION_API_KEY'
+/** Canonical credential name for the default Zhipu Vision endpoint. */
+export const DEFAULT_VISION_API_KEY_REF = 'ZHIPUAI_API_KEY'
 export const DEFAULT_FREE_FALLBACKS = Object.freeze([
   'glm-4.1v-thinking-flash',
   'glm-4v-flash',
@@ -58,7 +59,7 @@ export const Config: z<Config> = z.object({
   apiKey: z.string().role('secret').default('')
     .description('Literal API key; prefer apiKeyEnv and the DSH credential store'),
   apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_VISION_API_KEY_REF)
-    .description('Credential reference resolved for each image request'),
+    .description('Credential reference resolved for each image request; defaults to ZHIPUAI_API_KEY'),
   baseURL: z.string().default(DEFAULT_VISION_BASE_URL)
     .description('OpenAI-compatible endpoint base URL; /chat/completions is appended'),
   fallbackModels: z.array(z.string()).default([])
@@ -293,8 +294,12 @@ async function resolveApiKey(
   const references = options.cloud === true
     ? [
       backend.apiKeyEnv,
-      'DSH_VISION_API_KEY',
       'ZHIPUAI_API_KEY',
+      'DSH_VISION_API_KEY',
+      // Keep the first release's name as a migration fallback. New installs
+      // use the provider's canonical key above so the settings card does not
+      // create a second copy of the same Zhipu credential.
+      'VISION_API_KEY',
       'DASHSCOPE_API_KEY',
     ]
     : [backend.apiKeyEnv, 'DSH_LOCAL_VISION_API_KEY']
@@ -311,8 +316,9 @@ function noBackendMessage(config: ResolvedVisionConfig): string {
     ? ' Set oh-dsh-vision.localModel to a locally installed OCR/VLM model '
       + '(for example an Ollama model) to enable local fallback.'
     : ''
-  return 'view_image: no usable vision backend is configured. Store VISION_API_KEY '
-    + 'in $DSH_HOME/.credentials.yaml or export it, or configure '
+  return 'view_image: no usable vision backend is configured. Store ZHIPUAI_API_KEY '
+    + 'in $DSH_HOME/.credentials.yaml (legacy VISION_API_KEY is also accepted) '
+    + 'or export it, or configure '
     + 'oh-dsh-vision.apiKeyEnv in settings.yaml.'
     + localHint
 }

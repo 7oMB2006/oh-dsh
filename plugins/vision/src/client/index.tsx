@@ -6,6 +6,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { DesktopBridge } from '../../../../src/contracts.ts'
 // These imports contribute only Cordis/client type merges. Runtime
 // collaboration remains through the native settings, locale, connection, and
 // slot services provided by DSH.
@@ -18,8 +19,15 @@ import { useState, type CSSProperties } from 'react'
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
 const SETTINGS_NAMESPACE = 'oh-dsh-vision'
-const DEFAULT_CLOUD_KEY_REF = 'VISION_API_KEY'
-const DEFAULT_LOCAL_KEY_REF = 'LOCAL_VISION_API_KEY'
+const DEFAULT_CLOUD_KEY_REF = 'ZHIPUAI_API_KEY'
+const LEGACY_CLOUD_KEY_REF = 'VISION_API_KEY'
+const ZHIPU_CONSOLE_URL = 'https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys'
+
+declare global {
+  interface Window {
+    dshDesktop?: DesktopBridge
+  }
+}
 
 /** Settings that are safe to edit through the redacted native settings API. */
 interface VisionSettings {
@@ -38,17 +46,13 @@ interface VisionSettings {
   timeoutMs?: number
 }
 
-type VisionFieldName = keyof VisionSettings
+/** The card intentionally exposes only the two settings most users need. */
+type VisionFieldName = 'baseURL' | 'model'
 
 type VisionLocaleKey =
   | 'title' | 'description' | 'apiKey' | 'apiKeyHint' | 'apiKeySet' | 'apiKeyUnset'
-  | 'apiKeyEnv' | 'apiKeyEnvHint' | 'baseURL' | 'baseURLHint' | 'model' | 'modelHint'
-  | 'fallbackModels' | 'fallbackModelsHint' | 'maxTokens' | 'maxTokensHint'
-  | 'timeoutMs' | 'timeoutMsHint' | 'maxImageBytes' | 'maxImageBytesHint'
-  | 'retryAttempts' | 'retryAttemptsHint' | 'retryBackoffMs' | 'retryBackoffMsHint'
-  | 'localApiKey' | 'localApiKeyHint' | 'localApiKeySet' | 'localApiKeyUnset'
-  | 'localApiKeyEnv' | 'localApiKeyEnvHint' | 'localBaseURL' | 'localBaseURLHint'
-  | 'localModel' | 'localModelHint' | 'localFallbackModels' | 'localFallbackModelsHint'
+  | 'baseURL' | 'baseURLHint' | 'openConsole' | 'model' | 'modelHint'
+  | 'localFallbackHint' | 'credentialReadOnly'
   | 'overridden' | 'reset' | 'readOnly' | 'expand' | 'collapse' | 'save' | 'saving'
   | 'discard' | 'unsaved' | 'saveFailed' | 'invalidValue'
 
@@ -82,10 +86,9 @@ interface CardState {
   saving: boolean
   failed: boolean
   fields: Record<VisionFieldName, CardFieldState>
+  cloudKeyText: string
   cloudKeyConfigured: boolean
   cloudKeyWritable: boolean
-  localKeyConfigured: boolean
-  localKeyWritable: boolean
 }
 
 interface CardFace {
@@ -106,19 +109,8 @@ interface PlannedWrite {
 }
 
 const FIELD_ORDER: readonly VisionFieldName[] = [
-  'apiKeyEnv',
   'baseURL',
   'model',
-  'fallbackModels',
-  'maxTokens',
-  'timeoutMs',
-  'maxImageBytes',
-  'retryAttempts',
-  'retryBackoffMs',
-  'localApiKeyEnv',
-  'localBaseURL',
-  'localModel',
-  'localFallbackModels',
 ]
 
 function textSpec(): FieldSpec {
@@ -130,54 +122,20 @@ function textSpec(): FieldSpec {
   }
 }
 
-function listSpec(): FieldSpec {
-  return {
-    format: value => Array.isArray(value) ? value.join(', ') : '',
-    parse: (text) => {
-      const values = text.split(/[\n,]/u).map(item => item.trim()).filter(Boolean)
-      return values.length === 0 ? { kind: 'clear' } : { kind: 'set', value: values }
-    },
-  }
-}
-
-function integerSpec(minimum: number): FieldSpec {
-  return {
-    format: value => typeof value === 'number' ? String(value) : '',
-    parse: (text) => {
-      const trimmed = text.trim()
-      if (trimmed === '') return { kind: 'clear' }
-      const value = Number(trimmed)
-      if (!Number.isSafeInteger(value) || value < minimum) return undefined
-      return { kind: 'set', value }
-    },
-  }
-}
-
 const FIELD_SPECS: Record<VisionFieldName, FieldSpec> = {
-  apiKeyEnv: textSpec(),
   baseURL: textSpec(),
-  fallbackModels: listSpec(),
-  localApiKeyEnv: textSpec(),
-  localBaseURL: textSpec(),
-  localFallbackModels: listSpec(),
-  localModel: textSpec(),
-  maxImageBytes: integerSpec(1),
-  maxTokens: integerSpec(1),
   model: textSpec(),
-  retryAttempts: integerSpec(0),
-  retryBackoffMs: integerSpec(100),
-  timeoutMs: integerSpec(1_000),
 }
 
-function snapshotValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: VisionFieldName): unknown {
+function snapshotValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: keyof VisionSettings): unknown {
   return (snapshot.value as Record<string, unknown> | undefined)?.[field]
 }
 
-function baseValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: VisionFieldName): unknown {
+function baseValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: keyof VisionSettings): unknown {
   return (snapshot.base as Record<string, unknown> | undefined)?.[field]
 }
 
-function hasUserValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: VisionFieldName): boolean {
+function hasUserValue(snapshot: SettingsScopeSnapshot<VisionSettings>, field: keyof VisionSettings): boolean {
   const user = snapshot.user as Record<string, unknown> | undefined
   return user !== undefined && Object.hasOwn(user, field)
 }
@@ -205,9 +163,6 @@ class VisionCardController {
   private readonly staged = new Map<string, StagedEdit>()
   private readonly store: SnapshotStore<CardState>
   private cloudCredential: CredentialState = {
-    ref: '', configured: false, writable: true,
-  }
-  private localCredential: CredentialState = {
     ref: '', configured: false, writable: true,
   }
   private saving = false
@@ -238,8 +193,7 @@ class VisionCardController {
   refreshCredential(ref: string): void {
     const snapshot = this.scope.getSnapshot()
     const cloudRef = credentialRef(snapshot, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF)
-    const localRef = credentialRef(snapshot, 'localApiKeyEnv', DEFAULT_LOCAL_KEY_REF)
-    if (ref === cloudRef || ref === localRef) void this.refreshCredentials()
+    if (ref === cloudRef || ref === LEGACY_CLOUD_KEY_REF) void this.refreshCredentials()
   }
 
   private project(): CardState {
@@ -274,15 +228,14 @@ class VisionCardController {
       saving: this.saving,
       failed: this.failed,
       fields,
+      cloudKeyText: this.staged.get('cloudApiKey')?.text ?? '',
       cloudKeyConfigured: this.cloudCredential.configured,
       cloudKeyWritable: this.cloudCredential.writable,
-      localKeyConfigured: this.localCredential.configured,
-      localKeyWritable: this.localCredential.writable,
     }
   }
 
   private edit(field: string, text: string): void {
-    if (field !== 'cloudApiKey' && field !== 'localApiKey' && !(field in FIELD_SPECS)) return
+    if (field !== 'cloudApiKey' && !(field in FIELD_SPECS)) return
     this.staged.set(field, { text, clear: false })
     this.failed = false
     this.publish()
@@ -310,7 +263,7 @@ class VisionCardController {
     const snapshot = this.scope.getSnapshot()
     const writes: PlannedWrite[] = []
     for (const [field, staged] of this.staged) {
-      if (field === 'cloudApiKey' || field === 'localApiKey') {
+      if (field === 'cloudApiKey') {
         if (staged.text.trim() !== '') {
           writes.push({ run: () => this.writeCredential(field, staged.text.trim()) })
         }
@@ -363,9 +316,8 @@ class VisionCardController {
 
   private async writeCredential(field: string, value: string): Promise<boolean> {
     const snapshot = this.scope.getSnapshot()
-    const ref = field === 'cloudApiKey'
-      ? credentialRef(snapshot, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF)
-      : credentialRef(snapshot, 'localApiKeyEnv', DEFAULT_LOCAL_KEY_REF)
+    if (field !== 'cloudApiKey') return false
+    const ref = credentialRef(snapshot, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF)
     try {
       const response = await this.api.credentials.set({ ref, value })
       if (!response.result.ok) return false
@@ -373,35 +325,28 @@ class VisionCardController {
       return false
     }
     await this.refreshCredentials()
-    return field === 'cloudApiKey'
-      ? this.cloudCredential.configured
-      : this.localCredential.configured
+    return this.cloudCredential.configured
   }
 
   private async refreshCredentials(): Promise<void> {
     const snapshot = this.scope.getSnapshot()
     const cloudRef = credentialRef(snapshot, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF)
-    const localRef = credentialRef(snapshot, 'localApiKeyEnv', DEFAULT_LOCAL_KEY_REF)
     this.cloudCredential = { ...this.cloudCredential, ref: cloudRef, configured: false }
-    this.localCredential = { ...this.localCredential, ref: localRef, configured: false }
     this.publish()
     try {
-      const response = await this.api.credentials.describe({ refs: [cloudRef, localRef] })
+      const refs = cloudRef === LEGACY_CLOUD_KEY_REF
+        ? [cloudRef]
+        : [cloudRef, LEGACY_CLOUD_KEY_REF]
+      const response = await this.api.credentials.describe({ refs })
       if (!response.result.ok) return
       const current = this.scope.getSnapshot()
-      if (credentialRef(current, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF) !== cloudRef
-        || credentialRef(current, 'localApiKeyEnv', DEFAULT_LOCAL_KEY_REF) !== localRef) return
+      if (credentialRef(current, 'apiKeyEnv', DEFAULT_CLOUD_KEY_REF) !== cloudRef) return
       const cloud = response.result.value.credentials[cloudRef]
-      const local = response.result.value.credentials[localRef]
+      const legacy = response.result.value.credentials[LEGACY_CLOUD_KEY_REF]
       this.cloudCredential = {
         ref: cloudRef,
-        configured: cloud?.configured ?? false,
+        configured: cloud?.configured === true || legacy?.configured === true,
         writable: cloud?.writable ?? true,
-      }
-      this.localCredential = {
-        ref: localRef,
-        configured: local?.configured ?? false,
-        writable: local?.writable ?? true,
       }
       this.publish()
     } catch {
@@ -416,41 +361,18 @@ class VisionCardController {
 
 const en: Record<VisionLocaleKey, string> = {
   title: 'Vision',
-  description: 'Describes native image attachments for text-only models.',
-  apiKey: 'Cloud API key',
-  apiKeyHint: 'Stored in the DSH credential store. Leave blank to keep the current key.',
+  description: 'Use the native image input with DeepSeek V4 and other text-only models.',
+  apiKey: 'Zhipu Cloud API key',
+  apiKeyHint: 'Stored as ZHIPUAI_API_KEY in the DSH credential store and hidden after saving.',
   apiKeySet: 'Configured',
   apiKeyUnset: 'Not configured',
-  apiKeyEnv: 'Cloud credential reference',
-  apiKeyEnvHint: 'The credential name resolved before each cloud vision request.',
   baseURL: 'Cloud endpoint',
-  baseURLHint: 'OpenAI-compatible vision endpoint; /chat/completions is appended.',
+  baseURLHint: 'Defaults to Zhipu. /chat/completions is appended automatically.',
+  openConsole: 'Get a Zhipu key',
   model: 'Cloud model',
   modelHint: 'Primary cloud multimodal model.',
-  fallbackModels: 'Cloud fallback models',
-  fallbackModelsHint: 'Comma-separated models tried after transient cloud failures.',
-  maxTokens: 'Maximum description tokens',
-  maxTokensHint: 'Upper bound for each image description.',
-  timeoutMs: 'Request timeout (ms)',
-  timeoutMsHint: 'How long one vision request may run.',
-  maxImageBytes: 'Maximum image bytes',
-  maxImageBytesHint: 'Images larger than this are rejected before preprocessing.',
-  retryAttempts: 'Retry attempts',
-  retryAttemptsHint: 'Additional attempts for rate limits and transient failures.',
-  retryBackoffMs: 'Retry backoff (ms)',
-  retryBackoffMsHint: 'Initial delay for exponential retry backoff.',
-  localApiKey: 'Local OCR/VLM API key',
-  localApiKeyHint: 'Optional key for a local OpenAI-compatible endpoint.',
-  localApiKeySet: 'Configured',
-  localApiKeyUnset: 'Not configured',
-  localApiKeyEnv: 'Local credential reference',
-  localApiKeyEnvHint: 'Credential name used by the local OCR/VLM fallback.',
-  localBaseURL: 'Local OCR/VLM endpoint',
-  localBaseURLHint: 'For example, an Ollama OpenAI-compatible endpoint.',
-  localModel: 'Local OCR/VLM model',
-  localModelHint: 'Empty disables local fallback; enter an installed model id to enable it.',
-  localFallbackModels: 'Local fallback models',
-  localFallbackModelsHint: 'Comma-separated local model ids tried after transient failures.',
+  localFallbackHint: 'Local OCR/VLM fallback is optional. The Agent can configure its model and endpoint when needed; no second key is required here.',
+  credentialReadOnly: 'This key is supplied by the environment and cannot be replaced here.',
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
@@ -466,41 +388,18 @@ const en: Record<VisionLocaleKey, string> = {
 
 const zh: Record<VisionLocaleKey, string> = {
   title: 'Vision',
-  description: '为文本模型描述 DSH 原生图片附件。',
-  apiKey: '云端 API Key',
-  apiKeyHint: '保存到 DSH 凭据存储。留空表示保留当前密钥。',
+  description: '让 DeepSeek V4 等文本模型使用 DSH 原生图片输入。',
+  apiKey: '智谱云端 API Key',
+  apiKeyHint: '保存为 DSH 凭据中的 ZHIPUAI_API_KEY，保存后始终以星号隐藏。',
   apiKeySet: '已配置',
   apiKeyUnset: '未配置',
-  apiKeyEnv: '云端凭据引用',
-  apiKeyEnvHint: '每次调用云端 Vision 前解析的凭据名称。',
   baseURL: '云端接口地址',
-  baseURLHint: '兼容 OpenAI 的 Vision 接口，会自动追加 /chat/completions。',
+  baseURLHint: '默认使用智谱接口，会自动追加 /chat/completions。',
+  openConsole: '获取智谱 Key',
   model: '云端模型',
   modelHint: '首选云端多模态模型。',
-  fallbackModels: '云端备用模型',
-  fallbackModelsHint: '用逗号分隔，在云端临时失败后依次尝试。',
-  maxTokens: '描述最大 Token 数',
-  maxTokensHint: '每张图片描述允许生成的最大 Token 数。',
-  timeoutMs: '请求超时（毫秒）',
-  timeoutMsHint: '单次 Vision 请求最多运行多久。',
-  maxImageBytes: '图片最大字节数',
-  maxImageBytesHint: '超过此大小的图片会在预处理前被拒绝。',
-  retryAttempts: '重试次数',
-  retryAttemptsHint: '遇到限流或临时错误时的额外尝试次数。',
-  retryBackoffMs: '重试退避（毫秒）',
-  retryBackoffMsHint: '指数退避的初始等待时间。',
-  localApiKey: '本地 OCR/VLM API Key',
-  localApiKeyHint: '可选，用于本地兼容 OpenAI 的 OCR/VLM 接口。',
-  localApiKeySet: '已配置',
-  localApiKeyUnset: '未配置',
-  localApiKeyEnv: '本地凭据引用',
-  localApiKeyEnvHint: '本地 OCR/VLM fallback 使用的凭据名称。',
-  localBaseURL: '本地 OCR/VLM 接口地址',
-  localBaseURLHint: '例如 Ollama 的 OpenAI 兼容接口地址。',
-  localModel: '本地 OCR/VLM 模型',
-  localModelHint: '留空表示禁用本地 fallback；填写已安装的模型 ID 可启用。',
-  localFallbackModels: '本地备用模型',
-  localFallbackModelsHint: '用逗号分隔，在本地临时失败后依次尝试。',
+  localFallbackHint: '本地 OCR/VLM 是可选回退。需要时由 Agent 自动配置模型和接口，这里不再重复配置第二个 Key。',
+  credentialReadOnly: '这个 Key 来自环境变量，无法在此处覆盖。',
   overridden: '已覆盖',
   reset: '恢复默认',
   readOnly: '本部署的设置为只读。',
@@ -544,7 +443,8 @@ function Field(props: {
   onEdit(text: string): void
   onReset(): void
   t: (key: VisionLocaleKey) => string
-  numeric?: boolean
+  actionLabel?: string
+  onAction?(): void
 }) {
   const { state } = props
   return (
@@ -561,11 +461,15 @@ function Field(props: {
             </button>
           </span>
         ) : null}
+        {props.actionLabel !== undefined && props.onAction !== undefined ? (
+          <button type="button" style={linkButtonStyle} onClick={props.onAction}>
+            {props.actionLabel}
+          </button>
+        ) : null}
       </div>
       <input
         id={props.id}
         type="text"
-        inputMode={props.numeric === true ? 'numeric' : undefined}
         value={state.text}
         disabled={props.disabled}
         aria-invalid={state.invalid || undefined}
@@ -584,6 +488,7 @@ function SecretField(props: {
   label: string
   hint: string
   text: string
+  placeholder?: string
   configured: boolean
   disabled: boolean
   stateLabel: string
@@ -602,8 +507,9 @@ function SecretField(props: {
       <input
         id={props.id}
         type="password"
-        autoComplete="off"
+        autoComplete="new-password"
         value={props.text}
+        placeholder={props.placeholder}
         disabled={props.disabled}
         style={inputStyle}
         onChange={event => { props.onEdit(event.target.value) }}
@@ -613,6 +519,15 @@ function SecretField(props: {
       </p>
     </div>
   )
+}
+
+async function openExternal(url: string): Promise<void> {
+  if (typeof window !== 'undefined' && window.dshDesktop !== undefined) {
+    await window.dshDesktop.openExternal(url)
+    return
+  }
+  const open = (globalThis as { open?: (target: string, name?: string, features?: string) => unknown }).open
+  if (typeof open === 'function') open(url, '_blank', 'noopener,noreferrer')
 }
 
 const linkButtonStyle: CSSProperties = {
@@ -646,7 +561,7 @@ function VisionCard(props: VisionCardProps) {
   const [open, setOpen] = useState(false)
   if (!state.available) return null
   const disabled = !state.writable || state.saving
-  const field = (name: VisionFieldName, label: VisionLocaleKey, hint: VisionLocaleKey, numeric = false) => (
+  const field = (name: VisionFieldName, label: VisionLocaleKey, hint: VisionLocaleKey, actionLabel?: VisionLocaleKey) => (
     <Field
       key={name}
       id={`plugin-config-vision-${name}`}
@@ -654,10 +569,11 @@ function VisionCard(props: VisionCardProps) {
       hint={props.t(hint)}
       state={state.fields[name]}
       disabled={disabled}
-      numeric={numeric}
+      actionLabel={actionLabel === undefined ? undefined : props.t(actionLabel)}
       t={props.t}
       onEdit={text => { props.edit(name, text) }}
       onReset={() => { props.resetField(name) }}
+      onAction={actionLabel === undefined ? undefined : () => { void openExternal(ZHIPU_CONSOLE_URL) }}
     />
   )
   return (
@@ -679,39 +595,22 @@ function VisionCard(props: VisionCardProps) {
       {open ? (
         <div style={{ margin: '0 16px', paddingBottom: 8, borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
           {!state.writable ? <p role="status" style={{ color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 }}>{props.t('readOnly')}</p> : null}
+          {field('baseURL', 'baseURL', 'baseURLHint', 'openConsole')}
           <SecretField
             id="plugin-config-vision-cloud-key"
             label={props.t('apiKey')}
-            hint={props.t('apiKeyHint')}
-            text=""
+            hint={props.t(state.cloudKeyWritable ? 'apiKeyHint' : 'credentialReadOnly')}
+            text={state.cloudKeyText}
+            placeholder={state.cloudKeyConfigured ? '••••••••••••' : undefined}
             configured={state.cloudKeyConfigured}
-            disabled={!state.cloudKeyWritable || disabled}
+            disabled={state.saving}
             stateLabel={props.t(state.cloudKeyConfigured ? 'apiKeySet' : 'apiKeyUnset')}
             onEdit={text => { props.edit('cloudApiKey', text) }}
           />
-          {field('apiKeyEnv', 'apiKeyEnv', 'apiKeyEnvHint')}
-          {field('baseURL', 'baseURL', 'baseURLHint')}
           {field('model', 'model', 'modelHint')}
-          {field('fallbackModels', 'fallbackModels', 'fallbackModelsHint')}
-          {field('maxTokens', 'maxTokens', 'maxTokensHint', true)}
-          {field('timeoutMs', 'timeoutMs', 'timeoutMsHint', true)}
-          {field('maxImageBytes', 'maxImageBytes', 'maxImageBytesHint', true)}
-          {field('retryAttempts', 'retryAttempts', 'retryAttemptsHint', true)}
-          {field('retryBackoffMs', 'retryBackoffMs', 'retryBackoffMsHint', true)}
-          <SecretField
-            id="plugin-config-vision-local-key"
-            label={props.t('localApiKey')}
-            hint={props.t('localApiKeyHint')}
-            text=""
-            configured={state.localKeyConfigured}
-            disabled={!state.localKeyWritable || disabled}
-            stateLabel={props.t(state.localKeyConfigured ? 'localApiKeySet' : 'localApiKeyUnset')}
-            onEdit={text => { props.edit('localApiKey', text) }}
-          />
-          {field('localApiKeyEnv', 'localApiKeyEnv', 'localApiKeyEnvHint')}
-          {field('localBaseURL', 'localBaseURL', 'localBaseURLHint')}
-          {field('localModel', 'localModel', 'localModelHint')}
-          {field('localFallbackModels', 'localFallbackModels', 'localFallbackModelsHint')}
+          <p style={{ margin: '12px 0 4px', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12, lineHeight: 1.5 }}>
+            {props.t('localFallbackHint')}
+          </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, padding: '12px 0 4px', borderTop: '1px solid var(--dsw-alias-border-l2)' }}>
             {state.failed ? <p role="status" style={{ flex: 1, margin: 0, color: 'var(--dsw-alias-label-error)', fontSize: 12 }}>{props.t('saveFailed')}</p> : null}
             <button type="button" style={footerButtonStyle} disabled={!state.dirty || state.saving} onClick={props.discard}>{props.t('discard')}</button>

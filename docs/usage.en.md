@@ -174,17 +174,20 @@ size limits, and submission. The plugin does not intercept this flow. TUI has
 no graphical thumbnail; provide a workspace-local image path or HTTP(S) URL in
 the prompt to use the same `view_image` tool.
 
-The default backend uses Zhipu `glm-4.6v-flash`. Store its key in the shared
-data root's credential file (`~/.ohdsh/.credentials.yaml` by default) so all
-three surfaces can use it:
+The default backend uses Zhipu `glm-4.6v-flash`. In the native
+`Settings → Plugins → Plugin configuration → Vision` card, confirm the cloud
+endpoint first, then click `Get a Zhipu key` to open the Zhipu console. Paste
+the returned key into the password-style field; it is stored in the shared data
+root's credential file (`~/.ohdsh/.credentials.yaml` by default):
 
 ```yaml
-VISION_API_KEY: your-api-key
+ZHIPUAI_API_KEY: your-api-key
 ```
 
 Keep the credential file owner-readable only, for example with
 `chmod 600 ~/.ohdsh/.credentials.yaml` on macOS/Linux. Exporting
-`VISION_API_KEY` before launch is also supported.
+`ZHIPUAI_API_KEY` before launch is also supported. The legacy
+`VISION_API_KEY` name remains a migration fallback.
 
 Override the backend and model in the shared `~/.ohdsh/settings.yaml`:
 
@@ -198,11 +201,13 @@ oh-dsh-vision:
 maxImageBytes: 10485760
 ```
 
-The same fields are available in the native `Settings → Plugins → Plugin
-configuration → Vision` card. Cloud and local API keys are write-only controls
-backed by the DSH credentials store; they are never returned in the settings
-snapshot. The card also exposes endpoint, model, fallback, retry, timeout, and
-image-size settings, so you do not need to edit YAML for normal configuration.
+The card intentionally shows only the cloud endpoint, cloud model, and one
+masked Zhipu key field. The key is write-only through the DSH credential store
+and is never returned in a settings snapshot. Retry, fallback, timeout, image
+size, and local OCR/VLM options remain available to the Agent or through
+advanced `settings.yaml` configuration, so users do not have to enter several
+keys. Claude/Anthropic keys belong to their model provider and are not treated
+as the Zhipu Vision key.
 
 A local Ollama endpoint needs no key:
 
@@ -223,7 +228,7 @@ a non-local endpoint.
 
 ```yaml
 oh-dsh-vision:
-  apiKeyEnv: VISION_API_KEY
+  apiKeyEnv: ZHIPUAI_API_KEY
   retryAttempts: 3
   retryBackoffMs: 1000
   localBaseURL: http://localhost:11434/v1

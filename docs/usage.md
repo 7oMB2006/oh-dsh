@@ -158,15 +158,17 @@ Desktop、Web 和 TUI 都会加载内置的 `@oh-dsh/vision`。图片粘贴、�
 化缩略图，直接在消息中提供 Workspace 内的图片路径或 HTTP(S) URL，即可调用同一个
 `view_image` 工具。
 
-默认后端使用智谱 `glm-4.6v-flash`。把密钥写入共享数据根目录的凭据文件（默认
-`~/.ohdsh/.credentials.yaml`），三端即可共同使用：
+默认后端使用智谱 `glm-4.6v-flash`。在原生的“设置 → 插件 → 插件配置 → Vision”卡片中，
+先确认云端接口地址，再点击“获取智谱 Key”打开智谱控制台；复制回来的 Key 会以密码
+输入框显示，并保存到共享数据根目录的凭据文件（默认 `~/.ohdsh/.credentials.yaml`）：
 
 ```yaml
-VISION_API_KEY: your-api-key
+ZHIPUAI_API_KEY: your-api-key
 ```
 
 凭据文件应保持仅当前用户可读，例如在 macOS/Linux 上执行
-`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export VISION_API_KEY=...`。
+`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export ZHIPUAI_API_KEY=...`。
+旧版本使用的 `VISION_API_KEY` 仍会作为迁移回退读取。
 
 后端和模型可在共享的 `~/.ohdsh/settings.yaml` 中覆盖：
 
@@ -180,9 +182,10 @@ oh-dsh-vision:
 maxImageBytes: 10485760
 ```
 
-同样的字段可以在原生的“设置 → 插件 → 插件配置 → Vision”卡片中配置。云端和本地
-API Key 是只写控制项，通过 DSH credentials 保存，不会回显到设置快照；接口地址、模型、
-备用模型、重试、超时和图片大小等字段也都在卡片中提供，日常配置不需要手动编辑 YAML。
+卡片只显示云端接口地址、云端模型和一个隐藏的智谱 Key 输入框；Key 不会回显到设置快照。
+重试、备用模型、超时、图片大小和本地 OCR/VLM 选项仍可由 Agent 或 `settings.yaml` 高级配置，
+不要求用户重复填写多个 Key。Claude/Anthropic Key 属于对应模型提供方，不会被当作智谱 Vision
+Key 使用。
 
 使用本地 Ollama 时不要求密钥：
 
@@ -200,7 +203,7 @@ oh-dsh-vision:
 
 ```yaml
 oh-dsh-vision:
-  apiKeyEnv: VISION_API_KEY
+  apiKeyEnv: ZHIPUAI_API_KEY
   retryAttempts: 3
   retryBackoffMs: 1000
   localBaseURL: http://localhost:11434/v1
