@@ -9,9 +9,31 @@ export interface ComposerHistorySessions {
   scope?(id: string): unknown
 }
 
+export interface ComposerHistoryInputTriggers {
+  sessionOf?(scope: unknown): {
+    menu?: {
+      getSnapshot(): { open?: boolean }
+    }
+  } | undefined
+}
+
 interface ConversationInputService {
   input: {
     for(context: unknown): ComposerHistoryInput
+  }
+}
+
+/** Let an active slash or reference menu retain its own arrow-key handling. */
+export function hasOpenComposerTriggerMenu(
+  inputTriggers: ComposerHistoryInputTriggers | undefined,
+  sessions: ComposerHistorySessions,
+  sessionId: string,
+): boolean {
+  try {
+    const scope = sessions.scope?.(sessionId)
+    return scope !== undefined && inputTriggers?.sessionOf?.(scope)?.menu?.getSnapshot().open === true
+  } catch {
+    return false
   }
 }
 

@@ -45,11 +45,14 @@ import {
   type ComposerHistorySnapshot,
 } from './composer-input-history.ts'
 import {
-  hasOpenComposerMenu,
   historyDirectionForKey,
   isAtHistoryBoundary,
 } from './composer-history-keyboard.ts'
-import { composerInputForSession } from './composer-history-bridge.ts'
+import {
+  composerInputForSession,
+  hasOpenComposerTriggerMenu,
+  type ComposerHistoryInputTriggers,
+} from './composer-history-bridge.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
 import {
   betterSidebarApi,
@@ -112,6 +115,8 @@ interface SessionsService extends ReviewSessionsService {
   fork(options: { sessionId: string; increaseTitle?: boolean }): Promise<string>
   open(id: string): void
 }
+
+interface InputTriggersService extends ComposerHistoryInputTriggers, ReviewInputTriggersService {}
 
 interface WorkspaceView {
   workspaceId: string
@@ -1680,7 +1685,7 @@ export function apply(ctx: ClientContext): void {
   const panels = ctx.get('desktopPanels') as DesktopPanels
   const pinnedSummary = ctx.get('pinnedSummary') as PinnedSummary
   const sessions = ctx.get('sessions') as SessionsService
-  const inputTriggers = ctx.get('inputTriggers') as ReviewInputTriggersService
+  const inputTriggers = ctx.get('inputTriggers') as InputTriggersService
   const workspaces = ctx.get('workspaces') as WorkspacesService
   const originalOpenPath = workspaces.openPath
   const openExternalPath = async (path: string): Promise<void> => {
@@ -1783,8 +1788,7 @@ export function apply(ctx: ClientContext): void {
       if (!isComposerTextarea(textarea)) return
       const sessionId = sessions.list.getSnapshot().current
       if (sessionId === undefined) return
-      const card = textarea.closest('[data-composer-card]')
-      if (hasOpenComposerMenu(card)) return
+      if (hasOpenComposerTriggerMenu(inputTriggers, sessions, sessionId)) return
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
         composerHistory.resetNavigation(sessionId)
         return

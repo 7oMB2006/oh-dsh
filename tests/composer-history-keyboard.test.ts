@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
-  hasOpenComposerMenu,
   historyDirectionForKey,
   isAtHistoryBoundary,
 } from '../plugins/sidebar/src/client/composer-history-keyboard.ts'
@@ -35,10 +34,4 @@ test('limits history navigation to collapsed selection at textual boundaries', (
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'older'), false)
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'newer'), false)
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 2 }, 'older'), false)
-})
-
-test('defers arrow handling to an open composer command menu', () => {
-  assert.equal(hasOpenComposerMenu(null), false)
-  assert.equal(hasOpenComposerMenu({ querySelector: () => null }), false)
-  assert.equal(hasOpenComposerMenu({ querySelector: () => ({}) }), true)
 })
