@@ -6,7 +6,15 @@ const releaseApiUrl =
 const translations = {
     "zh-CN": {
         star: "星标",
-        title: "让 Harness 成为你的桌面工作流",
+        pageTitle: "Oh-DSH｜一套 Runtime，三种开发体验",
+        sloganRuntime: "一套 DSH runtime，",
+        sloganSurfaces: "Desktop、Web 与 TUI",
+        sloganExperience: "三种开发体验。",
+        surfaceLabel: "全端支持",
+        surfaceTitle: "同一套 DSH，适配三种开发场景",
+        desktopDetail: "完整的本地开发工作台",
+        webDetail: "随时从浏览器接入工作区",
+        tuiDetail: "在终端里保持专注与速度",
         downloadLatest: "下载最新版",
         downloadMac: "下载 macOS 版",
         downloadWindows: "下载 Windows 版",
@@ -22,11 +30,19 @@ const translations = {
         footer: "开放、可组合的 DeepSeek Harness 工作台",
         screenshotAlt: "Oh-DSH Desktop 深色界面，包含工作区、对话和插件入口",
         pageDescription:
-            "Oh-DSH Desktop 是构建在 DeepSeek Harness 之上的可安装、可扩展桌面工作台。",
+            "Oh-DSH 以一套 DSH runtime 提供 Desktop、Web UI 与 TUI 三种开发体验。",
     },
     en: {
         star: "Star",
-        title: "Make Harness part of your desktop workflow",
+        pageTitle: "Oh-DSH — One Runtime, Three Interfaces",
+        sloganRuntime: "One DSH runtime.",
+        sloganSurfaces: "Desktop · Web · TUI",
+        sloganExperience: "Three ways to build.",
+        surfaceLabel: "Three surfaces",
+        surfaceTitle: "The same DSH, shaped for every workflow",
+        desktopDetail: "A complete local development workbench",
+        webDetail: "Open your workspace from any browser",
+        tuiDetail: "Stay focused and fast in the terminal",
         downloadLatest: "Download latest",
         downloadMac: "Download for macOS",
         downloadWindows: "Download for Windows",
@@ -43,7 +59,7 @@ const translations = {
         screenshotAlt:
             "Oh-DSH Desktop dark interface with workspace, conversation, and plugin navigation",
         pageDescription:
-            "Oh-DSH Desktop is an installable, extensible workbench built on DeepSeek Harness.",
+            "Oh-DSH brings Desktop, Web UI, and TUI together on one DSH runtime.",
     },
 };
 
@@ -146,6 +162,7 @@ function applyLanguage(language) {
     });
 
     elements.descriptionMeta.content = copy.pageDescription;
+    document.title = copy.pageTitle;
     elements.downloadTrigger.textContent = copy[downloadCopyKey()];
     elements.platformLabel.textContent = platformName(language);
     elements.languageToggle.textContent = language === "zh-CN" ? "EN" : "中";
