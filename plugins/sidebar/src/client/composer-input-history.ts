@@ -4,6 +4,8 @@ import {
   InputHistory,
 } from './input-history.ts'
 
+export const DEFAULT_COMPOSER_HISTORY_SESSION_LIMIT = 32
+
 export interface ComposerHistoryContentBlock {
   readonly text?: unknown
   readonly type?: unknown
@@ -89,9 +91,17 @@ export class ComposerInputHistory {
   private readonly sessionEntries = new Map<string, CachedSessionEntries>()
   private readonly loading = new Set<string>()
   private readonly limit: number
+  private readonly sessionLimit: number
 
-  constructor(limit = DEFAULT_INPUT_HISTORY_LIMIT) {
+  constructor(
+    limit = DEFAULT_INPUT_HISTORY_LIMIT,
+    sessionLimit = DEFAULT_COMPOSER_HISTORY_SESSION_LIMIT,
+  ) {
+    if (!Number.isInteger(sessionLimit) || sessionLimit < 1) {
+      throw new RangeError('composer history session limit must be a positive integer')
+    }
     this.limit = limit
+    this.sessionLimit = sessionLimit
   }
 
   forSession(sessionId: string): InputHistory {
@@ -99,11 +109,15 @@ export class ComposerInputHistory {
     if (history === undefined) {
       history = new InputHistory(this.limit)
       this.histories.set(sessionId, history)
+      this.evictSessions()
+      return history
     }
+    this.touchSession(sessionId)
     return history
   }
 
   synchronize(sessionId: string, snapshot: ComposerHistorySnapshot): boolean {
+    const history = this.forSession(sessionId)
     const previous = this.sessionEntries.get(sessionId)
     if (previous?.nodes === snapshot.nodes) return false
     const sequences = submittedInputSequences(snapshot.nodes)
@@ -113,13 +127,16 @@ export class ComposerInputHistory {
     }
     const entries = submittedInputEntries(snapshot.nodes, this.cachedEntries)
     this.sessionEntries.set(sessionId, { nodes: snapshot.nodes, sequences })
-    this.forSession(sessionId).synchronize(entries)
+    history.synchronize(entries)
     return true
   }
 
   resetNavigation(sessionId: string | undefined): void {
     if (sessionId === undefined) return
-    this.histories.get(sessionId)?.resetNavigation()
+    const history = this.histories.get(sessionId)
+    if (history === undefined) return
+    this.touchSession(sessionId)
+    history.resetNavigation()
   }
 
   requestOlder(sessionId: string, session: ComposerHistorySession): boolean {
@@ -134,5 +151,28 @@ export class ComposerInputHistory {
       this.loading.delete(sessionId)
     })
     return true
+  }
+
+  private touchSession(sessionId: string): void {
+    const history = this.histories.get(sessionId)
+    if (history !== undefined) {
+      this.histories.delete(sessionId)
+      this.histories.set(sessionId, history)
+    }
+    const entries = this.sessionEntries.get(sessionId)
+    if (entries !== undefined) {
+      this.sessionEntries.delete(sessionId)
+      this.sessionEntries.set(sessionId, entries)
+    }
+  }
+
+  private evictSessions(): void {
+    while (this.histories.size > this.sessionLimit) {
+      const sessionId = this.histories.keys().next().value
+      if (sessionId === undefined) return
+      this.histories.delete(sessionId)
+      this.sessionEntries.delete(sessionId)
+      this.loading.delete(sessionId)
+    }
   }
 }

@@ -27,6 +27,23 @@ test('keeps histories isolated by session', () => {
   assert.equal(histories.forSession('two').navigate('older', '').value, 'two')
 })
 
+test('evicts least-recently-used session histories and rehydrates them from the snapshot', () => {
+  const histories = new ComposerInputHistory(100, 2)
+  const one = { nodes: [{ kind: 'user', seq: 1, content: [{ type: 'text', text: 'one' }] }] }
+  const two = { nodes: [{ kind: 'user', seq: 2, content: [{ type: 'text', text: 'two' }] }] }
+  histories.synchronize('one', one)
+  histories.synchronize('two', two)
+  histories.forSession('one')
+  histories.synchronize('three', {
+    nodes: [{ kind: 'user', seq: 3, content: [{ type: 'text', text: 'three' }] }],
+  })
+
+  assert.equal(histories.forSession('one').navigate('older', '').value, 'one')
+  assert.equal(histories.forSession('two').navigate('older', '').value, null)
+  assert.equal(histories.synchronize('two', two), true)
+  assert.equal(histories.forSession('two').navigate('older', '').value, 'two')
+})
+
 test('skips unchanged conversation node windows during assistant streaming', () => {
   const histories = new ComposerInputHistory()
   const nodes = [
