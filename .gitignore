@@ -9,3 +9,4 @@ tmp/
 .direnv/
 result
 result-*
+.agent-workflows/
