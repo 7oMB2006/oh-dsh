@@ -32,10 +32,20 @@ test('review, pinned summary, and embedded side tools keep distinct layouts', ()
   assert.match(workspace, /if \(open\) this\.pinnedSummary\.setOpen\(false\)/)
   assert.match(workspace, /if \(this\.state\.open\) this\.pinnedSummary\.setOpen\(false\)/)
   assert.match(workspace, /ohDshRightPanelOwner = 'sidebar'/)
-  assert.match(summary, /ohDshRightPanelOwner = 'pinned-summary'/)
-  assert.match(summary, /calc\(var\(--oh-dsh-pinned-summary-width\) \+ 24px\)/)
-  assert.match(summary, /height: calc\(\(100vh - var\(--oh-dsh-titlebar-height, 40px\) - 24px\) \/ 2\);/)
-  assert.doesNotMatch(summary, /height: min\(360px/)
+  assert.doesNotMatch(summary, /ohDshRightPanelOwner = 'pinned-summary'/)
+  assert.doesNotMatch(summary, /#root\s*\{[^}]*padding-right:/s)
+  assert.match(summary, /height: auto;/)
+  assert.match(summary, /max-height: min\(/)
+  assert.match(summary, /transform: translateY\(-8px\) scale\(0\.98\);/)
+  assert.match(
+    summary,
+    /\[data-oh-dsh-summary-body\]\s*\{[^}]*flex: 0 1 auto;[^}]*min-height: 0;[^}]*overflow: auto;/s,
+  )
+  assert.match(
+    summary,
+    /document\.addEventListener\('pointerdown', this\.#handleDocumentPointerDown\)/,
+  )
+  assert.match(summary, /event\.key === 'Escape'/)
   assert.doesNotMatch(workspace, /aria-label="Toggle review panel"/)
   assert.match(workspace, /className="oh-dsh-review-view"/)
   assert.doesNotMatch(workspace, /oh-dsh-review-panel/)

@@ -1,4 +1,4 @@
-/** Layout-reserving pinned summary derived from the active DSH session. */
+/** Floating pinned summary derived from the active DSH session. */
 
 import type { LocaleService, Translate } from '../../shared/i18n.ts'
 import { localeTag } from '../../shared/i18n.ts'
@@ -59,31 +59,35 @@ const OPEN_KEY = 'oh-dsh-desktop.pinned-summary.open'
 
 const SUMMARY_CSS = `
 html {
-  --oh-dsh-pinned-summary-width: 288px;
-}
-
-html[data-oh-dsh-summary-pinned='true'] #root {
-  box-sizing: border-box;
-  padding-right: calc(var(--oh-dsh-pinned-summary-width) + 24px);
+  --oh-dsh-pinned-summary-width: 304px;
 }
 
 [data-oh-dsh-pinned-summary] {
   position: fixed;
   z-index: 9000;
-  top: calc(var(--oh-dsh-titlebar-height, 40px) + 12px);
-  right: 12px;
-  height: calc((100vh - var(--oh-dsh-titlebar-height, 40px) - 24px) / 2);
-  width: var(--oh-dsh-pinned-summary-width);
+  display: flex;
+  flex-direction: column;
+  top: calc(var(--oh-dsh-titlebar-height, 40px) + 8px);
+  right: 14px;
+  width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 28px));
+  height: auto;
+  max-height: min(
+    420px,
+    calc(100vh - var(--oh-dsh-titlebar-height, 40px) - 20px)
+  );
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l1);
-  border-radius: 22px;
+  border-radius: 16px;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
-  box-shadow: 0 14px 42px rgb(0 0 0 / 9%);
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 14%),
+    0 2px 10px rgb(0 0 0 / 6%);
   opacity: 0;
   pointer-events: none;
-  transform: translateX(calc(100% + 24px));
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top right;
   visibility: hidden;
   transition:
     opacity 140ms var(--ds-ease-in-out, ease),
@@ -95,15 +99,16 @@ html[data-oh-dsh-summary-pinned='true'] #root {
 [data-oh-dsh-pinned-summary][data-open='true'] {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0);
+  transform: translateY(0) scale(1);
   visibility: visible;
   transition-delay: 0s;
 }
 
 [data-oh-dsh-summary-header] {
   display: flex;
+  flex: 0 0 44px;
   align-items: center;
-  height: 48px;
+  height: 44px;
   padding: 0 10px 0 15px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   box-sizing: border-box;
@@ -131,8 +136,9 @@ html[data-oh-dsh-summary-pinned='true'] #root {
 }
 
 [data-oh-dsh-summary-body] {
-  height: calc(100% - 48px);
-  padding: 14px 15px 16px;
+  flex: 0 1 auto;
+  min-height: 0;
+  padding: 12px 15px 14px;
   box-sizing: border-box;
   overflow: auto;
 }
@@ -172,8 +178,10 @@ html[data-oh-dsh-summary-pinned='true'] #root {
 }
 
 @media (max-width: 900px) {
-  html[data-oh-dsh-summary-pinned='true'] #root { padding-right: 0; }
-  [data-oh-dsh-pinned-summary] { box-shadow: -20px 0 48px rgb(0 0 0 / 14%); }
+  [data-oh-dsh-pinned-summary] {
+    right: 8px;
+    width: min(var(--oh-dsh-pinned-summary-width), calc(100vw - 16px));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -249,8 +257,16 @@ class PinnedSummaryService implements PinnedSummary {
   #unsubscribeList: (() => void) | undefined
   #unsubscribeSession: (() => void) | undefined
   #unsubscribeLocale: (() => void) | undefined
-  readonly #narrowViewport = window.matchMedia('(max-width: 900px)')
-  readonly #handleViewportChange = (): void => { this.applyState() }
+  readonly #handleDocumentPointerDown = (event: PointerEvent): void => {
+    if (!this.#open || this.#panel === undefined) return
+    const target = event.target
+    if (!(target instanceof Node) || this.#panel.contains(target)) return
+    if (target instanceof Element && target.closest('.oh-dsh-panel-toolbar') !== null) return
+    this.setOpen(false)
+  }
+  readonly #handleDocumentKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.#open) this.setOpen(false)
+  }
 
   constructor(
     sessions: SessionsService,
@@ -270,6 +286,7 @@ class PinnedSummaryService implements PinnedSummary {
 
     const panel = document.createElement('aside')
     panel.dataset.ohDshPinnedSummary = 'true'
+    panel.setAttribute('role', 'dialog')
     panel.setAttribute('aria-label', this.#t('summary.label'))
     panel.innerHTML = `
       <header data-oh-dsh-summary-header>
@@ -292,7 +309,8 @@ class PinnedSummaryService implements PinnedSummary {
     this.#source = required(panel, '[data-oh-dsh-summary-source]')
     this.#text = required(panel, '[data-oh-dsh-summary-text]')
     this.#close.addEventListener('click', () => { this.setOpen(false) })
-    this.#narrowViewport.addEventListener('change', this.#handleViewportChange)
+    document.addEventListener('pointerdown', this.#handleDocumentPointerDown)
+    document.addEventListener('keydown', this.#handleDocumentKeyDown)
     this.#unsubscribeList = this.#sessions.list.subscribe(() => { this.bindAndRender() })
     this.#unsubscribeLocale = this.#locale.subscribe(() => {
       this.renderChrome()
@@ -307,14 +325,11 @@ class PinnedSummaryService implements PinnedSummary {
     this.#unsubscribeList?.()
     this.#unsubscribeSession?.()
     this.#unsubscribeLocale?.()
-    this.#narrowViewport.removeEventListener('change', this.#handleViewportChange)
+    document.removeEventListener('pointerdown', this.#handleDocumentPointerDown)
+    document.removeEventListener('keydown', this.#handleDocumentKeyDown)
     this.#panel?.remove()
     this.#style?.remove()
     delete document.documentElement.dataset.ohDshSummaryPinned
-    if (document.documentElement.dataset.ohDshRightPanelOwner === 'pinned-summary') {
-      delete document.documentElement.dataset.ohDshRightPanelOwner
-      document.getElementById('root')?.style.removeProperty('padding-right')
-    }
   }
 
   isOpen(): boolean {
@@ -346,19 +361,8 @@ class PinnedSummaryService implements PinnedSummary {
     }
     if (this.#open) {
       html.dataset.ohDshSummaryPinned = 'true'
-      html.dataset.ohDshRightPanelOwner = 'pinned-summary'
-      const appRoot = document.getElementById('root')
-      if (appRoot !== null) {
-        appRoot.style.paddingRight = this.#narrowViewport.matches
-          ? '0px'
-          : 'calc(var(--oh-dsh-pinned-summary-width) + 24px)'
-      }
     } else {
       delete html.dataset.ohDshSummaryPinned
-      if (html.dataset.ohDshRightPanelOwner === 'pinned-summary') {
-        delete html.dataset.ohDshRightPanelOwner
-        document.getElementById('root')?.style.removeProperty('padding-right')
-      }
     }
   }
 
@@ -425,7 +429,7 @@ class PinnedSummaryService implements PinnedSummary {
   }
 }
 
-/** Provide the pinned-summary service and its layout-reserving DOM surface. */
+/** Provide the pinned-summary service and its floating DOM surface. */
 export function apply(ctx: ClientContext): void {
   const locale = ctx.get('locale') as LocaleService
   const t: Translate<PinnedSummaryMessage> = locale.bind('oh-dsh.pinned-summary')
