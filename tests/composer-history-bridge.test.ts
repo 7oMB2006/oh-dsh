@@ -17,7 +17,6 @@ test('resolves the session-scoped public composer input', () => {
   assert.equal(received, scope)
   assert.equal(draft, 'recalled message')
 })
-
 test('degrades without a scope, service, or usable conversation input', () => {
   assert.equal(composerInputForSession({ get: () => undefined }, {}, 'session'), undefined)
   assert.equal(composerInputForSession({ get: () => undefined }, { scope: () => ({}) }, 'session'), undefined)
@@ -25,4 +24,3 @@ test('degrades without a scope, service, or usable conversation input', () => {
     get: () => { throw new Error('old runtime') },
   }, { scope: () => ({}) }, 'session'), undefined)
 })
-

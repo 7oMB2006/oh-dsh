@@ -1,7 +1,6 @@
 export interface ComposerHistoryInput {
   setDraft(text: string): void
 }
-
 export interface ComposerHistoryContext {
   get(name: string): unknown
 }
@@ -31,4 +30,3 @@ export function composerInputForSession(
     return undefined
   }
 }
-

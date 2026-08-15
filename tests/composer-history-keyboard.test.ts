@@ -24,7 +24,6 @@ test('recognizes only unmodified non-IME history arrows', () => {
   assert.equal(historyDirectionForKey(key('ArrowDown', { isComposing: true })), null)
   assert.equal(historyDirectionForKey(key('Enter')), null)
 })
-
 test('limits history navigation to collapsed selection at textual boundaries', () => {
   const multiline = 'first\nsecond\nthird'
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 0 }, 'older'), true)
@@ -36,4 +35,3 @@ test('limits history navigation to collapsed selection at textual boundaries', (
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 7, selectionEnd: 7 }, 'newer'), false)
   assert.equal(isAtHistoryBoundary({ value: multiline, selectionStart: 0, selectionEnd: 2 }, 'older'), false)
 })
-

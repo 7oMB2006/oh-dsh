@@ -5,7 +5,6 @@ export interface ComposerCaret {
   readonly selectionStart: number | null
   readonly value: string
 }
-
 export interface ComposerHistoryKey {
   readonly altKey: boolean
   readonly ctrlKey: boolean
@@ -32,4 +31,3 @@ export function isAtHistoryBoundary(
   if (selectionStart === null || selectionEnd === null || selectionStart !== selectionEnd) return false
   return direction === 'older' ? selectionStart === 0 : selectionEnd === value.length
 }
-

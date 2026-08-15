@@ -14,7 +14,6 @@ test('reads only confirmed text user messages in chronological order', () => {
     { kind: 'user', content: [{ type: 'text', text: '' }] },
   ]), ['first', 'second part'])
 })
-
 test('keeps histories isolated by session', () => {
   const histories = new ComposerInputHistory()
   histories.synchronize('one', { nodes: [{ kind: 'user', content: [{ type: 'text', text: 'one' }] }] })
@@ -48,4 +47,3 @@ test('loads one older page at a time only while capacity remains', async () => {
   })
   assert.equal(histories.requestOlder('session', session), false)
 })
-
