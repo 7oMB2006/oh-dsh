@@ -263,14 +263,9 @@ void app.whenReady().then(async () => {
         settle(new Error(`Pasted image thumbnail failed: ${state.vision.error}`))
         return
       }
-      if (state.vision.facts !== null
-        && state.vision.facts.bubbleBottom > state.vision.facts.cardTop + 1) {
-        settle(new Error(
-          'Pasted image thumbnail is not above the composer: '
-          + JSON.stringify(state.vision.facts),
-        ))
-        return
-      }
+      // DSH owns the native AttachmentRail layout. Keep this smoke check
+      // agnostic to whether a surface places the rail inside the composer
+      // card or as a floating bubble; only visibility and removal are ours.
       if (webSmoke
         && state.webReady === true
         && state.vision.seen === true
