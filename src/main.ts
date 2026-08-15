@@ -843,11 +843,17 @@ async function bootstrap(): Promise<void> {
   app.setName(PRODUCT_NAME)
   const ohDshHome = resolveOhDshHome(process.env)
   const electronDataRoot = desktopElectronDataRoot(ohDshHome)
-  migrateLegacyDesktopState({
+  const migration = migrateLegacyDesktopState({
     appDataRoot: app.getPath('appData'),
     env: process.env,
     ohDshHome,
   })
+  if (!migration.complete) {
+    throw new Error(
+      `legacy Desktop state migration under ${ohDshHome} is incomplete; `
+      + 'restore unavailable link targets and restart',
+    )
+  }
   mkdirSync(electronDataRoot, { recursive: true, mode: 0o700 })
   app.setPath('userData', electronDataRoot)
   app.setAboutPanelOptions({

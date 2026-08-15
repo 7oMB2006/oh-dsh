@@ -231,12 +231,18 @@ export async function main(
   }
 
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  migrateLegacyWebState({
+  const migration = migrateLegacyWebState({
     dataRoot,
     ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
       ? { legacyDefaultDataRoot: legacyWebDataRoot() }
       : {}),
   })
+  if (!migration.complete) {
+    throw new Error(
+      `legacy Web state migration under ${dataRoot} is incomplete; `
+      + 'restore unavailable link targets and retry',
+    )
+  }
   ensureWebProfile(dataRoot)
 
   const logTail: string[] = []

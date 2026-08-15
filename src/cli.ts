@@ -83,7 +83,7 @@ function macOpenEnvironment(env: NodeJS.ProcessEnv): string[] {
   const ohDshHome = env[OH_DSH_HOME_ENV]
   return ohDshHome === undefined || ohDshHome === ''
     ? []
-    : ['--env', `${OH_DSH_HOME_ENV}=${ohDshHome}`]
+    : ['--env', `${OH_DSH_HOME_ENV}=${posix.resolve(ohDshHome)}`]
 }
 
 /** Resolve one desktop launch without starting a process. */
