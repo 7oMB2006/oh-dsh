@@ -290,77 +290,36 @@ html:lang(zh-CN) .hero-title-surfaces {
     transform: translateY(-2px);
 }
 
-.surface-support {
-    padding: 0 0 clamp(88px, 9vw, 150px);
-}
-
-.surface-heading {
-    display: grid;
-    grid-template-columns: minmax(150px, 0.45fr) minmax(0, 1.55fr);
-    gap: 32px;
-    align-items: start;
-    padding: 30px 0 38px;
-    border-top: 1px solid rgba(255, 255, 255, 0.09);
-}
-
-.section-label {
-    margin: 5px 0 0;
-    color: var(--accent-strong);
-    font-size: 12px;
-    font-weight: 720;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
-.surface-heading h2 {
-    max-width: 18ch;
-    margin: 0;
-    font-size: clamp(30px, 3vw, 48px);
-    line-height: 1.12;
-    letter-spacing: -0.045em;
-    text-wrap: balance;
-}
-
-html:lang(zh-CN) .surface-heading h2 {
-    font-weight: 650;
-    line-height: 1.24;
-    letter-spacing: -0.035em;
-}
-
-.surface-grid {
+.surface-list {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
+    gap: 8px;
+    max-width: 460px;
+    margin-top: 24px;
 }
 
 .surface-card {
-    min-height: 168px;
-    padding: 24px;
+    min-width: 0;
+    min-height: 78px;
+    padding: 14px;
     background: rgba(255, 255, 255, 0.035);
     border: 1px solid var(--surface-border);
-    border-radius: 16px;
-    backdrop-filter: blur(18px);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
 }
 
-.surface-index {
-    color: var(--quiet);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.08em;
-}
-
-.surface-card h3 {
-    margin: 30px 0 0;
-    font-size: 20px;
+.surface-card h2 {
+    margin: 0;
+    font-size: 14px;
     font-weight: 680;
     letter-spacing: -0.025em;
 }
 
 .surface-card p {
-    margin: 8px 0 0;
+    margin: 6px 0 0;
     color: var(--muted);
-    font-size: 14px;
-    line-height: 1.6;
+    font-size: 12px;
+    line-height: 1.35;
 }
 
 .site-footer {
@@ -541,14 +500,6 @@ html:lang(zh-CN) .surface-heading h2 {
         font-size: clamp(40px, 8vw, 56px);
     }
 
-    .surface-heading {
-        grid-template-columns: 1fr;
-        gap: 16px;
-    }
-
-    .surface-heading h2 {
-        max-width: 22ch;
-    }
 }
 
 @media (max-width: 600px) {
@@ -573,12 +524,9 @@ html:lang(zh-CN) .surface-heading h2 {
         font-size: 36px;
     }
 
-    .surface-grid {
-        grid-template-columns: 1fr;
-    }
-
     .surface-card {
-        min-height: 138px;
+        min-height: 74px;
+        padding: 12px;
     }
 
     .site-footer {
