@@ -152,6 +152,19 @@ Common TUI options:
 
 ## Desktop operations
 
+### Conversation input history
+
+With the main conversation composer focused, `ArrowUp` at the start of the
+first line recalls the preceding submitted message. `ArrowDown` at the end of
+the last line moves forward and eventually restores the draft that was present
+before browsing. In a multi-line draft, arrows away from those boundaries keep
+their normal caret movement.
+
+History is scoped to the current session, contains only confirmed text user
+messages, and remains in memory only for the current application run. The
+composer keeps the most recent 100 entries and loads older session messages on
+demand while that window has capacity.
+
 | Action | macOS shortcut |
 | --- | --- |
 | Toggle the left sidebar | `⌘B` |
