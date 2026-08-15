@@ -45,6 +45,7 @@ import {
   type ComposerHistorySnapshot,
 } from './composer-input-history.ts'
 import {
+  hasOpenComposerMenu,
   historyDirectionForKey,
   isAtHistoryBoundary,
 } from './composer-history-keyboard.ts'
@@ -1782,6 +1783,8 @@ export function apply(ctx: ClientContext): void {
       if (!isComposerTextarea(textarea)) return
       const sessionId = sessions.list.getSnapshot().current
       if (sessionId === undefined) return
+      const card = textarea.closest('[data-composer-card]')
+      if (hasOpenComposerMenu(card)) return
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
         composerHistory.resetNavigation(sessionId)
         return

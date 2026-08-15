@@ -14,6 +14,10 @@ export interface ComposerHistoryKey {
   readonly shiftKey: boolean
 }
 
+export interface ComposerHistoryCard {
+  querySelector(selectors: string): unknown
+}
+
 /** Return a history direction only for unmodified, non-IME arrow keys. */
 export function historyDirectionForKey(event: ComposerHistoryKey): InputHistoryDirection | null {
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing) return null
@@ -30,4 +34,10 @@ export function isAtHistoryBoundary(
   const { selectionStart, selectionEnd, value } = input
   if (selectionStart === null || selectionEnd === null || selectionStart !== selectionEnd) return false
   return direction === 'older' ? selectionStart === 0 : selectionEnd === value.length
+}
+
+/** The conversation command menu owns arrow navigation while it is visible. */
+export function hasOpenComposerMenu(card: ComposerHistoryCard | null): boolean {
+  return card !== null
+    && card.querySelector('[aria-haspopup="listbox"][aria-expanded="true"]') !== null
 }
