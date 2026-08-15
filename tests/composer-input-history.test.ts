@@ -27,6 +27,26 @@ test('keeps histories isolated by session', () => {
   assert.equal(histories.forSession('two').navigate('older', '').value, 'two')
 })
 
+test('skips unchanged conversation node windows during assistant streaming', () => {
+  const histories = new ComposerInputHistory()
+  const nodes = [
+    { kind: 'user', seq: 1, content: [{ type: 'text', text: 'first' }] },
+  ]
+  assert.equal(histories.synchronize('session', { nodes }), true)
+  const streamingNodes = [
+    ...nodes,
+    { kind: 'assistant', seq: 2, content: [{ type: 'text', text: 'answer' }] },
+  ]
+  assert.equal(histories.synchronize('session', { nodes: streamingNodes }), false)
+
+  const updatedNodes = [
+    ...streamingNodes,
+    { kind: 'user', seq: 3, content: [{ type: 'text', text: 'second' }] },
+  ]
+  assert.equal(histories.synchronize('session', { nodes: updatedNodes }), true)
+  assert.equal(histories.forSession('session').navigate('older', '').value, 'second')
+})
+
 test('loads one older page at a time only while capacity remains', async () => {
   let resolveLoad: (() => void) | undefined
   let loads = 0

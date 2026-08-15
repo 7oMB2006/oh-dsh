@@ -47,6 +47,10 @@ export class InputHistory {
     }
   }
 
+  get size(): number {
+    return this.entries.length
+  }
+
   resetNavigation(): void {
     this.cursor = null
     this.draft = null
