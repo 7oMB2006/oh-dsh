@@ -4,12 +4,12 @@
         Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
         "PingFang SC", "Microsoft YaHei", sans-serif;
     font-synthesis: none;
-    --background: #080b12;
-    --surface-border: rgba(255, 255, 255, 0.11);
-    --text: #f6f7fb;
-    --muted: #a5acbb;
-    --quiet: #767e8f;
-    --accent-strong: #a9c4ff;
+    --background: #020a13;
+    --surface-border: rgba(151, 196, 255, 0.14);
+    --text: #edf5ff;
+    --muted: #a9bfd8;
+    --quiet: #718daa;
+    --accent-strong: #96bdff;
 }
 
 html:lang(zh-CN) {
@@ -28,28 +28,94 @@ html {
 }
 
 body {
+    position: relative;
+    isolation: isolate;
     min-height: 100vh;
     margin: 0;
     overflow-x: hidden;
     color: var(--text);
-    background:
-        radial-gradient(circle at 28% 46%, rgba(40, 87, 172, 0.17), transparent 32rem),
-        radial-gradient(circle at 81% 18%, rgba(64, 91, 151, 0.12), transparent 28rem),
-        linear-gradient(145deg, #090c13 0%, #0b0f18 48%, #070a10 100%);
+    background: linear-gradient(180deg, #061522 0%, var(--background) 100%);
 }
 
 body::before {
     position: fixed;
-    inset: 0;
-    z-index: -1;
+    inset: -34%;
+    z-index: 0;
     content: "";
     pointer-events: none;
-    opacity: 0.26;
+    opacity: 0.78;
+    background:
+        conic-gradient(
+            from 214deg at 46% 48%,
+            transparent 0 14%,
+            rgba(70, 125, 216, 0.12) 18%,
+            rgba(105, 164, 255, 0.4) 22%,
+            transparent 29% 53%,
+            rgba(69, 142, 215, 0.3) 59%,
+            rgba(137, 184, 255, 0.18) 63%,
+            transparent 70% 100%
+        ),
+        radial-gradient(
+            ellipse at 32% 38%,
+            rgba(75, 141, 229, 0.34),
+            transparent 33%
+        ),
+        radial-gradient(
+            ellipse at 72% 58%,
+            rgba(38, 111, 187, 0.3),
+            transparent 30%
+        );
+    filter: blur(58px) saturate(1.16);
+    animation: harness-current-drift 24s ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+body::after {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    content: "";
+    pointer-events: none;
+    opacity: 0.32;
     background-image:
-        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: linear-gradient(to bottom, black, transparent 82%);
+        linear-gradient(rgba(164, 201, 249, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(164, 201, 249, 0.07) 1px, transparent 1px);
+    background-position: center;
+    background-size: 68px 68px;
+    mask-image: radial-gradient(
+        ellipse 76% 72% at 49% 42%,
+        black 7%,
+        transparent 84%
+    );
+}
+
+.harness-particles {
+    position: fixed;
+    z-index: 2;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: 0.72;
+    mask-image: radial-gradient(
+        ellipse 78% 74% at 49% 43%,
+        black 5%,
+        transparent 86%
+    );
+}
+
+@keyframes harness-current-drift {
+    0% {
+        transform: translate3d(-4%, -3%, 0) rotate(-7deg) scale(1.02);
+    }
+
+    52% {
+        transform: translate3d(3%, 2%, 0) rotate(3deg) scale(1.1);
+    }
+
+    100% {
+        transform: translate3d(1%, 5%, 0) rotate(8deg) scale(1.05);
+    }
 }
 
 a {
@@ -69,6 +135,8 @@ a:focus-visible {
 }
 
 .page-shell {
+    position: relative;
+    z-index: 3;
     width: min(1760px, 100%);
     min-height: 100vh;
     margin: 0 auto;
@@ -80,7 +148,7 @@ a:focus-visible {
     align-items: center;
     justify-content: space-between;
     min-height: 96px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid rgba(151, 196, 255, 0.09);
 }
 
 .brand,
@@ -118,7 +186,7 @@ a:focus-visible {
     color: var(--text);
     font-size: 13px;
     font-weight: 650;
-    background: rgba(255, 255, 255, 0.055);
+    background: rgba(7, 24, 39, 0.7);
     border: 1px solid var(--surface-border);
     border-radius: 9px;
     transition:
@@ -127,8 +195,8 @@ a:focus-visible {
 }
 
 .github-star:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(16, 43, 64, 0.82);
+    border-color: rgba(151, 196, 255, 0.24);
 }
 
 .github-star svg {
@@ -156,7 +224,7 @@ a:focus-visible {
     font: inherit;
     font-weight: 650;
     cursor: pointer;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(7, 24, 39, 0.7);
     border: 1px solid var(--surface-border);
     border-radius: 999px;
     transition:
@@ -165,8 +233,8 @@ a:focus-visible {
 }
 
 .language-toggle:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(16, 43, 64, 0.82);
+    border-color: rgba(151, 196, 255, 0.24);
 }
 
 .hero {
@@ -192,7 +260,7 @@ a:focus-visible {
     z-index: -1;
     height: 18%;
     content: "";
-    background: #05070c;
+    background: #01070e;
     filter: blur(34px);
     opacity: 0.9;
 }
@@ -201,7 +269,7 @@ a:focus-visible {
     position: absolute;
     inset: 18% 14%;
     z-index: -2;
-    background: rgba(65, 116, 220, 0.38);
+    background: rgba(70, 137, 224, 0.42);
     filter: blur(90px);
     border-radius: 50%;
 }
@@ -317,7 +385,7 @@ html:lang(zh-CN) .hero-title-surfaces {
     min-width: 0;
     min-height: 78px;
     padding: 14px;
-    background: rgba(255, 255, 255, 0.035);
+    background: rgba(7, 24, 39, 0.62);
     border: 1px solid var(--surface-border);
     border-radius: 12px;
     backdrop-filter: blur(12px);
@@ -345,7 +413,7 @@ html:lang(zh-CN) .hero-title-surfaces {
     min-height: 72px;
     color: var(--quiet);
     font-size: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(151, 196, 255, 0.09);
 }
 
 .download-dialog {
@@ -354,15 +422,15 @@ html:lang(zh-CN) .hero-title-surfaces {
     overflow: visible;
     color: var(--text);
     background:
-        radial-gradient(circle at 90% 4%, rgba(84, 128, 220, 0.18), transparent 13rem),
-        #10141d;
-    border: 1px solid rgba(255, 255, 255, 0.14);
+        radial-gradient(circle at 90% 4%, rgba(84, 142, 226, 0.24), transparent 13rem),
+        #071827;
+    border: 1px solid rgba(151, 196, 255, 0.18);
     border-radius: 22px;
     box-shadow: 0 36px 100px rgba(0, 0, 0, 0.65);
 }
 
 .download-dialog::backdrop {
-    background: rgba(3, 5, 9, 0.72);
+    background: rgba(1, 6, 12, 0.76);
     backdrop-filter: blur(9px);
 }
 
@@ -558,5 +626,14 @@ html:lang(zh-CN) .hero-title-surfaces {
     *::after {
         scroll-behavior: auto !important;
         transition-duration: 0.01ms !important;
+    }
+
+    body::before {
+        animation: none;
+        transform: rotate(-2deg) scale(1.05);
+    }
+
+    .harness-particles {
+        opacity: 0.44;
     }
 }
