@@ -17,6 +17,7 @@ class FakeUpdater extends EventEmitter {
   result: { isUpdateAvailable: boolean; updateInfo: UpdateInfo } | null = null
   downloadResult = ['/tmp/Oh-DSH-Desktop-update.zip']
   quitCalls = 0
+  installError: Error | undefined
   async checkForUpdates() {
     this.emit('checking-for-update')
     if (this.result?.isUpdateAvailable) this.emit('update-available', this.result.updateInfo)
@@ -28,7 +29,10 @@ class FakeUpdater extends EventEmitter {
     this.emit('update-downloaded', { downloadedFile: this.downloadResult[0], version: this.result?.updateInfo.version })
     return this.downloadResult
   }
-  quitAndInstall() { this.quitCalls += 1 }
+  quitAndInstall() {
+    this.quitCalls += 1
+    if (this.installError !== undefined) this.emit('error', this.installError)
+  }
 }
 
 function updateInfo(version: string, file = 'Oh-DSH-Desktop-1.2.0-arm64.zip'): UpdateInfo {
@@ -131,6 +135,18 @@ test('manager clears install-on-quit request before attempting immediate install
   assert.equal(manager.shouldInstallOnQuit(), true)
   assert.equal((await manager.command({ type: 'install-now' })).status, 'scheduled')
   assert.equal(manager.shouldInstallOnQuit(), false)
+})
+
+test('manager preserves a synchronous updater install error for recovery', async () => {
+  const updater = new FakeUpdater()
+  updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  updater.installError = Object.assign(new Error('installer missing'), { code: 'UPDATE_INSTALLER_MISSING' })
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  await manager.check()
+  await manager.download()
+  const state = await manager.command({ type: 'install-now' })
+  assert.equal(state.status, 'error')
+  if (state.status === 'error') assert.equal(state.code, 'UPDATE_INSTALLER_MISSING')
 })
 
 test('manager exposes actionable retryable errors', async () => {

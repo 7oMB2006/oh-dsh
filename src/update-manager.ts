@@ -331,6 +331,7 @@ export class DesktopUpdateManager {
         return this.publishScheduled()
       }
       this.updater?.quitAndInstall(false, true)
+      if (this.state.status === 'error') return this.state
       return this.publishScheduled()
     } catch (error) {
       return this.fail(error, 'install')
