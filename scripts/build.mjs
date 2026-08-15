@@ -42,6 +42,24 @@ const builds = [
   }),
   build({
     ...shared,
+    entryPoints: [join(root, 'src', 'update-preload.ts')],
+    outfile: join(dist, 'update-preload.cjs'),
+    platform: 'node',
+    format: 'cjs',
+    external: ['electron'],
+  }),
+  build({
+    bundle: true,
+    entryPoints: [join(root, 'src', 'update-dialog.ts')],
+    outfile: join(dist, 'update-dialog.js'),
+    platform: 'browser',
+    format: 'iife',
+    target: 'es2022',
+    sourcemap: true,
+    logLevel: 'info',
+  }),
+  build({
+    ...shared,
     entryPoints: [join(root, 'src', 'preload.ts')],
     outfile: join(dist, 'preload.cjs'),
     platform: 'node',
@@ -155,6 +173,7 @@ for (const plugin of pluginPackages) {
 await Promise.all(builds)
 
 copyFileSync(join(root, 'src', 'splash.html'), join(dist, 'splash.html'))
+copyFileSync(join(root, 'src', 'update.html'), join(dist, 'update.html'))
 copyFileSync(join(root, 'cordis.patch.yml'), join(dist, 'cordis.patch.yml'))
 const releaseManifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 releaseManifest.version = productVersion

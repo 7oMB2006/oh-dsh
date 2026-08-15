@@ -64,7 +64,7 @@ function run(command, args, options = {}) {
   }
 }
 
-/** Create a portable link: POSIX symlinks, junctions on Windows, copies for files. */
+/** Create a portable link: POSIX symlinks, copied trees on Windows, copies for files. */
 function portableSymlink(target, link) {
   rmSync(link, { recursive: true, force: true })
   if (process.platform !== 'win32') {
@@ -76,9 +76,15 @@ function portableSymlink(target, link) {
     copyFileSync(resolved, link)
     return
   }
-  // Junction targets must be absolute; materializeExternalLinks already
-  // dereferenced the store-backed entries into the staged runtime.
-  symlinkSync(resolved, link, 'junction')
+  // Do not emit Windows junctions. The staged runtime is later consumed by
+  // electron-builder, whose archive walk follows junctions and can re-enter
+  // pnpm workspace cycles. Materializing the already-resolved target keeps the
+  // installer tree self-contained and finite.
+  cpSync(resolved, link, {
+    recursive: true,
+    dereference: true,
+    preserveTimestamps: true,
+  })
 }
 
 function download(url, target) {
