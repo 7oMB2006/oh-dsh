@@ -70,58 +70,19 @@
                     </div>
 
                     <div class="hero-copy">
-                        <p class="eyebrow" data-i18n="eyebrow">
-                            DeepSeek Harness 的多端工作台
-                        </p>
                         <h1 id="hero-title" data-i18n="title">
                             让 Harness 成为你的桌面工作流
                         </h1>
-                        <p class="hero-description" data-i18n="description">
-                            一个可安装、可扩展的工作台，把 Chat、终端、文件、
-                            代码审查和插件放进同一个界面。
-                        </p>
-
                         <div class="hero-actions">
                             <a
                                 class="download-button"
                                 href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
-                                data-i18n="download"
+                                data-download-trigger
+                                data-i18n="downloadLatest"
                             >
                                 下载最新版
                             </a>
-                            <a
-                                class="source-link"
-                                href="https://github.com/hust-open-atom-club/oh-dsh"
-                            >
-                                <span data-i18n="source">查看源代码</span>
-                                <span aria-hidden="true">↗</span>
-                            </a>
                         </div>
-
-                        <p class="platform-note" data-i18n="platforms">
-                            支持 macOS、Windows 与 Linux
-                        </p>
-
-                        <ul class="capability-list" aria-label="Core capabilities">
-                            <li>
-                                <span data-i18n="capabilityOne">统一工作区</span>
-                                <small data-i18n="capabilityOneDetail">
-                                    Chat、终端、文件与审查
-                                </small>
-                            </li>
-                            <li>
-                                <span data-i18n="capabilityTwo">插件优先</span>
-                                <small data-i18n="capabilityTwoDetail">
-                                    可预览、安装与回滚
-                                </small>
-                            </li>
-                            <li>
-                                <span data-i18n="capabilityThree">配置共享</span>
-                                <small data-i18n="capabilityThreeDetail">
-                                    Desktop、Web 与 TUI
-                                </small>
-                            </li>
-                        </ul>
                     </div>
                 </section>
             </main>
@@ -131,5 +92,58 @@
                 <span data-i18n="footer">开放、可组合的 DeepSeek Harness 工作台</span>
             </footer>
         </div>
+
+        <dialog
+            class="download-dialog"
+            aria-labelledby="download-dialog-title"
+            aria-describedby="download-dialog-description"
+            data-download-dialog
+        >
+            <button
+                class="dialog-close"
+                type="button"
+                aria-label="关闭 / Close"
+                data-dialog-close
+            >
+                ×
+            </button>
+            <p class="dialog-kicker" data-i18n="downloadReady">准备下载</p>
+            <h2 id="download-dialog-title" data-i18n="downloadTitle">
+                下载前，顺手点亮一颗 Star？
+            </h2>
+            <p
+                id="download-dialog-description"
+                class="dialog-description"
+                data-i18n="downloadDescription"
+            >
+                Oh-DSH 完全开源。你的 Star 会帮助更多开发者发现它，随后我们会继续下载。
+            </p>
+            <p class="detected-platform">
+                <span data-i18n="detectedPlatform">已识别当前平台</span>
+                <strong data-platform-label>当前设备</strong>
+            </p>
+            <div class="dialog-actions">
+                <a
+                    class="dialog-primary"
+                    href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
+                    data-star-download
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            d="m12 2.8 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"
+                        ></path>
+                    </svg>
+                    <span data-i18n="starAndDownload">去 GitHub Star，并继续下载</span>
+                </a>
+                <a
+                    class="dialog-secondary"
+                    href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"
+                    data-direct-download
+                    data-i18n="directDownload"
+                >
+                    直接下载
+                </a>
+            </div>
+        </dialog>
     </body>
 </html>

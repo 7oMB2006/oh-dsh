@@ -5,12 +5,10 @@
         "PingFang SC", "Microsoft YaHei", sans-serif;
     font-synthesis: none;
     --background: #080b12;
-    --surface: rgba(17, 21, 31, 0.72);
     --surface-border: rgba(255, 255, 255, 0.11);
     --text: #f6f7fb;
     --muted: #a5acbb;
     --quiet: #767e8f;
-    --accent: #7ea7ff;
     --accent-strong: #a9c4ff;
 }
 
@@ -167,7 +165,7 @@ a:focus-visible {
 
 .hero {
     display: grid;
-    grid-template-columns: minmax(0, 1.65fr) minmax(340px, 0.8fr);
+    grid-template-columns: minmax(0, 1.75fr) minmax(320px, 0.65fr);
     gap: clamp(44px, 5vw, 96px);
     align-items: start;
     min-height: calc(100vh - 154px);
@@ -177,7 +175,6 @@ a:focus-visible {
 .product-visual {
     position: relative;
     min-width: 0;
-    margin-top: 39px;
     isolation: isolate;
 }
 
@@ -216,16 +213,7 @@ a:focus-visible {
 }
 
 .hero-copy {
-    max-width: 520px;
-}
-
-.eyebrow {
-    margin: 0 0 20px;
-    color: var(--accent-strong);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    max-width: 460px;
 }
 
 h1 {
@@ -237,25 +225,16 @@ h1 {
     text-wrap: balance;
 }
 
-.hero-description {
-    max-width: 38rem;
-    margin: 30px 0 0;
-    color: var(--muted);
-    font-size: clamp(17px, 1.25vw, 21px);
-    line-height: 1.72;
-}
-
 .hero-actions {
     display: flex;
-    align-items: center;
-    gap: 22px;
-    margin-top: 38px;
+    margin-top: 34px;
 }
 
 .download-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    min-width: 220px;
     min-height: 54px;
     padding: 0 28px;
     color: #0a0d14;
@@ -277,61 +256,6 @@ h1 {
     transform: translateY(-2px);
 }
 
-.source-link {
-    display: inline-flex;
-    gap: 8px;
-    align-items: center;
-    color: var(--muted);
-    font-size: 15px;
-    font-weight: 620;
-    transition: color 160ms ease;
-}
-
-.source-link:hover {
-    color: var(--text);
-}
-
-.platform-note {
-    margin: 16px 0 0;
-    color: var(--quiet);
-    font-size: 13px;
-}
-
-.capability-list {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    margin: 42px 0 0;
-    padding: 0;
-    list-style: none;
-}
-
-.capability-list li {
-    min-height: 108px;
-    padding: 18px;
-    background: var(--surface);
-    border: 1px solid var(--surface-border);
-    border-radius: 16px;
-    backdrop-filter: blur(18px);
-}
-
-.capability-list span,
-.capability-list small {
-    display: block;
-}
-
-.capability-list span {
-    font-size: 14px;
-    font-weight: 680;
-}
-
-.capability-list small {
-    margin-top: 8px;
-    color: var(--quiet);
-    font-size: 12px;
-    line-height: 1.5;
-}
-
 .site-footer {
     display: flex;
     gap: 12px;
@@ -343,18 +267,140 @@ h1 {
     border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.download-dialog {
+    width: min(470px, calc(100% - 32px));
+    padding: 36px;
+    overflow: visible;
+    color: var(--text);
+    background:
+        radial-gradient(circle at 90% 4%, rgba(84, 128, 220, 0.18), transparent 13rem),
+        #10141d;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 22px;
+    box-shadow: 0 36px 100px rgba(0, 0, 0, 0.65);
+}
+
+.download-dialog::backdrop {
+    background: rgba(3, 5, 9, 0.72);
+    backdrop-filter: blur(9px);
+}
+
+.dialog-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    color: var(--muted);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+}
+
+.dialog-close:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.dialog-kicker {
+    margin: 0 0 14px;
+    color: var(--accent-strong);
+    font-size: 12px;
+    font-weight: 720;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.download-dialog h2 {
+    max-width: 14ch;
+    margin: 0;
+    font-size: 30px;
+    line-height: 1.18;
+    letter-spacing: -0.035em;
+}
+
+.dialog-description {
+    margin: 18px 0 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.68;
+}
+
+.detected-platform {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 22px 0 0;
+    padding: 12px 14px;
+    color: var(--quiet);
+    font-size: 13px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid var(--surface-border);
+    border-radius: 11px;
+}
+
+.detected-platform strong {
+    color: var(--text);
+    font-weight: 680;
+}
+
+.dialog-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.dialog-primary,
+.dialog-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 12px;
+}
+
+.dialog-primary {
+    gap: 9px;
+    color: #0a0d14;
+    background: #f5f7fb;
+}
+
+.dialog-primary:hover {
+    background: #ffffff;
+}
+
+.dialog-primary svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
+.dialog-secondary {
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--surface-border);
+}
+
+.dialog-secondary:hover {
+    color: var(--text);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
 @media (max-width: 1120px) {
     .hero {
         grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
         gap: 42px;
-    }
-
-    .capability-list {
-        grid-template-columns: 1fr;
-    }
-
-    .capability-list li {
-        min-height: auto;
     }
 }
 
@@ -381,16 +427,11 @@ h1 {
 
     .product-visual {
         grid-row: 2;
-        margin-top: 0;
     }
 
     h1 {
         max-width: 11ch;
         font-size: clamp(46px, 12vw, 68px);
-    }
-
-    .capability-list {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -403,23 +444,12 @@ h1 {
         display: none;
     }
 
-    .hero-actions {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
     .download-button {
         width: 100%;
     }
 
-    .source-link {
-        justify-content: center;
-        min-height: 40px;
-    }
-
-    .capability-list {
-        grid-template-columns: 1fr;
-        margin-top: 32px;
+    .download-dialog {
+        padding: 30px 22px 22px;
     }
 
     .site-footer {
