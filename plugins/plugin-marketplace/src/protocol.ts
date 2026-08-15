@@ -158,7 +158,7 @@ export interface MarketplaceSnapshot {
 }
 
 export type MarketplaceCommand =
-  | { type: 'refresh' }
+  | { type: 'refresh'; force?: boolean }
   | { type: 'inspect'; action: MarketplaceAction; pluginId: string }
   | { type: 'prepare'; action: MarketplaceAction; pluginId: string }
   | {
@@ -185,8 +185,15 @@ export function parseMarketplaceCommand(value: unknown): MarketplaceCommand {
   if (!isRecord(value) || typeof value.type !== 'string') {
     throw new Error('marketplace command must be an object with a type')
   }
-  if (value.type === 'refresh' || value.type === 'discard'
-    || value.type === 'apply' || value.type === 'undo') {
+  if (value.type === 'refresh') {
+    if (value.force !== undefined && typeof value.force !== 'boolean') {
+      throw new Error('invalid marketplace refresh command')
+    }
+    return value.force === undefined
+      ? { type: 'refresh' }
+      : { type: 'refresh', force: value.force }
+  }
+  if (value.type === 'discard' || value.type === 'apply' || value.type === 'undo') {
     return { type: value.type }
   }
   if (value.type === 'inspect' || value.type === 'prepare') {

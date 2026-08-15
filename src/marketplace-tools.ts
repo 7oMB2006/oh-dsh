@@ -226,7 +226,9 @@ export function mountMarketplaceAgentTools(
       refresh: { type: 'boolean', description: 'Refresh the GitHub catalog before searching.' },
     },
     async execute(args) {
-      const info = await snapshot(credentials, args.refresh === true ? { type: 'refresh' } : undefined)
+      const info = await snapshot(credentials, args.refresh === true
+        ? { type: 'refresh', force: true }
+        : undefined)
       const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : ''
       const status = typeof args.status === 'string' ? args.status : 'all'
       const category = typeof args.category === 'string' ? args.category : null

@@ -795,7 +795,7 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
                   {t('undo-last-apply')}
                 </button>
               )}
-              <button className="oh-marketplace-button" disabled={pending} onClick={() => { void run({ type: 'refresh' }) }} type="button">
+              <button className="oh-marketplace-button" disabled={pending} onClick={() => { void run({ type: 'refresh', force: true }) }} type="button">
                 {pending ? t('working') : t('refresh')}
               </button>
               <button
@@ -823,7 +823,7 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
               <button
                 className="oh-marketplace-button"
                 disabled={pending}
-                onClick={() => { resetView(); void run({ type: 'refresh' }) }}
+                onClick={() => { resetView(); void run({ type: 'refresh', force: true }) }}
                 type="button"
               >
                 {t('reset-and-reload')}
