@@ -1,14 +1,14 @@
 """Register Oh-DSH plugin packages into dsh-runtime/node_modules.
 
-Mirrors installDesktopPackages() from scripts/stage-dsh.mjs: each plugin
-manifest is copied into node_modules/<name>/package.json with build/scripts/
-devDependencies stripped, and the compiled dist files are placed beside it.
-Runtime dependencies are resolved via a symlink to dsh-runtime/node_modules.
+Mirrors installDesktopPackages() from scripts/stage-dsh.mjs: selected plugin
+manifests are copied into node_modules/<name>/package.json with build/scripts/
+devDependencies stripped, and compiled files are placed beside them.
 
-Usage: register-plugins.py <bundleRoot> <distRoot> <dshRuntimeRoot>
-  bundleRoot     — oh-dsh bundle output (contains manifests/)
+Usage: register-plugins.py <bundleRoot> <distRoot> <dshRuntimeRoot> <surface>
+  bundleRoot     — oh-dsh bundle output (contains manifests/ and tui-renderer/)
   distRoot       — final package dist root ($out/lib/oh-dsh/dist)
   dshRuntimeRoot — $out/dsh-runtime
+  surface        — full, web, or tui
 """
 
 import json
@@ -17,15 +17,16 @@ import shutil
 import sys
 
 def main():
-    bundle_root, dist_root, dsh_runtime = sys.argv[1], sys.argv[2], sys.argv[3]
+    bundle_root, dist_root, dsh_runtime, surface = sys.argv[1:5]
     manifests_dir = os.path.join(bundle_root, "manifests")
     node_modules = os.path.join(dsh_runtime, "node_modules")
 
-    # manifest file key -> subdirectory under distRoot that holds the
-    # compiled output. None means the root package (dist/ itself).
+    # manifest key -> compiled output under distRoot. The desktop root is the
+    # only package whose files live directly under distRoot.
     plugin_dirs = {
-        "desktop": None,
+        "desktop": "",
         "web": "web",
+        "tui": os.path.join("plugins", "tui"),
         "skins": os.path.join("plugins", "skins"),
         "sidebar": os.path.join("plugins", "sidebar"),
         "panel-controls": os.path.join("plugins", "panel-controls"),
@@ -33,9 +34,19 @@ def main():
         "plugin-marketplace": os.path.join("plugins", "plugin-marketplace"),
         "better-sidebar-runtime": os.path.join("plugins", "better-sidebar-runtime"),
     }
+    selected = {
+        "full": set(plugin_dirs) | {"tui-renderer"},
+        "web": {"web", "skins", "sidebar", "panel-controls", "pinned-summary", "better-sidebar-runtime"},
+        "tui": {"tui", "tui-renderer", "skins"},
+    }.get(surface)
+    if selected is None:
+        raise ValueError(f"unknown Oh-DSH surface: {surface}")
+    installed_versions = {}
 
     for manifest_file in sorted(os.listdir(manifests_dir)):
         plugin_key = manifest_file.removesuffix(".json")
+        if plugin_key not in selected:
+            continue
         with open(os.path.join(manifests_dir, manifest_file)) as f:
             manifest = json.load(f)
 
@@ -43,10 +54,6 @@ def main():
             manifest.pop(key, None)
 
         name = manifest.get("name")
-        if not name:
-            print(f"skipping {manifest_file}: no name", file=sys.stderr)
-            continue
-
         package_dir = os.path.join(node_modules, *name.split("/"))
         os.makedirs(package_dir, exist_ok=True)
 
@@ -54,33 +61,52 @@ def main():
             json.dump(manifest, f, indent=2)
             f.write("\n")
 
-        # Symlink the plugin's dependency resolution to the shared
-        # dsh-runtime node_modules (satisfies require() for runtime deps).
         deps_link = os.path.join(package_dir, "node_modules")
-        if not os.path.exists(deps_link):
+        if plugin_key == "tui-renderer":
+            # The renderer requires React 19 while the Web runtime carries
+            # React 18. Keep its direct dependency graph package-local.
+            os.makedirs(deps_link, exist_ok=True)
+            dependency_names = set(manifest.get("dependencies", {}))
+            dependency_names.update(manifest.get("peerDependencies", {}))
+            extra_deps = os.path.join(bundle_root, "extra-deps")
+            for dependency in sorted(dependency_names):
+                extra = os.path.join(extra_deps, *dependency.split("/"))
+                shared = os.path.join(node_modules, *dependency.split("/"))
+                target = extra if os.path.isdir(extra) else shared
+                if not os.path.isdir(target):
+                    raise FileNotFoundError(f"missing TUI runtime dependency: {dependency}")
+                link = os.path.join(deps_link, *dependency.split("/"))
+                os.makedirs(os.path.dirname(link), exist_ok=True)
+                os.symlink(target, link)
+        else:
+            # Other bundled plugins use the DSH runtime's dependency graph.
             os.symlink(node_modules, deps_link)
 
-        # Copy the compiled dist files.
-        dist_subdir = plugin_dirs.get(plugin_key)
-        if dist_subdir is None:
-            # Root package (@oh-dsh/desktop): dist/plugin.js, dist/client.js,
-            # cordis.patch.yml live directly under distRoot.
+        # Copy the compiled package files.
+        if plugin_key == "tui-renderer":
+            src_base = os.path.join(bundle_root, "tui-renderer")
+            for fname in os.listdir(src_base):
+                src = os.path.join(src_base, fname)
+                dst = os.path.join(package_dir, fname)
+                if os.path.isdir(src):
+                    shutil.copytree(src, dst)
+                else:
+                    shutil.copy2(src, dst)
+        else:
+            dist_subdir = plugin_dirs[plugin_key]
+            src_base = os.path.join(dist_root, dist_subdir)
             dst_dir = os.path.join(package_dir, "dist")
             os.makedirs(dst_dir, exist_ok=True)
-            for fname in ("plugin.js", "client.js", "client.js.map", "cordis.patch.yml"):
-                src = os.path.join(dist_root, fname)
+            if plugin_key == "desktop":
+                filenames = ("plugin.js", "client.js", "client.js.map", "cordis.patch.yml")
+            else:
+                filenames = os.listdir(src_base)
+            for fname in filenames:
+                src = os.path.join(src_base, fname)
                 if os.path.exists(src):
                     shutil.copy2(src, os.path.join(dst_dir, fname))
-        else:
-            src_base = os.path.join(dist_root, dist_subdir)
-            if not os.path.isdir(src_base):
-                print(f"warning: no dist dir for {name}: {src_base}", file=sys.stderr)
-                continue
-            dst_dir = os.path.join(package_dir, "dist")
-            os.makedirs(dst_dir, exist_ok=True)
-            for fname in os.listdir(src_base):
-                shutil.copy2(os.path.join(src_base, fname), os.path.join(dst_dir, fname))
 
+        installed_versions[name] = manifest["version"]
         print(f"registered {name}")
 
     # Merge registered oh-dsh package names into the dsh runtime's
@@ -90,11 +116,7 @@ def main():
     with open(cli_manifest_path) as f:
         cli_manifest = json.load(f)
     deps = cli_manifest.setdefault("dependencies", {})
-    for manifest_file in sorted(os.listdir(manifests_dir)):
-        with open(os.path.join(manifests_dir, manifest_file)) as f:
-            m = json.load(f)
-        if m.get("name") and m.get("version"):
-            deps[m["name"]] = m["version"]
+    deps.update(installed_versions)
     with open(cli_manifest_path, "w") as f:
         json.dump(cli_manifest, f, indent=2)
         f.write("\n")

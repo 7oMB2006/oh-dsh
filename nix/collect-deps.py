@@ -1,10 +1,9 @@
-"""Collect the transitive npm dependency closure of a package from a pnpm
-virtual store, dereferencing symlinks.
+"""Collect a package's transitive npm dependency closure from a pnpm store.
+
+Each copied package receives a node_modules symlink to the flat closure root,
+so nested ESM imports resolve exactly as they do in the pnpm workspace.
 
 Usage: collect-deps.py <pnpmStoreDir> <packageJsonPath> <outDir>
-  pnpmStoreDir    — node_modules/.pnpm
-  packageJsonPath — the plugin's package.json (its `dependencies` are seeds)
-  outDir          — flat output directory, one subdirectory per package
 """
 
 import json
@@ -31,7 +30,11 @@ def main():
 
     os.makedirs(out_dir, exist_ok=True)
     visited = set()
-    queue = list(manifest.get("dependencies", {}).keys())
+    queue = list({
+        *manifest.get("dependencies", {}),
+        *manifest.get("optionalDependencies", {}),
+        *manifest.get("peerDependencies", {}),
+    })
 
     while queue:
         dep = queue.pop()
@@ -48,14 +51,28 @@ def main():
             shutil.rmtree(dst)
         shutil.copytree(src, dst, symlinks=False)
 
-        # Enqueue transitive deps.
+        # Recreate dependency lookup against the flat collected closure.
+        # Relative links keep the bundle relocatable into the final runtime.
+        package_node_modules = os.path.join(dst, "node_modules")
+        if os.path.lexists(package_node_modules):
+            if os.path.isdir(package_node_modules) and not os.path.islink(package_node_modules):
+                shutil.rmtree(package_node_modules)
+            else:
+                os.unlink(package_node_modules)
+        os.symlink(os.path.relpath(out_dir, dst), package_node_modules)
+
+        # Enqueue every dependency class that can participate in runtime ESM
+        # resolution. Missing optional peers are intentionally ignored above.
         dep_manifest_path = os.path.join(dst, "package.json")
         if os.path.exists(dep_manifest_path):
             with open(dep_manifest_path) as f:
                 dep_manifest = json.load(f)
-            for transitive in dep_manifest.get("dependencies", {}):
-                if transitive not in visited:
-                    queue.append(transitive)
+            transitives = {
+                *dep_manifest.get("dependencies", {}),
+                *dep_manifest.get("optionalDependencies", {}),
+                *dep_manifest.get("peerDependencies", {}),
+            }
+            queue.extend(transitives - visited)
 
         print(f"collected {dep}")
 
