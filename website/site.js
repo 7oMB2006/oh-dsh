@@ -67,9 +67,116 @@ const elements = {
     downloadTrigger: document.querySelector("[data-download-trigger]"),
     languageToggle: document.querySelector("[data-language-toggle]"),
     platformLabel: document.querySelector("[data-platform-label]"),
+    particles: document.querySelector("[data-harness-particles]"),
     starCount: document.querySelector("[data-star-count]"),
     starDownload: document.querySelector("[data-star-download]"),
 };
+
+function installHarnessParticles(canvas) {
+    const context = canvas?.getContext("2d", { alpha: true });
+    if (!context) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const pointer = { active: false, x: 0, y: 0 };
+    let frame;
+    let height = 0;
+    let particles = [];
+    let width = 0;
+
+    function randomFactory() {
+        let state = 0x4f484453;
+        return () => {
+            state = Math.imul(state ^ (state >>> 15), 1 | state);
+            state ^= state + Math.imul(state ^ (state >>> 7), 61 | state);
+            return ((state ^ (state >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    function resize() {
+        const scale = Math.min(window.devicePixelRatio || 1, 2);
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        context.setTransform(scale, 0, 0, scale, 0, 0);
+
+        const random = randomFactory();
+        const count = Math.max(120, Math.min(620, Math.floor((width * height) / 3200)));
+        particles = Array.from({ length: count }, () => ({
+            x: random() * width,
+            y: random() * height,
+            phase: random() * Math.PI * 2,
+            radius: 0.45 + random() * 0.75,
+            opacity: 0.14 + random() * 0.38,
+        }));
+        if (reducedMotion.matches) draw(performance.now());
+    }
+
+    function draw(time) {
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#a6cdff";
+
+        for (const particle of particles) {
+            let offsetX = Math.sin(time * 0.00022 + particle.phase) * 1.3;
+            let offsetY = Math.cos(time * 0.00018 + particle.phase) * 1.1;
+            let strength = 0;
+
+            if (pointer.active && !reducedMotion.matches) {
+                const deltaX = particle.x - pointer.x;
+                const deltaY = particle.y - pointer.y;
+                const distance = Math.hypot(deltaX, deltaY);
+                if (distance < 190 && distance > 0) {
+                    strength = (1 - distance / 190) ** 2;
+                    offsetX += (deltaX / distance) * strength * 22;
+                    offsetY += (deltaY / distance) * strength * 22;
+                }
+            }
+
+            context.globalAlpha = Math.min(0.9, particle.opacity + strength * 0.55);
+            context.beginPath();
+            context.arc(
+                particle.x + offsetX,
+                particle.y + offsetY,
+                particle.radius + strength * 0.75,
+                0,
+                Math.PI * 2,
+            );
+            context.fill();
+        }
+        context.globalAlpha = 1;
+    }
+
+    function animate(time) {
+        draw(time);
+        frame = reducedMotion.matches || document.hidden
+            ? undefined
+            : requestAnimationFrame(animate);
+    }
+
+    function restart() {
+        if (frame !== undefined) cancelAnimationFrame(frame);
+        frame = undefined;
+        draw(performance.now());
+        if (!reducedMotion.matches && !document.hidden) {
+            frame = requestAnimationFrame(animate);
+        }
+    }
+
+    window.addEventListener("resize", resize, { passive: true });
+    window.addEventListener("pointermove", (event) => {
+        if (event.pointerType === "touch") return;
+        pointer.active = true;
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+    }, { passive: true });
+    document.documentElement.addEventListener("pointerleave", () => {
+        pointer.active = false;
+    });
+    document.addEventListener("visibilitychange", restart);
+    reducedMotion.addEventListener("change", restart);
+    resize();
+    restart();
+}
 
 const storageKey = "oh-dsh-site-language";
 const platform = detectPlatform(navigator);
@@ -265,3 +372,4 @@ if (typeof fetch === "function") {
 }
 
 applyLanguage(preferredLanguage());
+installHarnessParticles(elements.particles);
