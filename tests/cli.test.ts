@@ -103,6 +103,28 @@ test('desktop launch keeps source and installed macOS paths distinct', () => {
   })
 })
 
+test('macOS installed launches inherit the shared Oh-DSH state root', () => {
+  assert.deepEqual(desktopLaunchSpec([], {
+    OH_DSH_HOME: '/data/oh-dsh',
+  }, 'darwin'), {
+    args: ['--env', 'OH_DSH_HOME=/data/oh-dsh', '-a', 'Oh-DSH Desktop'],
+    command: '/usr/bin/open',
+  })
+  assert.deepEqual(desktopLaunchSpec(['--inspect'], {
+    OH_DSH_DESKTOP_APP: '/Applications/Oh-DSH Desktop.app',
+    OH_DSH_HOME: '/data/oh-dsh',
+  }, 'darwin'), {
+    args: [
+      '--env',
+      'OH_DSH_HOME=/data/oh-dsh',
+      '/Applications/Oh-DSH Desktop.app',
+      '--args',
+      '--inspect',
+    ],
+    command: '/usr/bin/open',
+  })
+})
+
 test('desktop launch resolves paths with target platform semantics', () => {
   assert.deepEqual(desktopLaunchSpec(['--inspect'], {
     OH_DSH_DESKTOP_APP: 'C:\\Tools\\Oh-DSH Desktop.exe',
