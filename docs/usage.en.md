@@ -226,6 +226,13 @@ credentials, skins, and plugin caches. Electron-specific data lives under
 Web or TUI process with `--data`. Configure the DeepSeek API key in Models
 settings or in `~/.ohdsh/.env`.
 
+On first use of the shared root, Desktop imports sessions, credentials, plugins,
+and UI preferences from the old system `Oh-DSH-Desktop` application-data
+directory. Web imports the former `~/.oh-dsh-web/dsh` root and a nested `dsh/`
+inside the selected data directory. Migration copies only missing runtime data
+and leaves legacy directories in place for rollback; existing shared state is
+not replaced.
+
 Troubleshooting order:
 
 1. Run `ohdsh --help` to confirm the CLI source.

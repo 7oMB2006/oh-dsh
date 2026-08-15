@@ -211,6 +211,11 @@ Desktop、Web 和 TUI 默认共同使用 `~/.ohdsh`，且不会加载 `~/.dsh` �
 `--data` 临时隔离。DeepSeek API key 可以在 Models 设置中配置，或写入
 `~/.ohdsh/.env`。
 
+首次使用共享目录时，Desktop 会从系统应用数据目录中的旧
+`Oh-DSH-Desktop` 状态导入会话、凭据、插件与界面设置；Web 会导入旧
+`~/.oh-dsh-web/dsh` 和当前数据目录下的 `dsh/`。迁移只复制共享目录中
+缺失的运行时数据，并保留旧目录用于回滚；已存在的新状态不会被覆盖。
+
 排查顺序：
 
 1. 运行 `ohdsh --help` 确认 CLI 来源。

@@ -6,6 +6,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   DEFAULT_OH_DSH_HOME_DIRECTORY,
+  hasOhDshHomeOverride,
+  legacyWebDataRoot,
+  migrateLegacyWebState,
   resolveOhDshHome,
 } from './data-root.ts'
 import { UsageError } from './errors.ts'
@@ -181,11 +184,12 @@ export async function main(
   runtimeFactory: (options: DshRuntimeOptions) => DshRuntimeSupervisor = options =>
     new DshRuntimeSupervisor(options),
 ): Promise<number> {
+  const defaultDataRoot = resolveOhDshHome(env)
   const options = parseLaunchArgs(
     argv,
     env,
     stdout.isTTY === true,
-    resolveOhDshHome(env),
+    defaultDataRoot,
   )
   if (options.help) {
     stdout.write(USAGE)
@@ -227,6 +231,12 @@ export async function main(
   }
 
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
+  migrateLegacyWebState({
+    dataRoot,
+    ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
+      ? { legacyDefaultDataRoot: legacyWebDataRoot() }
+      : {}),
+  })
   ensureWebProfile(dataRoot)
 
   const logTail: string[] = []
