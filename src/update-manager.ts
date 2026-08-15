@@ -159,6 +159,7 @@ export class DesktopUpdateManager {
   private token: CancellationToken | undefined
   private operation: Operation = 'check'
   private lastCheck: Promise<DesktopUpdateState> | undefined
+  private installOnQuitRequested = false
   private readonly listeners = new Set<(state: DesktopUpdateState) => void>()
   private readonly eventListeners: Array<[string, (...args: any[]) => void]> = []
 
@@ -183,6 +184,8 @@ export class DesktopUpdateManager {
   }
 
   getState(): DesktopUpdateState { return this.state }
+
+  shouldInstallOnQuit(): boolean { return this.installOnQuitRequested }
 
   subscribe(listener: (state: DesktopUpdateState) => void): () => void {
     this.listeners.add(listener)
@@ -317,8 +320,10 @@ export class DesktopUpdateManager {
   }
 
   async installNow(): Promise<DesktopUpdateState> {
-    if (this.metadata === undefined || this.state.status !== 'downloaded') return this.state
+    const scheduledInstall = this.state.status === 'scheduled' && this.installOnQuitRequested
+    if (this.metadata === undefined || (this.state.status !== 'downloaded' && !scheduledInstall)) return this.state
     this.operation = 'install'
+    this.installOnQuitRequested = false
     try {
       if (this.metadata.platform === 'deb') {
         if (this.metadata.installerPath === null || this.onOpenInstaller === undefined) throw Object.assign(new Error('the downloaded .deb installer is unavailable'), { code: 'UPDATE_INSTALLER_MISSING' })
@@ -334,6 +339,7 @@ export class DesktopUpdateManager {
 
   installOnQuit(): DesktopUpdateState {
     if (this.metadata === undefined || this.state.status !== 'downloaded' || this.metadata.platform === 'deb') return this.state
+    this.installOnQuitRequested = true
     if (this.updater !== undefined) this.updater.autoInstallOnAppQuit = true
     return this.publishScheduled()
   }

@@ -916,6 +916,27 @@ async function bootstrap(): Promise<void> {
   })
   app.on('before-quit', (event) => {
     if (quitting) return
+    if (updateManager?.shouldInstallOnQuit() === true) {
+      event.preventDefault()
+      quitting = true
+      quittingForUpdate = true
+      void (async () => {
+        await stopForApplicationQuit()
+        const result = await updateManager?.command({ type: 'install-now' })
+        if (result?.status === 'error') {
+          quitting = false
+          quittingForUpdate = false
+          await restartRuntime()
+          await openUpdateWindow()
+        }
+      })().catch(async (error: unknown) => {
+        quitting = false
+        quittingForUpdate = false
+        appendLog('desktop', `failed to install update on quit: ${error instanceof Error ? error.message : String(error)}`)
+        await showSplash({ error: true, message: '更新安装失败。', detail: logTail.slice(-12).join('\n') })
+      })
+      return
+    }
     event.preventDefault()
     quitting = true
     appendLog('desktop', quittingForUpdate ? 'quitting to install desktop update' : 'quitting application')

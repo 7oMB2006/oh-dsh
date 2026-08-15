@@ -109,6 +109,30 @@ test('manager provides a deb installer fallback without invoking updater install
   assert.deepEqual(await manager.command({ type: 'install-on-quit' }), manager.getState())
 })
 
+test('manager records an explicit install-on-quit request', async () => {
+  const updater = new FakeUpdater()
+  updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  await manager.check()
+  await manager.download()
+  assert.equal(manager.shouldInstallOnQuit(), false)
+  assert.equal((await manager.command({ type: 'install-on-quit' })).status, 'scheduled')
+  assert.equal(manager.shouldInstallOnQuit(), true)
+  assert.equal(updater.autoInstallOnAppQuit, true)
+})
+
+test('manager clears install-on-quit request before attempting immediate install', async () => {
+  const updater = new FakeUpdater()
+  updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  const manager = new DesktopUpdateManager({ currentVersion: '1.1.0', platform: 'darwin', arch: 'arm64', updater })
+  await manager.check()
+  await manager.download()
+  await manager.command({ type: 'install-on-quit' })
+  assert.equal(manager.shouldInstallOnQuit(), true)
+  assert.equal((await manager.command({ type: 'install-now' })).status, 'scheduled')
+  assert.equal(manager.shouldInstallOnQuit(), false)
+})
+
 test('manager exposes actionable retryable errors', async () => {
   const updater = new FakeUpdater()
   updater.result = null
