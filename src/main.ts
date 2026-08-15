@@ -795,12 +795,15 @@ function installIpc(): void {
     const installNow = command.type === 'install-now'
       && current.status === 'downloaded'
       && current.platform !== 'deb'
-    if (installNow) {
-      quittingForUpdate = true
-      await stopForApplicationQuit()
-    }
     const result = await manager.command(command)
-    if (installNow && result.status === 'error') quittingForUpdate = false
+    if (installNow) {
+      if (result.status === 'error') {
+        quittingForUpdate = false
+      } else {
+        quittingForUpdate = true
+        await stopForApplicationQuit()
+      }
+    }
     return result
   })
   ipcMain.handle('desktop:get-info', event => {
