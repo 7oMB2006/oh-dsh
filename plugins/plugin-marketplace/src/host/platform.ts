@@ -36,6 +36,13 @@ export interface DshCommandInput {
   args: string[]
   dshHome: string
   sandboxRoot: string
+  /**
+   * Set to `false` to run without the write-restricted seatbelt. Used to
+   * re-home the live profile's node_modules against the persistent home
+   * store after a preview is applied; sandboxed runs keep their store inside
+   * the preview root, which is deleted with the preview.
+   */
+  sandboxed?: boolean
 }
 
 export interface BundleBuildInput {
@@ -577,18 +584,20 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
   }
 
   async runDsh(input: DshCommandInput): Promise<void> {
+    const sandboxed = input.sandboxed !== false
     const temporary = join(input.sandboxRoot, '.tmp')
-    mkdirSync(temporary, { recursive: true, mode: 0o700 })
+    if (sandboxed) mkdirSync(temporary, { recursive: true, mode: 0o700 })
     const env = withGitHubCredentials({
       ...this.#options.env,
       DSH_DESKTOP_APP_DATA: input.sandboxRoot,
-      DSH_DESKTOP_PREVIEW: '1',
+      ...(sandboxed ? { DSH_DESKTOP_PREVIEW: '1', TMPDIR: temporary } : {}),
       DSH_HOME: input.dshHome,
-      TMPDIR: temporary,
     }, this.#ghPath)
     const nodeArguments = [this.#options.cliEntry, ...input.args]
     const sandbox = '/usr/bin/sandbox-exec'
-    const command = process.platform === 'darwin' && existsSync(sandbox) ? sandbox : this.#options.nodeBinary
+    const command = sandboxed && process.platform === 'darwin' && existsSync(sandbox)
+      ? sandbox
+      : this.#options.nodeBinary
     const args = command === sandbox
       ? ['-p', previewSandboxPolicy(input.sandboxRoot), this.#options.nodeBinary, ...nodeArguments]
       : nodeArguments
