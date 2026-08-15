@@ -107,9 +107,15 @@ void app.whenReady().then(async () => {
             }
             window.__OH_DSH_SMOKE_VISION_SEEN__ = true
             if (window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ !== true) {
-              window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
-              const item = thumbnail?.parentElement
-              item?.querySelector('button[aria-label*="Remove"], button[aria-label*="移除"], button[aria-label*="删除"]')?.click()
+              const remove = [...(card.querySelectorAll('button') ?? [])]
+                .find(button => /remove|移除|删除/i.test([
+                  button.getAttribute('aria-label'),
+                  button.getAttribute('title'),
+                ].filter(Boolean).join(' ')))
+              if (remove instanceof HTMLButtonElement) {
+                window.__OH_DSH_SMOKE_VISION_REMOVE_REQUESTED__ = true
+                remove.click()
+              }
             }
           }
           if (window.__OH_DSH_SMOKE_VISION_REQUESTED__ !== true) {
