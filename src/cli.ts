@@ -11,6 +11,9 @@ import { main as runWeb } from './web.ts'
 
 const SURFACE_NAMES = ['desktop', 'web', 'tui'] as const
 type SurfaceName = typeof SURFACE_NAMES[number]
+const SURFACE_ALIASES: Readonly<Record<string, SurfaceName>> = Object.freeze({
+  gui: 'desktop',
+})
 
 export function availableSurfaces(env: NodeJS.ProcessEnv = process.env): readonly SurfaceName[] {
   const configured = env.OH_DSH_SURFACES
@@ -21,6 +24,8 @@ export function availableSurfaces(env: NodeJS.ProcessEnv = process.env): readonl
 
 export function cliHelp(env: NodeJS.ProcessEnv = process.env): string {
   const surfaces = availableSurfaces(env)
+  const aliases = Object.entries(SURFACE_ALIASES)
+    .filter(([, surface]) => surfaces.includes(surface))
   const descriptions: Record<SurfaceName, string> = {
     desktop: 'Start Oh-DSH Desktop',
     web: 'Start Oh-DSH Web',
@@ -33,6 +38,7 @@ Usage:
 
 Surfaces:
 ${surfaces.map(surface => `  ${surface.padEnd(9)} ${descriptions[surface]}`).join('\n')}
+${aliases.length === 0 ? '' : `\nAliases:\n${aliases.map(([alias, surface]) => `  ${alias.padEnd(9)} ${descriptions[surface]}`).join('\n')}`}
 
 Run "ohdsh <surface> --help" for surface options.
 `
@@ -174,19 +180,22 @@ export async function main(
   tuiRunner: TuiRunner = runTui,
 ): Promise<number> {
   const [surface, ...args] = argv
+  const selectedSurface = surface === undefined
+    ? undefined
+    : SURFACE_ALIASES[surface] ?? surface
   const help = cliHelp(env)
   if (surface === undefined || surface === '--help' || surface === '-h') {
     stdout.write(help)
     return 0
   }
-  if (SURFACE_NAMES.includes(surface as SurfaceName)
-    && !availableSurfaces(env).includes(surface as SurfaceName)) {
+  if (SURFACE_NAMES.includes(selectedSurface as SurfaceName)
+    && !availableSurfaces(env).includes(selectedSurface as SurfaceName)) {
     stderr.write(`Surface '${surface}' is not included in this Oh-DSH distribution.\n\n${help}`)
     return 2
   }
-  if (surface === 'desktop') return await desktopRunner(args, env)
-  if (surface === 'web') return await webRunner(args, env, stdout)
-  if (surface === 'tui') return await tuiRunner(args, env, stdout, stderr)
+  if (selectedSurface === 'desktop') return await desktopRunner(args, env)
+  if (selectedSurface === 'web') return await webRunner(args, env, stdout)
+  if (selectedSurface === 'tui') return await tuiRunner(args, env, stdout, stderr)
   stderr.write(`Unknown surface: ${surface}\n\n${help}`)
   return 2
 }

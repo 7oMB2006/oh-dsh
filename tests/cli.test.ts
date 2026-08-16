@@ -20,7 +20,7 @@ function output(): { stream: NodeJS.WriteStream; text: () => string } {
   }
 }
 
-test('ohdsh dispatches desktop, web, and TUI through one surface command', async () => {
+test('ohdsh dispatches desktop aliases, web, and TUI through one surface command', async () => {
   const stdout = output()
   const stderr = output()
   const calls: Array<{ args: readonly string[]; surface: string }> = []
@@ -38,6 +38,17 @@ test('ohdsh dispatches desktop, web, and TUI through one surface command', async
       calls.push({ args, surface: 'web' })
       return 0
     },
+  ), 0)
+  assert.equal(await main(
+    ['gui', '--inspect'],
+    {},
+    stdout.stream,
+    stderr.stream,
+    async args => {
+      calls.push({ args, surface: 'desktop' })
+      return 0
+    },
+    async () => 0,
   ), 0)
   assert.equal(await main(
     ['web', '--port', '0'],
@@ -64,6 +75,7 @@ test('ohdsh dispatches desktop, web, and TUI through one surface command', async
   ), 0)
   assert.deepEqual(calls, [
     { args: ['--inspect'], surface: 'desktop' },
+    { args: ['--inspect'], surface: 'desktop' },
     { args: ['--port', '0'], surface: 'web' },
     { args: ['--inline'], surface: 'tui' },
   ])
@@ -89,6 +101,13 @@ test('layered distributions list and reject unavailable surfaces', async () => {
     stderr.stream,
   ), 2)
   assert.match(stderr.text(), /Surface 'desktop' is not included/)
+  assert.equal(await main(
+    ['gui'],
+    { OH_DSH_SURFACES: 'web' },
+    stdout.stream,
+    stderr.stream,
+  ), 2)
+  assert.match(stderr.text(), /Surface 'gui' is not included/)
 })
 
 test('desktop launch keeps source and installed macOS paths distinct', () => {

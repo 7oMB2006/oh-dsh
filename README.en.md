@@ -113,6 +113,7 @@ Run `./bin/ohdsh` from Web-only and TUI-only packages, or add it to `PATH`.
 
 ```sh
 ohdsh desktop          # Start Oh-DSH Desktop
+ohdsh gui              # Alias for Oh-DSH Desktop
 ohdsh web              # Start Oh-DSH Web
 ohdsh web --port 3080  # Choose the Web port
 ohdsh tui              # Start Oh-DSH TUI
