@@ -58,9 +58,9 @@ See `docs/design.en.md` and `docs/design.md` for detailed boundaries.
 - Include a body explaining why and impact. Keep every body line at most 72
   characters.
 - Sign every commit the current PR introduces with the contributor's own DCO
-  using `git commit -s`: `Signed-off-by: Name <email>`.
-- Scope DCO checks to the current PR: require sign-off only for commits the
-  PR introduces; never re-check commits already in the base history.
+  using `git commit -s`: `Signed-off-by: Name <email>`. Scope DCO checks
+  only to those PR-introduced commits; never re-check commits already in
+  the base history.
 - An optional `Assisted-by: <tool>` trailer may disclose AI assistance. It is
   not a DCO, must not identify a fictional person, and is never required.
 - Preserve upstream licenses, notices, links, and downstream attribution.
