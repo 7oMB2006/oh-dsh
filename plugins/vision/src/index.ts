@@ -584,7 +584,7 @@ export function apply(ctx: Context, config: Config): void {
   resolveVisionConfig(config)
   let current = (): Config => config
   installDeepSeekV4ImageAdmission(ctx)
-  installDeepSeekV4ImagePreprocessor(ctx, current)
+  installDeepSeekV4ImagePreprocessor(ctx, () => current())
 
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'view_image',

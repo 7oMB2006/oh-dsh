@@ -153,3 +153,91 @@ test('vision HTTP failures redact credentials and classify fallback statuses', a
   )
   assert.equal(isRetriableVisionError(new VisionHttpError('bad request', 400)), false)
 })
+
+test('vision preprocessor follows settings updates', async () => {
+  let requestUrl = ''
+  let requestBody: { model?: string } | undefined
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    requestUrl = String(url)
+    requestBody = JSON.parse(String(init?.body))
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: 'described' } }],
+    }), { status: 200 })
+  }) as typeof fetch
+
+  let streamHandler: ((options: any, next: () => unknown) => unknown) | undefined
+  let settingsValue: any = {}
+  let rewrittenOptions: any
+
+  const llm = {
+    stream: async function* (options: any) {
+      rewrittenOptions = options
+      yield { type: 'text', text: 'ok' }
+    },
+  }
+  const context = {
+    attachments: {
+      readImage: async (ref: any) => ({ ref, data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) }),
+    },
+    credentials: { resolve: async () => undefined },
+    effect: (effect: () => unknown) => effect(),
+    get: () => undefined,
+    inject: (_deps: string[], callback: (sctx: any) => void) => {
+      callback({
+        effect: (effect: () => unknown) => effect(),
+        settings: {
+          register: () => ({
+            get: () => settingsValue,
+            watch: () => {},
+          }),
+        },
+      })
+    },
+    llm,
+    on: (_event: string, handler: any) => {
+      streamHandler = handler
+    },
+    systemPrompt: { section: () => () => {} },
+    tools: { register: () => () => {} },
+  }
+
+  try {
+    apply(context as never, {})
+    settingsValue = {
+      apiKey: 'sk-updated',
+      baseURL: 'https://updated.example/v1',
+      model: 'updated-model',
+    }
+
+    assert.ok(streamHandler)
+    const result = streamHandler!(
+      {
+        provider: 'deepseek',
+        model: 'deepseek-v4',
+        messages: [{
+          role: 'user',
+          content: [{
+            type: 'image',
+            attachment: {
+              attachmentId: 'attachment-1',
+              mediaType: 'image/png',
+              name: 'shot.png',
+            },
+          }],
+        }],
+      },
+      () => { throw new Error('next should not be called') },
+    ) as AsyncIterable<unknown>
+    for await (const _ of result) {
+      // consume the generator
+    }
+
+    assert.equal(requestUrl, 'https://updated.example/v1/chat/completions')
+    assert.equal(requestBody?.model, 'updated-model')
+    assert.equal(rewrittenOptions.messages[0].content[0].type, 'text')
+    assert.match(rewrittenOptions.messages[0].content[0].text, /Attached image \(shot\.png\)/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
