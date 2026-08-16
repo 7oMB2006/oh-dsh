@@ -1,0 +1,28 @@
+{
+  "name": "@oh-dsh/tui-marketplace",
+  "version": "0.1.4",
+  "description": "Oh-DSH TUI renderer adapter adding the shared plugin marketplace surface",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js"
+  ],
+  "ohDsh": {
+    "upstream": {
+      "name": "dsh-TUI",
+      "package": "dsh-cc-tui",
+      "repository": "https://github.com/ccch1mneyyy/dsh-TUI"
+    }
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-session": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tool-ask-user": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-user-questions": "^0.1.0-rc.6",
+    "react": "^19.2.0"
+  }
+}

@@ -22,6 +22,13 @@ export type MarketplaceMessage =
   | 'updated'
   | 'unknown'
   | 'repository'
+  | 'surfaces'
+  | 'surfaces.assumed-all'
+  | 'surfaces.all'
+  | 'surfaces.none'
+  | 'surfaces.desktop'
+  | 'surfaces.web'
+  | 'surfaces.tui'
   | 'trust'
   | 'trust.organization'
   | 'trust.community'
@@ -74,7 +81,7 @@ export type MarketplaceMessage =
   | 'close'
   | 'preview.running'
   | 'discard'
-  | 'apply-to-desktop'
+  | 'apply'
   | 'apply-action'
   | 'reset-and-reload'
   | 'search.label'
@@ -105,7 +112,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     updates: 'Updates',
     'update-available': 'Update available',
     'not-installed': 'Not installed',
-    managed: 'Desktop managed',
+    managed: 'Oh-DSH managed',
     all: 'All',
     'all-categories': 'All categories',
     'mechanism.repository': 'Repository',
@@ -118,6 +125,13 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     updated: 'Updated',
     unknown: 'Unknown',
     repository: 'Repository',
+    surfaces: 'Effective surfaces',
+    'surfaces.assumed-all': 'TUI · Web · Desktop (assumed)',
+    'surfaces.all': 'TUI · Web · Desktop',
+    'surfaces.none': 'None declared',
+    'surfaces.desktop': 'Desktop',
+    'surfaces.web': 'Web',
+    'surfaces.tui': 'TUI',
     trust: 'Source trust',
     'trust.organization': 'Registry reviewed source',
     'trust.community': 'Community source',
@@ -134,7 +148,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'risk-reason.install-scripts': 'Declares install-time scripts',
     'risk-reason.trusted-host-code': 'Runs as trusted host code after apply',
     'risk-reason.source-change': 'Source identity differs from the TOFU lock',
-    'risk-reason.protected-plugin': 'Owned by the desktop transaction layer',
+    'risk-reason.protected-plugin': 'Owned by an Oh-DSH transaction layer',
     'source-review': 'Source lock',
     'source-review.first-use': 'First use · lock after apply',
     'source-review.matched': 'Matches the stored TOFU identity',
@@ -170,7 +184,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     close: 'Close Plugins',
     'preview.running': '{plugin} is running in an isolated preview window.',
     discard: 'Discard',
-    'apply-to-desktop': 'Apply to desktop',
+    apply: 'Apply to {target}',
     'apply-action': 'Apply {action}',
     'reset-and-reload': 'Reset and reload',
     'search.label': 'Search plugins',
@@ -187,7 +201,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'auth.not-refreshed': 'Plugin catalog has not been refreshed yet.',
     'notice.loaded': 'Loaded {count} catalog plugins.',
     'notice.preview-ready': 'Isolated {action} preview is ready for {plugin}.',
-    'notice.discarded': 'Discarded the {plugin} preview without changing the desktop profile.',
+    'notice.discarded': 'Discarded the {plugin} preview without changing the profile.',
     'notice.applied': 'Applied {plugin}; the previous profile remains available for Undo.',
     'notice.restored': 'Restored the profile from before {plugin} was applied.',
   },
@@ -200,7 +214,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     updates: '可更新',
     'update-available': '有可用更新',
     'not-installed': '未安装',
-    managed: '由桌面端管理',
+    managed: '由 Oh-DSH 管理',
     all: '全部',
     'all-categories': '全部分类',
     'mechanism.repository': '仓库插件',
@@ -213,6 +227,13 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     updated: '更新时间',
     unknown: '未知',
     repository: '仓库',
+    surfaces: '生效界面',
+    'surfaces.assumed-all': 'TUI · Web · Desktop（默认假定）',
+    'surfaces.all': 'TUI · Web · Desktop',
+    'surfaces.none': '未声明',
+    'surfaces.desktop': 'Desktop',
+    'surfaces.web': 'Web',
+    'surfaces.tui': 'TUI',
     trust: '来源信任',
     'trust.organization': 'Registry 已审核来源',
     'trust.community': '社区来源',
@@ -229,7 +250,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'risk-reason.install-scripts': '声明了安装阶段脚本',
     'risk-reason.trusted-host-code': '应用后会作为受信任主机代码运行',
     'risk-reason.source-change': '来源身份与 TOFU 锁不一致',
-    'risk-reason.protected-plugin': '由桌面事务层自身管理',
+    'risk-reason.protected-plugin': '由 Oh-DSH 事务层自身管理',
     'source-review': '来源锁',
     'source-review.first-use': '首次使用 · 应用后写入锁',
     'source-review.matched': '与已保存的 TOFU 身份一致',
@@ -265,7 +286,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     close: '关闭插件市场',
     'preview.running': '{plugin} 正在隔离预览窗口中运行。',
     discard: '放弃',
-    'apply-to-desktop': '应用到桌面端',
+    apply: '应用到 {target}',
     'apply-action': '应用{action}',
     'reset-and-reload': '重置并重新加载',
     'search.label': '搜索插件',
@@ -282,7 +303,7 @@ export const MARKETPLACE_MESSAGES: LocaleMessages<MarketplaceMessage> = {
     'auth.not-refreshed': '插件目录尚未刷新。',
     'notice.loaded': '已加载 {count} 个目录插件。',
     'notice.preview-ready': '{plugin} 的隔离{action}预览已就绪。',
-    'notice.discarded': '已放弃 {plugin} 的预览，桌面端配置未发生更改。',
+    'notice.discarded': '已放弃 {plugin} 的预览，Profile 配置未发生更改。',
     'notice.applied': '已应用 {plugin}；之前的配置仍可撤销恢复。',
     'notice.restored': '已恢复应用 {plugin} 之前的配置。',
   },

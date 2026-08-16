@@ -67,6 +67,8 @@ export interface LoadCatalogOptions {
 }
 
 export interface ProductionMarketplacePlatformOptions {
+  /** Surface-owned app-data root for cache and credential helpers. */
+  appDataPath?: string
   cliEntry: string
   cwd: string
   env: NodeJS.ProcessEnv
@@ -125,8 +127,10 @@ function repositoryRawUrl(repository: string, path: string): string {
   return `https://raw.githubusercontent.com/${repository}/HEAD/${segments.map(encodeURIComponent).join('/')}`
 }
 
-function catalogCachePath(environment: NodeJS.ProcessEnv): string | null {
-  const appDataPath = environment.DSH_DESKTOP_APP_DATA
+function catalogCachePath(
+  environment: NodeJS.ProcessEnv,
+  appDataPath = environment.DSH_DESKTOP_APP_DATA,
+): string | null {
   if (appDataPath === undefined || appDataPath === '') return null
   return join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')
 }
@@ -275,10 +279,10 @@ function gitConfigString(value: string): string {
 export function withGitHubCredentials(
   environment: NodeJS.ProcessEnv,
   ghPath: string | null,
+  appDataPath = environment.DSH_DESKTOP_APP_DATA,
 ): NodeJS.ProcessEnv {
   const clean = withoutCommandLineGitConfig(environment)
   if (ghPath === null) return clean
-  const appDataPath = clean.DSH_DESKTOP_APP_DATA
   if (appDataPath === undefined || appDataPath === '') return clean
   const directory = join(appDataPath, 'plugin-marketplace')
   const configPath = join(directory, 'gitconfig')
@@ -456,7 +460,10 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
     const repository = match[1] ?? ''
     const path = match[2] ?? ''
     const contentPath = repositoryContentPath(repository, path)
-    const cachePath = catalogCachePath(this.#options.env)
+    const cachePath = catalogCachePath(
+      this.#options.env,
+      this.#options.appDataPath ?? this.#options.env.DSH_DESKTOP_APP_DATA,
+    )
     const cached = readCatalogCache(cachePath, locator)
     const now = this.#options.now?.() ?? Date.now()
     const age = cached === null ? Number.POSITIVE_INFINITY : now - cached.fetchedAt
@@ -578,7 +585,11 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       '--no-checkout',
     ], { env: this.#options.env, timeoutMs: 120_000 })
     await runCommand('git', ['-C', target, 'checkout', '--detach', commit], {
-      env: withGitHubCredentials(this.#options.env, gh),
+      env: withGitHubCredentials(
+        this.#options.env,
+        gh,
+        this.#options.appDataPath ?? this.#options.env.DSH_DESKTOP_APP_DATA,
+      ),
       timeoutMs: 60_000,
     })
   }

@@ -494,7 +494,7 @@ async function startPreviewSurface(input: {
   pluginId: string
   sandboxRoot: string
   transactionId: string
-}): Promise<void> {
+}): Promise<{ url?: string }> {
   await stopPreviewSurface()
   const identity = { pluginId: input.pluginId, transactionId: input.transactionId }
   const supervisor = new DshRuntimeSupervisor(previewRuntimeOptions(input))
@@ -522,6 +522,7 @@ async function startPreviewSurface(input: {
     })
     previewWindow = window
     await window.loadURL(url.href)
+    return {}
   } catch (error) {
     await stopPreviewSurface().catch(() => {})
     throw error

@@ -156,10 +156,19 @@ test('TUI bundle mounts its surface and skins before the upstream renderer', () 
   ).replace(/\r\n?/g, '\n')
   assert.match(patch, /- id: cc-tui\n  disabled: true/)
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
+  const marketplace = patch.indexOf("name: '@oh-dsh/plugin-marketplace'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
   const vision = patch.indexOf("name: '@oh-dsh/vision'")
-  const renderer = patch.indexOf("name: 'dsh-cc-tui'")
-  assert.ok(surface >= 0 && surface < skins && skins < vision && vision < renderer)
+  const renderer = patch.indexOf("name: '@oh-dsh/tui-marketplace'")
+  assert.ok(surface >= 0 && surface < marketplace && marketplace < skins && skins < vision && vision < renderer)
+})
+
+test('TUI source adapter filter accepts both Windows and POSIX separators', () => {
+  const build = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build.mjs'),
+    'utf8',
+  )
+  assert.match(build, /upstream\[\\\\\/\]dsh-TUI\[\\\\\/\]src\[\\\\\/\]/)
 })
 
 test('TUI upstream adapter removes legacy terminal branding and scopes storage', () => {

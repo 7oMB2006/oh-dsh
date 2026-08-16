@@ -2,12 +2,17 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { LocaleService, Translate } from '../../../shared/i18n.ts'
+import {
+  createMarketplaceHttpBridge,
+  waitForMarketplaceRestart,
+} from './http.ts'
 import { localeTag } from '../../../shared/i18n.ts'
 import { useTranslate } from '../../../shared/use-i18n.ts'
 import type {
@@ -16,6 +21,8 @@ import type {
   MarketplacePlugin,
   MarketplaceRiskReason,
   MarketplaceSnapshot,
+  PluginMarketplaceBridge,
+  MarketplaceSurfaceSupport,
 } from '../protocol.ts'
 import { MARKETPLACE_MESSAGES, type MarketplaceMessage } from './i18n.ts'
 import marketplaceCss from './marketplace.css'
@@ -32,6 +39,75 @@ interface ClientContext {
   reflect: {
     provide(name: string, value: unknown, options?: unknown): (() => Promise<void> | void) | void
   }
+}
+
+/** A synchronously reserved tab that can navigate once a preview is ready. */
+interface MarketplacePreviewReservation {
+  navigate(url: string): void
+}
+
+/** Browser UI carrier: Electron IPC on desktop, HTTP on the Web shell. */
+interface MarketplaceClientBridge {
+  kind: 'desktop' | 'web'
+  openExternal(url: string): Promise<void> | void
+  pluginMarketplace: PluginMarketplaceBridge
+  reservePreview(): MarketplacePreviewReservation | null
+}
+
+function httpMarketplaceBridge(): PluginMarketplaceBridge {
+  return createMarketplaceHttpBridge('/oh-dsh/plugin-marketplace')
+}
+
+/** Keep preview runtimes free of their own nested marketplace transaction. */
+function isMarketplacePreviewWindow(): boolean {
+  return new URLSearchParams(window.location.search).has('oh-dsh-marketplace-preview')
+}
+
+function resolveClientBridge(): MarketplaceClientBridge | null {
+  if (isMarketplacePreviewWindow()) return null
+  const desktop = window.dshDesktop
+  if (desktop?.pluginMarketplace !== undefined) {
+    return {
+      kind: 'desktop',
+      openExternal: url => desktop.openExternal(url),
+      pluginMarketplace: desktop.pluginMarketplace,
+      reservePreview: () => null,
+    }
+  }
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    return {
+      kind: 'web',
+      openExternal: (url) => {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      },
+      pluginMarketplace: httpMarketplaceBridge(),
+      reservePreview: () => {
+        const tab = window.open('about:blank', '_blank', 'noopener,noreferrer')
+        if (tab === null) return null
+        return {
+          navigate: url => {
+            if (tab.closed) window.open(url, '_blank', 'noopener,noreferrer')
+            else tab.location.replace(url)
+          },
+        }
+      },
+    }
+  }
+  return null
+}
+
+function surfaceSupportLabel(
+  plugin: MarketplacePlugin,
+  t: Translate<MarketplaceMessage>,
+): string {
+  const surfaces: MarketplaceSurfaceSupport = plugin.surfaces
+  if (surfaces.declared === false) return t('surfaces.assumed-all')
+  const names = (['desktop', 'web', 'tui'] as const)
+    .filter(kind => surfaces[kind])
+    .map(kind => t(`surfaces.${kind}`))
+  if (names.length === 3) return t('surfaces.all')
+  if (names.length === 0) return t('surfaces.none')
+  return names.join(' · ')
 }
 
 interface MarketplaceViewState {
@@ -223,7 +299,7 @@ function MarketplaceNavigationEntry({
 }
 
 class PluginMarketplaceViewService implements PluginMarketplaceView {
-  readonly #bridge: DesktopBridge
+  readonly #bridge: MarketplaceClientBridge
   readonly #locale: LocaleService
   readonly #t: Translate<MarketplaceMessage>
   readonly #sessions: SessionsService
@@ -246,7 +322,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   }
 
   constructor(
-    bridge: DesktopBridge,
+    bridge: MarketplaceClientBridge,
     locale: LocaleService,
     t: Translate<MarketplaceMessage>,
     sessions: SessionsService,
@@ -467,6 +543,9 @@ function PluginCard({
             {t('managed')}
           </span>
         )}
+        <span className="oh-marketplace-pill" data-surfaces="true">
+          {surfaceSupportLabel(plugin, t)}
+        </span>
       </div>
     </button>
   )
@@ -480,15 +559,17 @@ function PluginDetail({
   locale,
   t,
   close,
+  reservePreview,
   run,
 }: {
-  bridge: DesktopBridge
+  bridge: MarketplaceClientBridge
   pending: boolean
   plugin: MarketplacePlugin
   snapshot: MarketplaceSnapshot
   locale: LocaleService
   t: Translate<MarketplaceMessage>
   close(): void
+  reservePreview?(): void
   run(command: MarketplaceCommand): Promise<void>
 }): JSX.Element {
   const [confirmations, setConfirmations] = useState<MarketplaceConfirmation[]>([])
@@ -526,6 +607,7 @@ function PluginDetail({
               ? t('unknown')
               : new Date(plugin.pushedAt).toLocaleString(localeTag(locale))}
           </dd>
+          <dt>{t('surfaces')}</dt><dd>{surfaceSupportLabel(plugin, t)}</dd>
           <dt>{t('repository')}</dt><dd>{plugin.url.replace('https://github.com/', '')}</dd>
           <dt>{t('trust')}</dt><dd>{t(`trust.${plugin.trust}`)}</dd>
           <dt>{t('runtime-boundary')}</dt><dd>{runtimeRiskLabel(plugin, t)}</dd>
@@ -650,7 +732,10 @@ function PluginDetail({
               className="oh-marketplace-button"
               data-primary="true"
               disabled={pending || !readyToPreview}
-              onClick={() => { void run({ type: 'preview', confirmations }) }}
+              onClick={() => {
+                reservePreview?.()
+                void run({ type: 'preview', confirmations })
+              }}
               type="button"
             >
               {t('preview.launch')}
@@ -688,7 +773,7 @@ function localizedHostMessage(
     const action = t(`action.${match[1] as 'install' | 'update' | 'enable' | 'disable' | 'uninstall'}`)
     return t('notice.preview-ready', { action, plugin: match[2] })
   }
-  match = /^Discarded the (.+) preview without changing the desktop profile\.$/.exec(message)
+  match = /^Discarded the (.+) preview without changing the profile\.$/.exec(message)
   if (match !== null) return t('notice.discarded', { plugin: match[1] })
   match = /^Applied (.+); the previous profile remains available for Undo\.$/.exec(message)
   if (match !== null) return t('notice.applied', { plugin: match[1] })
@@ -698,7 +783,7 @@ function localizedHostMessage(
 }
 
 function MarketplaceSurface({ bridge, locale, translate, view }: {
-  bridge: DesktopBridge
+  bridge: MarketplaceClientBridge
   locale: LocaleService
   translate: Translate<MarketplaceMessage>
   view: PluginMarketplaceViewService
@@ -714,12 +799,33 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
   >('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const openedPreviewRef = useRef<string | null>(null)
+  const previewReservationRef = useRef<MarketplacePreviewReservation | null>(null)
 
   const run = useCallback(async (command: MarketplaceCommand): Promise<void> => {
     setPending(true)
     setLocalError(null)
     try {
-      setSnapshot(await bridge.pluginMarketplace.dispatch(command))
+      const snapshot = await bridge.pluginMarketplace.dispatch(command)
+      setSnapshot(snapshot)
+      if (bridge.kind === 'web' && command.type === 'preview') {
+        const previewUrl = snapshot.preview?.previewUrl
+        if (previewUrl !== null && previewUrl !== undefined) {
+          openedPreviewRef.current = snapshot.preview?.transactionId ?? openedPreviewRef.current
+          const reservation = previewReservationRef.current ?? bridge.reservePreview()
+          previewReservationRef.current = null
+          if (reservation === null) {
+            window.open(previewUrl, '_blank', 'noopener,noreferrer')
+          } else {
+            reservation.navigate(previewUrl)
+          }
+        }
+      }
+      if (bridge.kind === 'web' && (command.type === 'apply' || command.type === 'undo')) {
+        void waitForMarketplaceRestart('/oh-dsh/plugin-marketplace').then(() => {
+          window.location.reload()
+        })
+      }
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -783,6 +889,16 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
   useEffect(() => {
     if (viewState.open) resetView()
   }, [viewState.open])
+
+  useEffect(() => {
+    const preview = snapshot?.preview
+    if (preview === null || preview === undefined || preview.previewUrl === null) return
+    if (openedPreviewRef.current === preview.transactionId) return
+    openedPreviewRef.current = preview.transactionId
+    if (bridge.kind === 'web') {
+      bridge.reservePreview()?.navigate(preview.previewUrl)
+    }
+  }, [bridge, snapshot?.preview])
 
   return (
     <div className="oh-marketplace-surface" data-open={String(viewState.open)} aria-hidden={!viewState.open}>
@@ -920,6 +1036,9 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
               locale={locale}
               t={t}
               close={() => { setSelectedId(null) }}
+              reservePreview={() => {
+                previewReservationRef.current = bridge.reservePreview()
+              }}
               run={run}
             />
           )}
@@ -930,15 +1049,9 @@ function MarketplaceSurface({ bridge, locale, translate, view }: {
 }
 
 export function apply(ctx: ClientContext): void {
-  // Three-surface adaptation: the marketplace lifecycle runs over the
-  // Electron bridge, which only the desktop shell provides. On the web
-  // surface the marketplace is skipped (its HTTP transport is a roadmap
-  // item); the TUI surface has no browser client graph at all. Skipping
-  // instead of throwing keeps a miscomposed profile from crashing the
-  // client graph.
-  const bridge = window.dshDesktop
-  if (bridge === undefined) {
-    console.info('plugin-marketplace: skipped, the plugin marketplace is desktop-only')
+  const bridge = resolveClientBridge()
+  if (bridge === null) {
+    console.info('plugin-marketplace: skipped, no desktop or web bridge is available')
     return
   }
   const locale = ctx.get('locale') as LocaleService
@@ -948,7 +1061,7 @@ export function apply(ctx: ClientContext): void {
   const view = new PluginMarketplaceViewService(bridge, locale, t, sessions)
   ctx.effect(
     () => locale.register('oh-dsh.plugin-marketplace', MARKETPLACE_MESSAGES),
-    'oh-dsh-desktop: marketplace dictionaries',
+    'oh-dsh-plugin-marketplace: dictionaries',
   )
   slots.inject('sidebar.footer.action', () => slots.register({
     name: 'sidebar.footer.action',
@@ -960,17 +1073,25 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     let disposed = false
     let disposeProvider: (() => Promise<void> | void) | void
-    void bridge.getInfo().then(info => {
-      if (disposed || info.preview !== null) return
+    const mount = (): void => {
+      if (disposed) return
       view.mount()
       disposeProvider = ctx.reflect.provide('pluginMarketplace', view, undefined)
-    }).catch((error: unknown) => {
-      console.error('plugin-marketplace: failed to inspect the desktop window', error)
-    })
+    }
+    if (bridge.kind === 'web') {
+      mount()
+    } else {
+      void window.dshDesktop?.getInfo().then(info => {
+        if (disposed || info.preview !== null) return
+        mount()
+      }).catch((error: unknown) => {
+        console.error('plugin-marketplace: failed to inspect the desktop window', error)
+      })
+    }
     return () => {
       disposed = true
       view.dispose()
       if (typeof disposeProvider === 'function') void disposeProvider()
     }
-  }, 'oh-dsh-desktop: plugin marketplace')
+  }, 'oh-dsh-plugin-marketplace: client surface')
 }

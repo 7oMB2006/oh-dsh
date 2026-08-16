@@ -29,7 +29,8 @@
         "@oh-dsh/skins",
         "@oh-dsh/pinned-summary",
         "@oh-dsh/sidebar",
-        "@oh-dsh/panel-controls"
+        "@oh-dsh/panel-controls",
+        "@oh-dsh/plugin-marketplace"
       ],
       "platform": "web",
       "immediately": true

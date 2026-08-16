@@ -1,7 +1,7 @@
 /** Oh-DSH Web launcher: boot the packaged web profile and expose its URL. */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -264,6 +264,9 @@ export async function main(
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',
       OH_DSH_HOME: dataRoot,
+      OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
+      OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
+      OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
       PATH: runtimeSearchPath(paths, env),
     },
     nodeBinary: paths.nodeBinary,
@@ -271,36 +274,87 @@ export async function main(
     readyTimeoutMs: 60_000,
   })
 
+  const MAX_UNEXPECTED_RESTARTS = 5
+  const RESTART_DELAY_MS = 600
+  const marketplaceRestartPath = join(dataRoot, 'web', 'marketplace-restart')
   let stopping = false
+  let started = false
+  let browserOpened = false
+  let restarts = 0
+  let restartTimer: NodeJS.Timeout | null = null
+  const consumeMarketplaceRestart = (): boolean => {
+    try {
+      if (existsSync(marketplaceRestartPath)) {
+        rmSync(marketplaceRestartPath, { force: true })
+        return true
+      }
+    } catch {
+      // A failed marker read must not turn a restart into a crash loop.
+    }
+    return false
+  }
   const stop = async (): Promise<void> => {
     if (stopping) return
     stopping = true
+    if (restartTimer !== null) clearTimeout(restartTimer)
     await runtime.stop()
+  }
+  const fail = (error: unknown): void => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
+    process.stderr.write(`${logTail.slice(-20).join('\n')}\n`)
+    void stop()
+  }
+  const startOnce = async (): Promise<void> => {
+    const url = await runtime.start()
+    started = true
+    stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
+    if (options.open && browserOpened === false) {
+      browserOpened = true
+      openBrowser(url.href, process.platform)
+    }
   }
   const onSignal = (): void => {
     void stop().then(() => { process.exit(0) })
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
+  const scheduleRestart = (label: string): void => {
+    printLine(logTail, label)
+    restartTimer = setTimeout(() => {
+      restartTimer = null
+      void startOnce().catch((error: unknown) => {
+        fail(error)
+        process.exit(1)
+      })
+    }, RESTART_DELAY_MS)
+  }
   runtime.on('exit', (exit: RuntimeExit) => {
     if (stopping) return
-    process.stderr.write(
-      `Oh-DSH Web stopped (code=${String(exit.code)}, signal=${String(exit.signal)})\n`
-      + `${logTail.slice(-20).join('\n')}\n`,
-    )
-    process.exit(1)
+    if (started === false) return
+    const detail = `code=${String(exit.code)}, signal=${String(exit.signal)}`
+    if (consumeMarketplaceRestart()) {
+      restarts = 0
+      scheduleRestart(`Oh-DSH Web restarted for a marketplace transaction (${detail}).`)
+      return
+    }
+    if (restarts >= MAX_UNEXPECTED_RESTARTS) {
+      process.stderr.write(
+        `Oh-DSH Web stopped after repeated restarts (${detail})\n`
+        + `${logTail.slice(-20).join('\n')}\n`,
+      )
+      process.exit(1)
+      return
+    }
+    restarts += 1
+    scheduleRestart(`Oh-DSH Web exited (${detail}); restarting (${String(restarts)})…`)
   })
 
   try {
-    const url = await runtime.start()
-    stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
-    if (options.open) openBrowser(url.href, process.platform)
+    await startOnce()
     await new Promise<void>(() => {})
     return 0
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
-    process.stderr.write(`${logTail.slice(-20).join('\n')}\n`)
-    await stop()
+    fail(error)
     return 1
   }
 }

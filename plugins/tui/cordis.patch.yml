@@ -9,6 +9,9 @@
   - id: oh-tui
     name: '@oh-dsh/tui'
 
+  - id: oh-plugin-marketplace
+    name: '@oh-dsh/plugin-marketplace'
+
   - id: oh-skins
     name: '@oh-dsh/skins'
 
@@ -16,7 +19,7 @@
     name: '@oh-dsh/vision'
 
   - id: oh-tui-renderer
-    name: 'dsh-cc-tui'
+    name: '@oh-dsh/tui-marketplace'
     config:
       sessionId: !!js process.env.OH_DSH_TUI_SESSION_ID ?? undefined
       provider: !!js process.env.OH_DSH_TUI_PROVIDER ?? 'deepseek-official'

@@ -1,7 +1,7 @@
 /** Oh-DSH TUI launcher over the pinned upstream dsh-TUI bundle. */
 
 import { spawn, type SpawnOptions } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
@@ -197,6 +197,9 @@ export function tuiLaunchSpec(
     OH_DSH_TUI_SESSION_ID: options.sessionId,
     OH_DSH_TUI_TITLE: 'Oh-DSH TUI',
     OH_DSH_HOME: dataRoot,
+    OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
+    OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
+    OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
     PATH: runtimeSearchPath(paths, env),
   }
   return {
@@ -254,17 +257,38 @@ export async function main(
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
   ensureTuiProfile(dataRoot)
 
-  const spec = tuiLaunchSpec(
-    { ...options, cwd, dataRoot },
-    env,
-    paths,
-    resolveTuiVersion(root),
-  )
-  return await new Promise<number>((resolveExit, rejectExit) => {
-    const child = spawnTui(spec.command, spec.args, spec.spawnOptions)
-    child.once('error', rejectExit)
-    child.once('exit', (code, signal) => {
-      resolveExit(code ?? (signal === null ? 1 : 128))
+  const runOnce = async (current: TuiLaunchOptions): Promise<number> => {
+    const spec = tuiLaunchSpec(
+      { ...current, cwd, dataRoot },
+      env,
+      paths,
+      resolveTuiVersion(root),
+    )
+    return await new Promise<number>((resolveExit, rejectExit) => {
+      const child = spawnTui(spec.command, spec.args, spec.spawnOptions)
+      child.once('error', rejectExit)
+      child.once('exit', (code, signal) => {
+        resolveExit(code ?? (signal === null ? 1 : 128))
+      })
     })
-  })
+  }
+
+  let next = options
+  // Exit code 75 means a marketplace apply/undo committed a new profile.
+  // Only a validated resume marker restarts the TUI; a bare 75 without a
+  // marker is returned to the caller instead of entering a restart loop.
+  while (true) {
+    const code = await runOnce(next)
+    if (code !== 75) return code
+    const resumePath = join(dataRoot, 'tui', 'marketplace-resume')
+    let sessionId: string | undefined
+    try {
+      sessionId = readFileSync(resumePath, 'utf8').trim() || undefined
+      rmSync(resumePath, { force: true })
+    } catch {
+      sessionId = undefined
+    }
+    if (sessionId === undefined) return code
+    next = { ...next, sessionId }
+  }
 }

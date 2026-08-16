@@ -34,6 +34,7 @@ for (const required of [
   join(stage, 'dsh-runtime', 'node_modules', 'dsh-cc-tui', 'lib', 'types', 'index.js'),
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'tui', 'dist', 'index.js'),
   join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'tui', 'dist', 'cordis.patch.yml'),
+  join(stage, 'dsh-runtime', 'node_modules', '@oh-dsh', 'tui-marketplace', 'dist', 'index.js'),
 ]) {
   if (!existsSync(required)) {
     throw new Error(`TUI distribution artifact missing: ${required}; run pnpm run build && pnpm run stage:dsh first`)

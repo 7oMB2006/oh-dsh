@@ -67,10 +67,15 @@ export interface MarketplacePreviewRuntimeInput {
   transactionId: string
 }
 
+/** Facts a preview runtime reports back after becoming ready. */
+export interface MarketplacePreviewRuntimeResult {
+  url?: string
+}
+
 /** Runtime/window operations injected by Electron and replaced in tests. */
 export interface MarketplaceRuntime {
   startLive(): Promise<void>
-  startPreview(input: MarketplacePreviewRuntimeInput): Promise<void>
+  startPreview(input: MarketplacePreviewRuntimeInput): Promise<MarketplacePreviewRuntimeResult>
   stopLive(): Promise<void>
   stopPreview(): Promise<void>
 }
@@ -727,7 +732,7 @@ export class PluginMarketplaceManager {
   private async prepare(action: MarketplaceAction, pluginId: string): Promise<void> {
     await this.inspect(action, pluginId)
     if (this.#plan?.riskLevel === 'blocked') {
-      throw new Error(`${pluginId} is protected by the desktop and cannot be modified by its own marketplace`)
+      throw new Error(`${pluginId} is protected by Oh-DSH and cannot be modified by its own marketplace`)
     }
     if (this.#plan?.requirements.length === 0) await this.preview([])
   }
@@ -740,7 +745,7 @@ export class PluginMarketplaceManager {
     const catalogPlugin = this.#catalog.find(plugin => plugin.id === pluginId)
     if (isProtectedMarketplacePlugin(pluginId, catalogPlugin?.repository)
       || catalogPlugin?.protected === true) {
-      throw new Error(`${pluginId} is protected by the desktop and cannot be modified by its own marketplace`)
+      throw new Error(`${pluginId} is protected by Oh-DSH and cannot be modified by its own marketplace`)
     }
     if (action === 'uninstall' || action === 'enable' || action === 'disable') {
       if (current === undefined) throw new Error(`${pluginId} was not installed by this marketplace`)
@@ -760,7 +765,7 @@ export class PluginMarketplaceManager {
       this.#plan = {
         action,
         buildScripts: {},
-        description: catalogPlugin?.description ?? `Manage ${pluginId} in the desktop profile.`,
+        description: catalogPlugin?.description ?? `Manage ${pluginId} in the Oh-DSH profile.`,
         mechanism: current.mechanism,
         packageName: current.packageName,
         pluginId,
@@ -841,7 +846,7 @@ export class PluginMarketplaceManager {
       resolvedPackage,
     )) {
       throw new Error(
-        `${pluginId} is protected by the desktop and cannot be modified by its own marketplace`,
+        `${pluginId} is protected by Oh-DSH and cannot be modified by its own marketplace`,
       )
     }
     if (resolvedMechanism === 'bundle'
@@ -1039,17 +1044,24 @@ export class PluginMarketplaceManager {
       const preview: MarketplacePreview = {
         action: plan.action,
         pluginId: plan.pluginId,
+        previewUrl: null,
         resolvedCommit: plan.resolvedCommit,
         startedAt: new Date().toISOString(),
         transactionId,
       }
       this.#active = { candidateHome, candidateProfile, preview, root }
-      await this.#options.runtime.startPreview({
+      const started = await this.#options.runtime.startPreview({
         dshHome: candidateHome,
         pluginId: plan.pluginId,
         sandboxRoot: root,
         transactionId,
       })
+      if (started.url !== undefined) {
+        this.#active = {
+          ...this.#active,
+          preview: { ...preview, previewUrl: started.url },
+        }
+      }
       this.#lastAction = `Isolated ${plan.action} preview is ready for ${plan.pluginId}.`
     } catch (error) {
       this.#active = null
@@ -1088,7 +1100,7 @@ export class PluginMarketplaceManager {
     removeWithin(this.#previewsRoot, active.root, this.#warn)
     this.#active = null
     this.#plan = null
-    this.#lastAction = `Discarded the ${active.preview.pluginId} preview without changing the desktop profile.`
+    this.#lastAction = `Discarded the ${active.preview.pluginId} preview without changing the profile.`
   }
 
   private async applyPreview(): Promise<void> {

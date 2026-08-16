@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 import { resolveProductVersion } from '../src/version.ts'
+import { transformTuiUpstreamSource } from './tui-upstream-source-adapter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(root, 'dist')
@@ -26,6 +27,7 @@ const pluginPackages = [
     external: ['@deepseek-ai/*'],
   },
   { directory: 'tui', hostOnly: true },
+  { directory: 'tui-marketplace', hostOnly: true },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
@@ -143,7 +145,7 @@ for (const plugin of pluginPackages) {
   const hostEntry = plugin.directory === 'better-sidebar-runtime'
     ? join(root, 'upstream', 'DSH-better-sidebar', 'src', 'index.ts')
     : join(source, 'index.ts')
-  builds.push(build({
+  const hostBuild = {
     ...shared,
     entryPoints: [hostEntry],
     outfile: join(output, 'index.js'),
@@ -152,7 +154,23 @@ for (const plugin of pluginPackages) {
     external: plugin.external ?? (plugin.directory === 'better-sidebar-runtime'
       ? ['@deepseek-ai/*', 'cordis', 'node-pty', 'schemastery', 'ws']
       : []),
-  }))
+  }
+  if (plugin.directory === 'tui-marketplace') {
+    hostBuild.banner = { js: nodeEsmRequireBanner }
+    hostBuild.plugins = [{
+      name: 'oh-dsh-tui-upstream-source-adapter',
+      setup(buildApi) {
+        buildApi.onLoad(
+          { filter: /upstream[\\/]dsh-TUI[\\/]src[\\/].*\.(?:ts|tsx)$/ },
+          async args => ({
+            contents: transformTuiUpstreamSource(args.path, await readFileSync(args.path, 'utf8')),
+            loader: args.path.endsWith('.tsx') ? 'tsx' : 'ts',
+          }),
+        )
+      },
+    }]
+  }
+  builds.push(build(hostBuild))
   if (plugin.hostOnly !== true) {
     builds.push(build({
       bundle: true,

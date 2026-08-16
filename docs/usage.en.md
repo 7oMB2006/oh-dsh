@@ -287,6 +287,16 @@ choice applies immediately and survives restarts.
 
 ## Plugin marketplace
 
+Desktop, Web, and TUI share one plugin marketplace: all three surfaces can
+search plugins, prepare candidates, preview, apply, enable, update, and
+uninstall. Desktop and Web use the sidebar marketplace; in TUI run `/plugins`
+(or press `Ctrl+M`) to open the terminal marketplace.
+
+The catalog labels the surfaces where each plugin is expected to take effect.
+Installation itself succeeds on all three surfaces; if a plugin declares Web
+or Desktop support only, it will not take effect in TUI after installation,
+and the cards and details call that out explicitly.
+
 Recommended flow:
 
 1. Choose a plugin from Not installed.
