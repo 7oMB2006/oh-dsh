@@ -1,5 +1,6 @@
 .oh-dsh-terminal-dock {
   position: relative;
+  z-index: 10;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -11,18 +12,21 @@
   -webkit-app-region: no-drag;
 }
 
+.oh-dsh-terminal-dock[data-collapsed] {
+  display: none;
+}
+
 .oh-dsh-terminal-bar {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 34px;
+  height: 36px;
   padding: 0 8px;
   box-sizing: border-box;
-  border-bottom: 1px solid var(--dsw-alias-border-l1, rgb(0 0 0 / 7%));
   background: var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-base, #fff));
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .oh-dsh-terminal-tabs {
@@ -39,8 +43,8 @@
   align-items: center;
   gap: 5px;
   max-width: 180px;
-  height: 24px;
-  padding: 0 6px;
+  height: 32px;
+  padding: 0 8px;
   box-sizing: border-box;
   border-radius: 6px;
   color: var(--dsw-alias-label-secondary, #57606a);
@@ -60,8 +64,8 @@
 
 .oh-dsh-terminal-status {
   flex: none;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--dsw-alias-label-dimmed, #8c959f);
 }
@@ -89,8 +93,8 @@
 .oh-dsh-terminal-tab-close {
   display: grid;
   place-items: center;
-  width: 15px;
-  height: 15px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border-radius: 4px;
   background: transparent;
@@ -107,13 +111,13 @@
 
 .oh-dsh-terminal-add {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #57606a);
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .oh-dsh-terminal-hint {
@@ -132,19 +136,19 @@
 .oh-dsh-terminal-actions { gap: 2px; }
 
 .oh-dsh-terminal-action {
-  width: 27px;
-  height: 24px;
+  width: 32px;
+  height: 30px;
   padding: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary, #57606a);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .oh-dsh-terminal-settings {
   position: absolute;
   z-index: 8;
-  top: 46px;
+  top: 45px;
   right: 8px;
   display: grid;
   gap: 12px;
@@ -160,7 +164,7 @@
 
 .oh-dsh-terminal-dock[data-collapsed] .oh-dsh-terminal-settings {
   top: auto;
-  bottom: 38px;
+  bottom: 40px;
 }
 
 .oh-dsh-terminal-settings-header,
@@ -213,7 +217,7 @@
   position: relative;
   z-index: 1;
   flex: none;
-  height: 8px;
+  height: 4px;
   background: var(--dsw-alias-bg-layer-1, #fff);
   cursor: ns-resize;
   touch-action: none;
@@ -221,10 +225,10 @@
 
 .oh-dsh-terminal-resize::after {
   position: absolute;
-  top: 2px;
+  top: 1px;
   left: 50%;
   width: 32px;
-  height: 3px;
+  height: 2px;
   border-radius: 99px;
   background: var(--dsw-alias-label-dimmed, #8c959f);
   content: '';

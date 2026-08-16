@@ -139,7 +139,7 @@ export function TerminalPanel({ locale, t: translate, store, scopeKey, cwd, acti
                   event.stopPropagation()
                   store.dispatch({ type: 'remove-tab', id: tab.id })
                 }}
-              >×</button>
+              >✕</button>
             </span>
           ))}
           <button
@@ -166,7 +166,7 @@ export function TerminalPanel({ locale, t: translate, store, scopeKey, cwd, acti
             onClick={() => { store.dispatch({ type: 'toggle-collapsed' }) }}
             title={state.collapsed ? t('terminal.expand') : t('terminal.collapse')}
             aria-label={state.collapsed ? t('terminal.expand') : t('terminal.collapse')}
-          >{state.collapsed ? '⌃' : '⌄'}</button>
+          >✕</button>
         </div>
       </div>
       {settingsOpen && (
