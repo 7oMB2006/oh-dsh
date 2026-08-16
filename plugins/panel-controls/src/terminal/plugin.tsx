@@ -69,7 +69,8 @@ function currentSession(sessions: SessionsService): { scopeKey: string; cwd: str
 }
 
 function findConversationColumn(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[data-phase]')?.parentElement ?? null
+  const scrollBody = document.querySelector<HTMLElement>('[data-conversation-scroll]')
+  return scrollBody?.closest('[data-phase]')?.parentElement ?? null
 }
 
 class DesktopPanelService implements DesktopPanels {
