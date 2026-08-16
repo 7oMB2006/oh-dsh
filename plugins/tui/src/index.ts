@@ -4,6 +4,7 @@ import {
   OH_DSH_SURFACE_SERVICE,
   type OhDshSurface,
 } from '../../shared/surface.ts'
+import { humanApprovalGuidance } from '../../shared/guardrails.ts'
 
 interface SystemPromptService {
   section(entry: { name: string; order: number; text: () => string }): unknown
@@ -48,6 +49,11 @@ export function apply(ctx: HostContext): void {
       name: 'app:oh-dsh-tui-surface',
       order: -98,
       text: () => tuiPrompt(surface),
+    })
+    promptCtx.systemPrompt.section({
+      name: 'app:oh-dsh-human-approval',
+      order: -90,
+      text: () => humanApprovalGuidance(),
     })
   })
 }

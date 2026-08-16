@@ -8,6 +8,7 @@ import {
   OH_DSH_SURFACE_SERVICE,
   type OhDshSurface,
 } from '../plugins/shared/surface.ts'
+import { humanApprovalGuidance } from '../plugins/shared/guardrails.ts'
 
 interface SystemPromptService {
   section(entry: {
@@ -91,6 +92,11 @@ export function apply(ctx: HostContext): void {
       name: 'app:oh-dsh-desktop-surface',
       order: -98,
       text: () => desktopPrompt(capability),
+    })
+    promptCtx.systemPrompt.section({
+      name: 'app:oh-dsh-human-approval',
+      order: -90,
+      text: () => humanApprovalGuidance(),
     })
   })
 

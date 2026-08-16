@@ -101,7 +101,7 @@ test('desktop Host plugin publishes capability, prompt, and bash environment', (
   process.env.DSH_DESKTOP_PROFILE = 'desktop'
   process.env.DSH_DESKTOP_VERSION = '9.8.7'
   let capability: unknown
-  let prompt = ''
+  const sections: { text: () => string }[] = []
   let resolvedEnvironment: Record<string, string> = {}
   const context = {
     effect: <T>(effect: () => T): T => effect(),
@@ -115,7 +115,7 @@ test('desktop Host plugin publishes capability, prompt, and bash environment', (
       if (names[0] === 'systemPrompt') {
         callback({
           systemPrompt: {
-            section: (section: { text: () => string }) => { prompt = section.text() },
+            section: (section: { text: () => string }) => { sections.push(section) },
           },
         })
       }
@@ -145,7 +145,11 @@ test('desktop Host plugin publishes capability, prompt, and bash environment', (
       profile: 'desktop',
       version: '9.8.7',
     })
+    const prompt = sections.map(section => section.text()).join('\n')
     assert.match(prompt, /Oh-DSH Desktop/)
+    assert.match(prompt, /explicit approval/)
+    assert.match(prompt, /remote repositories/)
+    assert.match(prompt, /ask_user_question/)
     assert.doesNotMatch(prompt, /ChatGPT|OpenAI/)
     assert.deepEqual(resolvedEnvironment, {
       DSH_DESKTOP: '1',
