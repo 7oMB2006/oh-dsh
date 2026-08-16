@@ -363,6 +363,10 @@ inside the selected data directory, plus root-level skin and sidebar
 preferences. Migration copies only missing data and leaves legacy directories
 in place for rollback; existing shared state is not replaced.
 
+Only one Oh-DSH surface owns the shared data root at a time. Other surfaces
+can start in read-only mode to view history, but cannot write to active
+sessions while the owner is running.
+
 Troubleshooting order:
 
 1. Run `ohdsh --help` to confirm the CLI source.

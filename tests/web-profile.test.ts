@@ -19,6 +19,7 @@ import {
   WEB_BUNDLES,
   WEB_PROFILE,
 } from '../src/profile.ts'
+import { acquireRuntimeLock } from '../src/runtime-lock.ts'
 import {
   DshRuntimeSupervisor,
   type DshRuntimeOptions,
@@ -234,6 +235,35 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     assert.equal(runtime.plan.env.OH_DSH_HOME, join(dataRoot, 'state'))
   } finally {
     process.chdir(previous)
+    rmSync(temp, { recursive: true, force: true })
+  }
+})
+
+test('web launcher refuses a data root already owned by another surface', async () => {
+  const temp = mkdtempSync(join(tmpdir(), 'dsh-web-lock-'))
+  const dataRoot = realpathSync(temp)
+  const packaged = join(dataRoot, 'package')
+  const nodeBinary = process.platform === 'win32'
+    ? join(packaged, 'node-runtime', 'node.exe')
+    : join(packaged, 'node-runtime', 'bin', 'node')
+  mkdirSync(dirname(nodeBinary), { recursive: true })
+  mkdirSync(join(packaged, 'dsh-runtime', 'lib'), { recursive: true })
+  writeFileSync(nodeBinary, '')
+  writeFileSync(join(packaged, 'dsh-runtime', 'lib', 'bin.js'), '')
+
+  const state = join(dataRoot, 'state')
+  const owner = acquireRuntimeLock(state, 'desktop')
+  try {
+    await assert.rejects(
+      main(
+        ['--data', state],
+        { DSH_OH_WEB_ROOT: packaged, PATH: process.env.PATH },
+        { isTTY: false } as NodeJS.WriteStream,
+      ),
+      /already using/,
+    )
+  } finally {
+    owner.release()
     rmSync(temp, { recursive: true, force: true })
   }
 })

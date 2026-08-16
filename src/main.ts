@@ -43,6 +43,7 @@ import {
 } from './data-root.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
+import { acquireRuntimeLock } from './runtime-lock.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 import {
   bundledRuntimePaths,
@@ -867,6 +868,8 @@ async function bootstrap(): Promise<void> {
     app.quit()
     return
   }
+  const runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
+  process.once('exit', () => { runtimeLock.release() })
   app.on('second-instance', (_event, argv) => {
     queuedPaths.push(...argv.slice(1).filter(argument => !argument.startsWith('-')))
     if (mainWindow === undefined || mainWindow.isDestroyed()) {

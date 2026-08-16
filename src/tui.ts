@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { defaultOhDshHome } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureTuiProfile, TUI_PROFILE } from './profile.ts'
+import { acquireRuntimeLock } from './runtime-lock.ts'
 import {
   bundledRuntimePaths,
   runtimeSearchPath,
@@ -257,6 +258,9 @@ export async function main(
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
   ensureTuiProfile(dataRoot)
 
+  const runtimeLock = acquireRuntimeLock(dataRoot, 'tui')
+  process.once('exit', () => { runtimeLock.release() })
+
   const runOnce = async (current: TuiLaunchOptions): Promise<number> => {
     const spec = tuiLaunchSpec(
       { ...current, cwd, dataRoot },
@@ -273,22 +277,26 @@ export async function main(
     })
   }
 
-  let next = options
-  // Exit code 75 means a marketplace apply/undo committed a new profile.
-  // Only a validated resume marker restarts the TUI; a bare 75 without a
-  // marker is returned to the caller instead of entering a restart loop.
-  while (true) {
-    const code = await runOnce(next)
-    if (code !== 75) return code
-    const resumePath = join(dataRoot, 'tui', 'marketplace-resume')
-    let sessionId: string | undefined
-    try {
-      sessionId = readFileSync(resumePath, 'utf8').trim() || undefined
-      rmSync(resumePath, { force: true })
-    } catch {
-      sessionId = undefined
+  try {
+    let next = options
+    // Exit code 75 means a marketplace apply/undo committed a new profile.
+    // Only a validated resume marker restarts the TUI; a bare 75 without a
+    // marker is returned to the caller instead of entering a restart loop.
+    while (true) {
+      const code = await runOnce(next)
+      if (code !== 75) return code
+      const resumePath = join(dataRoot, 'tui', 'marketplace-resume')
+      let sessionId: string | undefined
+      try {
+        sessionId = readFileSync(resumePath, 'utf8').trim() || undefined
+        rmSync(resumePath, { force: true })
+      } catch {
+        sessionId = undefined
+      }
+      if (sessionId === undefined) return code
+      next = { ...next, sessionId }
     }
-    if (sessionId === undefined) return code
-    next = { ...next, sessionId }
+  } finally {
+    runtimeLock.release()
   }
 }

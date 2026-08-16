@@ -13,6 +13,7 @@ import {
 } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
+import { acquireRuntimeLock } from './runtime-lock.ts'
 import {
   DshRuntimeSupervisor,
   type DshRuntimeOptions,
@@ -245,6 +246,9 @@ export async function main(
   }
   ensureWebProfile(dataRoot)
 
+  const runtimeLock = acquireRuntimeLock(dataRoot, 'web')
+  process.once('exit', () => { runtimeLock.release() })
+
   const logTail: string[] = []
   const runtime = runtimeFactory({
     args: [
@@ -314,7 +318,10 @@ export async function main(
     }
   }
   const onSignal = (): void => {
-    void stop().then(() => { process.exit(0) })
+    void stop().then(() => {
+      runtimeLock.release()
+      process.exit(0)
+    })
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
@@ -338,6 +345,7 @@ export async function main(
       return
     }
     if (restarts >= MAX_UNEXPECTED_RESTARTS) {
+      runtimeLock.release()
       process.stderr.write(
         `Oh-DSH Web stopped after repeated restarts (${detail})\n`
         + `${logTail.slice(-20).join('\n')}\n`,
@@ -356,5 +364,7 @@ export async function main(
   } catch (error) {
     fail(error)
     return 1
+  } finally {
+    runtimeLock.release()
   }
 }
