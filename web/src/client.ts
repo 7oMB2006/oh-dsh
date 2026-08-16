@@ -18,9 +18,16 @@ html[data-oh-dsh-web='true'] [class*='sessionLogButton'] {
 }
 `
 
+const ORIGINAL_TRANSFORM_KEY = 'ohDshOriginalTransform'
+
 function applySessionLogShift(): void {
   const button = document.querySelector<HTMLElement>('[class*="sessionLogButton"]')
   if (button === null) return
+
+  // Remember the host's original inline transform so cleanup can restore it.
+  if (button.dataset[ORIGINAL_TRANSFORM_KEY] === undefined) {
+    button.dataset[ORIGINAL_TRANSFORM_KEY] = button.style.transform || ''
+  }
 
   // Prefer the actual right-side card group in the header. The Session log
   // button is usually in headerUtilities, while the cards/icons live in the
@@ -87,6 +94,13 @@ function installWebChrome(): () => void {
     cancelAnimationFrame(frame)
     mutationObserver?.disconnect()
     resizeObserver?.disconnect()
+    for (const button of document.querySelectorAll<HTMLElement>('[class*="sessionLogButton"]')) {
+      const original = button.dataset[ORIGINAL_TRANSFORM_KEY]
+      if (original !== undefined) {
+        button.style.transform = original
+        delete button.dataset[ORIGINAL_TRANSFORM_KEY]
+      }
+    }
     style.remove()
     delete document.documentElement.dataset.ohDshWeb
   }
