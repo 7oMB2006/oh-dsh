@@ -112,6 +112,7 @@ Web-only 与 TUI-only 包可直接运行 `./bin/ohdsh`，也可以把它加入 `
 
 ```sh
 ohdsh desktop          # 启动 Oh-DSH Desktop
+ohdsh gui              # Desktop 的启动别名
 ohdsh web              # 启动 Oh-DSH Web
 ohdsh web --port 3080  # 指定 Web 端口
 ohdsh tui              # 启动 Oh-DSH TUI

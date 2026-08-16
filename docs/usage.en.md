@@ -134,12 +134,14 @@ selection, scrolling, and copy behavior.
 
 ```sh
 ohdsh desktop
+ohdsh gui
 ohdsh web
 ohdsh tui
 ```
 
 - `desktop` opens the installed app and falls back to the Electron development
   entry when run from a source checkout.
+- `gui` is an alias for `desktop`.
 - `web` starts the HTTP service and prints its URL.
 - `tui` initializes its Profile and attaches the upstream renderer to the
   current terminal.

@@ -124,11 +124,13 @@ screen，全屏选择、滚动和复制由上游 `dsh-TUI` 处理。
 
 ```sh
 ohdsh desktop
+ohdsh gui
 ohdsh web
 ohdsh tui
 ```
 
 - `desktop` 启动已安装应用；源码仓库中回退到 Electron 开发入口。
+- `gui` 是 `desktop` 的启动别名。
 - `web` 启动 HTTP 服务并打印访问地址。
 - `tui` 初始化独立 Profile，并在当前终端中附着运行上游 renderer。
 
