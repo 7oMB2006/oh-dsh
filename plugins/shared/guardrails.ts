@@ -2,9 +2,10 @@
  * Shared human-approval guardrails for Oh-DSH surfaces.
  *
  * These are deliberately additive system-prompt sections: they reduce model
- * proactivity without removing tools, and they apply regardless of which
- * DeepSeek Harness preset or model (for example DeepSeek V4 Flash or Pro) a
- * session is running on.
+ * proactivity without removing tools. They apply to the standard, Code, and
+ * Cordis agent presets, and to models such as DeepSeek V4 Flash or Pro. The
+ * minimal preset uses a complete persona that suppresses global sections, so
+ * this guardrail intentionally does not apply there.
  */
 
 /** Prompt guidance that asks the model to pause before shared/external actions. */
