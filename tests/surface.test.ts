@@ -70,3 +70,20 @@ test('every bundled plugin adapts explicitly per surface', () => {
   assert.match(tuiHost, /OH_DSH_SURFACE_SERVICE/)
   assert.match(tuiHost, /Oh-DSH TUI/)
 })
+
+test('every Oh-DSH surface host adds the human-approval guardrail', () => {
+  const hosts = [
+    'src/plugin.ts',
+    'web/src/index.ts',
+    'plugins/tui/src/index.ts',
+  ]
+  for (const file of hosts) {
+    const source = readFileSync(join(root, file), 'utf8')
+    assert.match(source, /humanApprovalGuidance/)
+    assert.match(source, /app:oh-dsh-human-approval/)
+  }
+  const shared = readFileSync(join(root, 'plugins/shared/guardrails.ts'), 'utf8')
+  assert.match(shared, /ask_user_question/)
+  assert.match(shared, /remote repositories/)
+  assert.match(shared, /explicit approval/)
+})
