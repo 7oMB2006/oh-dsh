@@ -1138,7 +1138,7 @@ rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 const pnpm = resolvePinnedPnpm(dshSource)
 if (npmRelease) {
-  const releaseLockfile = join(root, 'scripts', 'dsh-runtime-rc6-lock.yaml')
+  const releaseLockfile = join(root, 'scripts', `dsh-runtime-${DSH_SOURCE_SPEC.version}-lock.yaml`)
   const assemblyLockfile = join(dshSource, 'pnpm-lock.yaml')
   if (existsSync(releaseLockfile)) copyFileSync(releaseLockfile, assemblyLockfile)
   console.log('Installing pinned DSH npm release assembly')

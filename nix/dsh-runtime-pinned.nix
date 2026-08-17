@@ -25,7 +25,7 @@ let
   src = runCommand "dsh-runtime-pinned-src" { } ''
     mkdir -p $out
     tar -xzf ${tarball} -C $out --strip-components=1
-    cp ${../scripts/dsh-runtime-rc6-lock.yaml} $out/pnpm-lock.yaml
+    cp ${../scripts}/dsh-runtime-${dshSourceSpec.version}-lock.yaml $out/pnpm-lock.yaml
   '';
 in
 

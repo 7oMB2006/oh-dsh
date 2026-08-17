@@ -26,9 +26,10 @@ broke `pnpm install --frozen-lockfile` and staging could not complete.
   `runtimeDependencyTarget`, preferring the exact release version and
   falling back to any stored version — a forked peer keeps its own version
   line.
-- `scripts/dsh-runtime-rc6-lock.yaml` is regenerated against the pristine
-  release manifest, so its specifiers match the release graph (caret
-  ranges), not the injected exact pins.
+- `scripts/dsh-runtime-<version>-lock.yaml` (named from the pinned
+  `DSH_SOURCE_SPEC.version`) is regenerated against the pristine release
+  manifest, so its specifiers match the release graph (caret ranges), not
+  the injected exact pins.
 
 ## Consequences
 
