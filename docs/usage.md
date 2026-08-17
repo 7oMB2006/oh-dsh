@@ -1,34 +1,33 @@
-<p align="center">
-  <strong>简体中文</strong> ·
-  <a href="./usage.en.md">English</a> ·
-  <a href="../README.md">返回 README</a>
-</p>
+# Installation, operations, and troubleshooting
 
-# 安装、操作与排错
+English | [中文](usage.zh.md)
 
-## 选择发行形态
+## Choose a distribution
 
-- 需要完整本地工作台：安装 **Oh-DSH Desktop**。
-- 只需要浏览器交互：安装 **Oh-DSH Web**，不携带 Electron。
-- 纯终端交互：安装 **Oh-DSH TUI**，不携带 Electron 或浏览器 UI。
+- Install **Oh-DSH Desktop** for the complete local workbench.
+- Install **Oh-DSH Web** for browser-only use without Electron.
+- Install **Oh-DSH TUI** for terminal-only use without Electron or browser UI.
 
-完整版已经包含三种形态，因此安装一次后可以使用 `desktop`、`web` 和 `tui`。
+The full distribution includes all three surfaces, so one installation
+supports `desktop`, `web`, and `tui`.
 
-## 安装完整版
+## Install the full distribution
 
 ### macOS
 
-1. 从最新 Release 下载 DMG。
-2. 将 **Oh-DSH Desktop** 拖入 Applications。
-3. 未公证的测试构建首次运行时，在 Finder 中右键应用并选择“打开”。
+1. Download the DMG from the latest Release.
+2. Drag **Oh-DSH Desktop** into Applications.
+3. For an unnotarized test build, right-click the app in Finder and choose
+   **Open** on first launch.
 
-如确认文件来自项目 Release，但仍被 quarantine 阻止，可对实际下载文件执行：
+If a verified Release download remains quarantined, apply this to the actual
+downloaded file:
 
 ```sh
 xattr -d com.apple.quarantine ~/Downloads/Oh-DSH-Desktop-*.dmg
 ```
 
-安装统一命令：
+Install the unified command:
 
 ```sh
 sudo ln -sf \
@@ -38,14 +37,14 @@ sudo ln -sf \
 
 ### Linux
 
-AppImage：
+AppImage:
 
 ```sh
 chmod +x Oh-DSH-Desktop-*.AppImage
 ./Oh-DSH-Desktop-*.AppImage
 ```
 
-deb：
+deb:
 
 ```sh
 sudo apt install ./Oh-DSH-Desktop-*.deb
@@ -53,32 +52,37 @@ sudo apt install ./Oh-DSH-Desktop-*.deb
 
 ### Windows
 
-运行 Release 中的 Windows 安装器并启动 **Oh-DSH Desktop**。统一 CLI 位于应用
-资源目录的 `bin\ohdsh.cmd`，可以将该目录加入 `PATH`。
+Run the Windows installer from the Release and start **Oh-DSH Desktop**. The unified CLI is
+`bin\ohdsh.cmd` under the application resources directory; add that directory
+to `PATH` if desired.
 
-未签名安装器可能触发 Windows SmartScreen。确认文件来自项目 Release 后，选择
-“更多信息”再选择“仍要运行”；安装过程可能请求管理员授权。
+An unsigned installer may trigger Windows SmartScreen. After verifying that it
+came from the project Release, choose **More info**, then **Run anyway**. The
+installer may request administrator approval.
 
-### Desktop 在线更新
+### Desktop online updates
 
-在应用菜单中选择 **Oh-DSH Desktop -> 检查更新…**。更新窗口只检查
-`hust-open-atom-club/oh-dsh` 的 stable GitHub Release，不需要 GitHub 登录或
-token。
+Choose **Oh-DSH Desktop -> Check for Updates...** from the application menu.
+The updater checks only stable GitHub Releases from
+`hust-open-atom-club/oh-dsh`; it does not need a GitHub login or token.
 
-- macOS、Windows 和 Linux AppImage 在下载并校验后可选择立即重启安装，或在
-  下次退出时安装。
-- `.deb` 会下载并打开系统的软件包安装器，不会绕过系统权限执行 `sudo`、`apt`
-  或 `dpkg`。
-- 更新器会使用系统代理设置；离线、代理认证、404、磁盘不足、校验失败、取消和
-  重试都会在窗口中显示可恢复状态。校验失败时不会替换现有安装。
-- 更新只替换应用程序，现有 DSH 数据、工作区设置、会话、已安装插件和 marketplace
-  receipts 保留在原有数据目录中。
+- macOS, Windows, and Linux AppImage can restart and install after a verified
+  download, or install on the next application quit.
+- `.deb` downloads and opens the system package installer. It never runs
+  `sudo`, `apt`, or `dpkg` around the system permission boundary.
+- The updater uses the system proxy configuration. Offline, proxy-auth, 404,
+  insufficient-space, verification, cancellation, and retry states are shown
+  in the update window. A verification failure never replaces the current app.
+- An update replaces only the application. DSH data, workspace settings,
+  sessions, installed plugins, and marketplace receipts remain in the existing
+  data directory.
 
-仅限签名的打包 Desktop 可自动更新。首次带更新器的 Release 之前安装的版本仍需
-手动安装一次；本地开发构建和缺少当前平台安装包的 Release 会提供官方 Release
-页面作为回退。
+Automatic updates require a signed packaged Desktop build. Versions installed
+before the first updater-enabled Release need one manual install; local
+development builds and Releases without a matching platform package fall back
+to the official Release page.
 
-## 安装 Web-only
+## Install Web-only
 
 ```sh
 tar -xzf oh-dsh-web-*.tar.gz
@@ -86,30 +90,31 @@ cd oh-dsh-web-*/
 ./bin/ohdsh web
 ```
 
-Windows：
+Windows:
 
 ```bat
 bin\ohdsh.cmd web
 ```
 
-常用选项：
+Common options:
 
-| 选项 | 默认值 | 说明 |
+| Option | Default | Description |
 | --- | --- | --- |
-| `--host` | `127.0.0.1` | 监听地址 |
-| `--port` | `3080` | 监听端口；`0` 使用随机端口 |
-| `--data` | `~/.ohdsh` | 三端共享的 Oh-DSH 数据根目录 |
-| `--no-open` | 关闭 | 不自动打开浏览器 |
-| `--trusted-host` | 无 | 增加可信 authority，可重复 |
+| `--host` | `127.0.0.1` | Bind address |
+| `--port` | `3080` | Listen port; `0` selects a random port |
+| `--data` | `~/.ohdsh` | Shared Oh-DSH data root for all surfaces |
+| `--no-open` | off | Do not open the browser automatically |
+| `--trusted-host` | none | Add a trusted authority; repeatable |
 
-等价环境变量包括 `DSH_OH_WEB_HOST`、`DSH_OH_WEB_PORT`、
-`DSH_OH_WEB_HOME` 和 `DSH_OH_WEB_OPEN`。`OH_DSH_HOME` 可以统一覆盖
-Desktop、Web 和 TUI 的数据根目录。按 `Ctrl+C` 优雅退出。
+Equivalent environment variables include `DSH_OH_WEB_HOST`,
+`DSH_OH_WEB_PORT`, `DSH_OH_WEB_HOME`, and `DSH_OH_WEB_OPEN`. `OH_DSH_HOME`
+overrides the data root for Desktop, Web, and TUI together. Press `Ctrl+C` for
+a graceful shutdown.
 
-不要在未配置访问边界时直接监听 `0.0.0.0`。对局域网开放时，应同时配置
-`--trusted-host`，并由可信反向代理提供鉴权和 TLS。
+Do not bind to `0.0.0.0` without an access boundary. For LAN exposure, add
+`--trusted-host` and put authentication and TLS in a trusted reverse proxy.
 
-## 安装 TUI-only
+## Install TUI-only
 
 ```sh
 tar -xzf oh-dsh-tui-*.tar.gz
@@ -117,10 +122,11 @@ cd oh-dsh-tui-*/
 ./bin/ohdsh tui
 ```
 
-Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认使用 alternate
-screen，全屏选择、滚动和复制由上游 `dsh-TUI` 处理。
+Use `bin\ohdsh.cmd tui` on Windows. TUI requires a real interactive terminal.
+It uses the alternate screen by default; upstream `dsh-TUI` owns fullscreen
+selection, scrolling, and copy behavior.
 
-## 统一启动命令
+## Unified commands
 
 ```sh
 ohdsh desktop
@@ -129,50 +135,59 @@ ohdsh web
 ohdsh tui
 ```
 
-- `desktop` 启动已安装应用；源码仓库中回退到 Electron 开发入口。
-- `gui` 是 `desktop` 的启动别名。
-- `web` 启动 HTTP 服务并打印访问地址。
-- `tui` 初始化独立 Profile，并在当前终端中附着运行上游 renderer。
+- `desktop` opens the installed app and falls back to the Electron development
+  entry when run from a source checkout.
+- `gui` is an alias for `desktop`.
+- `web` starts the HTTP service and prints its URL.
+- `tui` initializes its Profile and attaches the upstream renderer to the
+  current terminal.
 
-TUI 常用选项：
+Common TUI options:
 
-| 选项 | 默认值 | 说明 |
+| Option | Default | Description |
 | --- | --- | --- |
-| `--cwd` | 当前目录 | Workspace |
-| `--data` | `~/.ohdsh` | 三端共享的 Oh-DSH 数据根目录 |
-| `--resume` | 新会话 | 恢复指定 Session id |
-| `--lang` | 上游设置 | `zh` 或 `en` |
-| `--preset` | `standard` | 初始 Agent preset |
-| `--inline` | 关闭 | 保留终端 scrollback，不使用 alternate screen |
+| `--cwd` | Current directory | Workspace |
+| `--data` | `~/.ohdsh` | Shared Oh-DSH data root for all surfaces |
+| `--resume` | New session | Resume a Session id |
+| `--lang` | Upstream preference | `zh` or `en` |
+| `--preset` | `standard` | Initial Agent preset |
+| `--inline` | Off | Preserve terminal scrollback instead of alternate screen |
 
-## 图片识别
+## Image recognition
 
-Desktop、Web 和 TUI 都会加载内置的 `@oh-dsh/vision`。图片粘贴、缩略图、附件保存
-和提交全部使用 DSH 原生 attachment rail。DeepSeek V4 的模型元数据在 DSH 中仍标记
-为 text-only，插件只在 Host 的最终图片能力校验处为 V4 放行，不接管输入栏，也不
-创建第二套图片气泡或引用协议。Host 会先用配置的视觉后端描述这些原生图片附件，再
-交给固定的 text-only 适配器序列化同一轮请求。`view_image` 仍可对明确给出的 Workspace
-图片路径、HTTP(S) URL 或 image data URL 做 OCR、图表读取、物体计数、截图排错与布局分析。
+Desktop, Web, and TUI all load the bundled `@oh-dsh/vision` plugin. DSH owns
+image paste, thumbnails, attachment storage, and submission through its native
+attachment rail. DeepSeek V4 is still described as text-only by the pinned DSH
+metadata; the plugin only admits V4 at the Host's final image-capability check.
+The Host then describes each native image attachment through the configured
+vision backend before the pinned text-only adapter serializes the same turn. It
+does not intercept the composer or create a second thumbnail/reference path.
+The `view_image` tool remains available for explicit workspace-local paths,
+HTTP(S) URLs, and image data URLs.
 
-在 Desktop 或 Web UI 中，复制一张 PNG、JPEG、WebP 或 GIF，把焦点放到消息输入框并
-按 `⌘V`（macOS）或 `Ctrl+V`（Windows/Linux）。当前 DSH 输入栏会在输入框内部显示
-原生缩略图，并负责删除、拖放、大小限制和提交；插件不会拦截这条流程。TUI 没有图形
-化缩略图，直接在消息中提供 Workspace 内的图片路径或 HTTP(S) URL，即可调用同一个
-`view_image` 工具。
+In Desktop or Web UI, copy a PNG, JPEG, WebP, or GIF, focus the message
+composer, and press `⌘V` on macOS or `Ctrl+V` on Windows/Linux. DSH's native
+composer displays the thumbnail inside the input card and owns remove, drag/drop,
+size limits, and submission. The plugin does not intercept this flow. TUI has
+no graphical thumbnail; provide a workspace-local image path or HTTP(S) URL in
+the prompt to use the same `view_image` tool.
 
-默认后端使用智谱 `glm-4.6v-flash`。在原生的“设置 → 插件 → 插件配置 → Vision”卡片中，
-先确认云端接口地址，再点击“获取智谱 Key”打开智谱控制台；复制回来的 Key 会以密码
-输入框显示，并保存到共享数据根目录的凭据文件（默认 `~/.ohdsh/.credentials.yaml`）：
+The default backend uses Zhipu `glm-4.6v-flash`. In the native
+`Settings → Plugins → Plugin configuration → Vision` card, confirm the cloud
+endpoint first, then click `Get a Zhipu key` to open the Zhipu console. Paste
+the returned key into the password-style field; it is stored in the shared data
+root's credential file (`~/.ohdsh/.credentials.yaml` by default):
 
 ```yaml
 ZHIPUAI_API_KEY: your-api-key
 ```
 
-凭据文件应保持仅当前用户可读，例如在 macOS/Linux 上执行
-`chmod 600 ~/.ohdsh/.credentials.yaml`。也可以在启动前 `export ZHIPUAI_API_KEY=...`。
-旧版本使用的 `VISION_API_KEY` 仍会作为迁移回退读取。
+Keep the credential file owner-readable only, for example with
+`chmod 600 ~/.ohdsh/.credentials.yaml` on macOS/Linux. Exporting
+`ZHIPUAI_API_KEY` before launch is also supported. The legacy
+`VISION_API_KEY` name remains a migration fallback.
 
-后端和模型可在共享的 `~/.ohdsh/settings.yaml` 中覆盖：
+Override the backend and model in the shared `~/.ohdsh/settings.yaml`:
 
 ```yaml
 oh-dsh-vision:
@@ -184,12 +199,15 @@ oh-dsh-vision:
 maxImageBytes: 10485760
 ```
 
-卡片只显示云端接口地址、云端模型和一个隐藏的智谱 Key 输入框；Key 不会回显到设置快照。
-重试、备用模型、超时、图片大小和本地 OCR/VLM 选项仍可由 Agent 或 `settings.yaml` 高级配置，
-不要求用户重复填写多个 Key。Claude/Anthropic Key 属于对应模型提供方，不会被当作智谱 Vision
-Key 使用。
+The card intentionally shows only the cloud endpoint, cloud model, and one
+masked Zhipu key field. The key is write-only through the DSH credential store
+and is never returned in a settings snapshot. Retry, fallback, timeout, image
+size, and local OCR/VLM options remain available to the Agent or through
+advanced `settings.yaml` configuration, so users do not have to enter several
+keys. Claude/Anthropic keys belong to their model provider and are not treated
+as the Zhipu Vision key.
 
-使用本地 Ollama 时不要求密钥：
+A local Ollama endpoint needs no key:
 
 ```yaml
 oh-dsh-vision:
@@ -197,11 +215,14 @@ oh-dsh-vision:
   model: qwen3-vl:4b
 ```
 
-插件始终优先使用云端凭据，并对云端备用模型进行有上限的重试。如果云端被限流、不可用
-或返回不兼容结果，会尝试配置的本地 OCR/VLM 模型；本地也失败后还会进行一次最终云端
-恢复，再提示你检查 Vision 卡片、换一把云端 Key 或安装本地模型。`localModel` 就是用户
-从本机 Ollama/LM Studio 兼容安装中选择的模型 ID；为空表示关闭本地回退。非本机端点才
-需要配置 `localApiKeyEnv`。
+Cloud credentials are attempted first with bounded retries and configured cloud
+fallback models. If the cloud request is rate-limited, unavailable, or returns
+an incompatible response, a configured local OCR/VLM model is tried. If that
+path also fails, one final cloud recovery is attempted before the error points
+you to the Vision card, a new cloud key, or a local model. `localModel` is the
+model ID you choose from your local Ollama/LM Studio-compatible installation;
+an empty value disables the local fallback. `localApiKeyEnv` is only needed for
+a non-local endpoint.
 
 ```yaml
 oh-dsh-vision:
@@ -214,68 +235,78 @@ oh-dsh-vision:
     - qwen2.5-vl:7b
 ```
 
-每个后端都会进行有上限的指数退避重试。两个后端都失败时，错误消息会提示用户检查
-云端 Key，或安装/配置本地 OpenAI-compatible OCR/VLM 模型。插件不会在仓库中内置或
-联网获取共享云端密钥；用户自己的授权凭据仍通过 DSH credentials 或配置的环境变量
-提供。
+Each backend has a bounded exponential retry. When both backends fail, the
+error tells the user to check the cloud key or install/configure a local
+OpenAI-compatible OCR/VLM model. The plugin does not embed or fetch a shared
+cloud secret; the user's authorized key remains in DSH credentials or the
+configured environment variable.
 
-本地图片路径只能位于当前 Session 的 Workspace 内，解析软链接后仍会检查边界；
-远程 URL 或本地图片内容只会在调用 `view_image` 时发送给所配置的视觉端点。浏览器
-附件按钮、粘贴和拖放都属于 DSH 原生图片输入；DeepSeek V4 的最终 admission check
-由插件放行，其他模型仍遵循各自的 image-input 元数据。
+Local image paths must remain inside the active Session workspace, including
+after symlink resolution. Remote URLs or local image bytes are sent to the
+configured vision endpoint only when `view_image` is called. The browser's
+attachment button, paste, and drag-and-drop remain native DSH image input;
+DeepSeek V4 is admitted by the plugin's final check, while other models keep
+their declared image-input behavior.
 
-## Desktop 操作
+## Desktop operations
 
-### 对话输入历史
+### Conversation input history
 
-焦点位于主对话输入框时，在第一行开头按 `ArrowUp` 可取回上一条已提交消息；在
-最后一行末尾按 `ArrowDown` 可向后浏览，并最终恢复开始浏览前的草稿。多行输入中，
-未处于这两个边界的方向键仍保持原有的光标移动行为。
+With the main conversation composer focused, `ArrowUp` at the start of the
+first line recalls the preceding submitted message. `ArrowDown` at the end of
+the last line moves forward and eventually restores the draft that was present
+before browsing. In a multi-line draft, arrows away from those boundaries keep
+their normal caret movement.
 
-历史按当前会话隔离，只包含已确认的用户文本消息，仅在本次应用运行期间保存在内存
-中。输入框最多保留最近 100 条记录；在容量允许时，浏览到最早记录会按需加载更早的
-会话消息。
+History is scoped to the current session, contains only confirmed text user
+messages, and remains in memory only for the current application run. The
+composer keeps the most recent 100 entries and loads older session messages on
+demand while that window has capacity.
 
-| 操作 | macOS 快捷键 |
+| Action | macOS shortcut |
 | --- | --- |
-| 切换左侧栏 | `⌘B` |
-| 切换底部 Terminal | `⌘J` |
-| 切换右侧栏 | `⌥⌘B` |
-| 打开 Review | `⌃⇧G` |
-| 打开 Browser | `⌘T` |
-| 打开 Files | `⌘P` |
-| 新建 Side chat | `⌥⌘S` |
-| 退出侧栏专注模式 | `Esc` |
+| Toggle the left sidebar | `⌘B` |
+| Toggle the bottom Terminal | `⌘J` |
+| Toggle the right sidebar | `⌥⌘B` |
+| Open Review | `⌃⇧G` |
+| Open Browser | `⌘T` |
+| Open Files | `⌘P` |
+| Start a Side chat | `⌥⌘S` |
+| Leave sidebar focus mode | `Esc` |
 
-设置页支持中英文、模型、权限、Agent preset、插件配置和 Oh-DSH 皮肤。
-设置弹窗会覆盖并虚化所有工作区和侧栏内容。
+Settings covers language, models, permissions, Agent presets, plugin config,
+and Oh-DSH skins. Its modal covers and blurs every workspace and sidebar.
 
-Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
-Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。
+Choose a skin from Settings on Web or Desktop. In TUI, run `/theme` to select
+the same Deep Current, Jade Circuit, Porcelain, or Ember Dusk palette. The
+choice applies immediately and survives restarts.
 
-## 插件市场
+## Plugin marketplace
 
-Desktop、Web 与 TUI 共用同一个插件市场：三端都能检索插件、准备
-candidate、隔离预览、应用、启用、更新和卸载。Desktop 与 Web 使用侧栏
-市场界面；TUI 在聊天中输入 `/plugins` 打开终端市场（也可按 `Ctrl+M`）。
+Desktop, Web, and TUI share one plugin marketplace: all three surfaces can
+search plugins, prepare candidates, preview, apply, enable, update, and
+uninstall. Desktop and Web use the sidebar marketplace; in TUI run `/plugins`
+(or press `Ctrl+M`) to open the terminal marketplace.
 
-插件目录会标注每个插件的生效界面。安装本身在三端都可以成功；但如果插件
-声明只支持 Web / Desktop，在 TUI 中安装后不会在 TUI 生效，卡片和详情会
-明确显示这一点。
+The catalog labels the surfaces where each plugin is expected to take effect.
+Installation itself succeeds on all three surfaces; if a plugin declares Web
+or Desktop support only, it will not take effect in TUI after installation,
+and the cards and details call that out explicitly.
 
-推荐流程：
+Recommended flow:
 
-1. 在未安装分类中选择插件。
-2. 检查来源、commit、权限和风险等级。
-3. 创建 candidate 并在隔离 Profile 中预览。
-4. 效果不合适时选择放弃，当前桌面不发生变化。
-5. 确认后应用；需要时再单独启用。
-6. 更新失败时恢复 previous。
+1. Choose a plugin from Not installed.
+2. Inspect its source, commit, permissions, and risk level.
+3. Prepare a candidate and preview it in an isolated Profile.
+4. Discard it if the result is unsuitable; the current Desktop is unchanged.
+5. Apply it explicitly, then enable it separately when needed.
+6. Recover the previous state if an update fails.
 
-Agent 可以通过对话发起同样的安装操作，但仍需要经过预览、风险确认和应用，
-不会直接修改当前 Profile。
+An Agent can initiate the same operation through chat, but still passes
+through preview, risk approval, and apply. It cannot directly mutate the
+current Profile.
 
-## 从源码启动与打包
+## Run and package from source
 
 ```sh
 git submodule update --init --recursive
@@ -290,48 +321,58 @@ ohdsh web --port 3080
 ohdsh tui
 ```
 
-打包命令：
+Packaging commands:
 
 ```sh
-pnpm run dist:mac       # macOS 完整版
-pnpm run dist:linux     # Linux 完整版
-pnpm run dist:win       # Windows 完整版
-pnpm run dist:web       # Web-only 轻量版
-pnpm run dist:tui       # TUI-only 终端版
+pnpm run dist:mac       # macOS full distribution
+pnpm run dist:linux     # Linux full distribution
+pnpm run dist:win       # Windows full distribution
+pnpm run dist:web       # Web-only lightweight distribution
+pnpm run dist:tui       # TUI-only terminal distribution
 ```
 
-发布工作流在 GitHub Actions 的 macOS 签名/公证凭据和 Windows Authenticode
-凭据齐全时生成正式签名包。缺少任一组凭据时，工作流会明确警告并降级生成 macOS
-ad-hoc 签名包或 Windows 未签名安装器，而不会阻止 Web、TUI 和 Desktop 打包。
-降级产物仅支持上文所述的手动安装，不能视为支持自动更新。启用正式签名需要配置
-`MACOS_CSC_LINK`、`MACOS_CSC_KEY_PASSWORD`、`APPLE_ID`、
-`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`、`WINDOWS_CSC_LINK` 和
-`WINDOWS_CSC_KEY_PASSWORD`。安装包、内嵌或外置 blockmap、`latest*.yml` 元数据
-仍会被严格校验，缺失时停止发布。可从 Actions 手动运行 Release workflow 做四平台
-打包检查；手动运行只上传 workflow artifacts，不创建 GitHub Release。
+The release workflow produces formally signed packages when all GitHub Actions
+secrets for macOS signing/notarization and Windows Authenticode signing are
+available. If either credential set is incomplete, the workflow emits an
+explicit warning and falls back to an ad-hoc-signed macOS package or an
+unsigned Windows installer without blocking Web, TUI, and Desktop packaging.
+Fallback artifacts support only the manual installation described above and
+must not be treated as supporting automatic updates. Formal signing requires
+`MACOS_CSC_LINK`, `MACOS_CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `WINDOWS_CSC_LINK`, and
+`WINDOWS_CSC_KEY_PASSWORD`. Installers, embedded or external blockmaps, and
+`latest*.yml` metadata remain strictly validated and stop the release when
+missing. Run the Release workflow manually from Actions for a four-platform
+packaging check; manual runs upload workflow artifacts without creating a
+GitHub Release.
 
-## 数据与排错
+## Data and troubleshooting
 
-Desktop、Web 和 TUI 默认共同使用 `~/.ohdsh`，且不会加载 `~/.dsh` 中的
-全局插件配置。三端分别使用 `profiles/desktop`、`profiles/web` 和
-`profiles/tui`，但共享会话、凭据、皮肤和插件缓存；Electron 自身的数据
-位于 `~/.ohdsh/desktop`。可用 `OH_DSH_HOME` 全局覆盖，也可用 Web/TUI 的
-`--data` 临时隔离。DeepSeek API key 可以在 Models 设置中配置，或写入
-`~/.ohdsh/.env`。
+Desktop, Web, and TUI share `~/.ohdsh` by default and do not load global plugin
+configuration from `~/.dsh`. They keep separate `profiles/desktop`,
+`profiles/web`, and `profiles/tui` compositions while sharing sessions,
+credentials, skins, and plugin caches. Electron-specific data lives under
+`~/.ohdsh/desktop`. Override all surfaces with `OH_DSH_HOME`, or isolate one
+Web or TUI process with `--data`. Configure the DeepSeek API key in Models
+settings or in `~/.ohdsh/.env`.
 
-首次使用共享目录时，Desktop 会从系统应用数据目录中的旧
-`Oh-DSH-Desktop` 状态导入会话、凭据、插件与界面设置；Web 会导入旧
-`~/.oh-dsh-web/dsh`、根级皮肤与侧栏偏好，以及当前数据目录下的 `dsh/`。
-迁移只复制共享目录中缺失的数据，并保留旧目录用于回滚；已存在的新状态
-不会被覆盖。
+On first use of the shared root, Desktop imports sessions, credentials, plugins,
+and UI preferences from the old system `Oh-DSH-Desktop` application-data
+directory. Web imports the former `~/.oh-dsh-web/dsh` root and a nested `dsh/`
+inside the selected data directory, plus root-level skin and sidebar
+preferences. Migration copies only missing data and leaves legacy directories
+in place for rollback; existing shared state is not replaced.
 
-排查顺序：
+Troubleshooting order:
 
-1. 运行 `ohdsh --help` 确认 CLI 来源。
-2. 运行 `ohdsh web --help` 检查参数。
-3. 运行 `ohdsh tui --help`，再用 `ohdsh tui --inline` 排除终端全屏兼容问题。
-4. 使用随机端口验证：`ohdsh web --port 0 --no-open`。
-5. 检查 Profile 是否同时安装并启用了所需插件。
-6. Desktop 启动失败时，从终端运行应用内 `bin/ohdsh desktop` 获取日志。
+1. Run `ohdsh --help` to confirm the CLI source.
+2. Run `ohdsh web --help` to inspect options.
+3. Run `ohdsh tui --help`, then use `ohdsh tui --inline` to isolate
+   alternate-screen terminal compatibility.
+4. Test a random port with `ohdsh web --port 0 --no-open`.
+5. Confirm that required plugins are both installed and enabled in the Profile.
+6. If Desktop does not start, run its bundled `bin/ohdsh desktop` in a terminal
+   to capture logs.
 
-架构与上游关系见[设计与插件边界](./design.md)。
+See [design and plugin boundaries](./design.md) for architecture and
+upstream relationships.

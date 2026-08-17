@@ -21,9 +21,9 @@
 <p align="center">
   <a href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"><strong>下载最新版</strong></a>
   ·
-  <a href="./docs/usage.md">使用文档</a>
+  <a href="./docs/usage.zh.md">使用文档</a>
   ·
-  <a href="./docs/design.md">设计文档</a>
+  <a href="./docs/design.zh.md">设计文档</a>
 </p>
 
 <p align="center">
@@ -128,7 +128,7 @@ ohdsh tui              # 启动 Oh-DSH TUI
 能力校验处放行 DeepSeek V4，并在固定的 text-only 适配器序列化同一轮请求前，通过
 配置的视觉后端描述原生附件。不另加输入栏气泡或引用协议。TUI 通过 Workspace
 图片路径或 URL 使用同一能力。
-凭据与后端配置见[图片识别使用说明](./docs/usage.md#图片识别)；云端/本地 Key 与 Vision
+凭据与后端配置见[图片识别使用说明](./docs/usage.zh.md#图片识别)；云端/本地 Key 与 Vision
 设置也可以在原生“设置 → 插件 → 插件配置 → Vision”卡片中修改。
 
 <details>
@@ -169,8 +169,8 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 
 ## 文档
 
-- [安装、操作与排错](./docs/usage.md)
-- [架构设计与插件边界](./docs/design.md)
+- [安装、操作与排错](./docs/usage.zh.md)
+- [架构设计与插件边界](./docs/design.zh.md)
 
 ## 插件推荐
 
@@ -183,7 +183,7 @@ Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 | [dshfind](https://dshfind.com/) | DSH 插件超市与学习社区，提供插件、生态与 DeepSeek Harness 周边推荐 |
 
 Oh-DSH 保留上游实现与署名，并在其上提供统一启动器、Profile、数据目录、
-跨端皮肤、界面适配和发行打包。详细边界见[设计文档](./docs/design.md)。
+跨端皮肤、界面适配和发行打包。详细边界见[设计文档](./docs/design.zh.md)。
 
 ## License
 
