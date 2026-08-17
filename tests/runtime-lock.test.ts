@@ -31,7 +31,7 @@ test('acquireRuntimeLock rejects a second live surface on the same root', () => 
     try {
       assert.throws(
         () => acquireRuntimeLock(root, 'web'),
-        /already using/,
+        /still using/,
       )
     } finally {
       first.release()
@@ -77,6 +77,62 @@ test('release does not delete a lock owned by a different process', () => {
 
     first.release()
     assert.equal(existsSync(path), true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('setChildPids records runtime children in the lock', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-lock-'))
+  try {
+    const lock = acquireRuntimeLock(root, 'web')
+    lock.setChildPids([process.pid])
+    const path = join(root, LOCK_FILE)
+    const info = JSON.parse(readFileSync(path, 'utf8')) as { childPids?: number[] }
+    assert.deepEqual(info.childPids, [process.pid])
+    lock.release()
+    assert.equal(existsSync(path), false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('acquireRuntimeLock refuses a stale owner with a live child process', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-lock-'))
+  try {
+    const path = join(root, LOCK_FILE)
+    writeFileSync(path, JSON.stringify({
+      pid: 2_147_483_647,
+      surface: 'old-surface',
+      startedAt: 1,
+      childPids: [process.pid],
+    }))
+
+    assert.throws(
+      () => acquireRuntimeLock(root, 'web'),
+      /still using/,
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('acquireRuntimeLock replaces a stale owner whose child is also dead', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-lock-'))
+  try {
+    const path = join(root, LOCK_FILE)
+    writeFileSync(path, JSON.stringify({
+      pid: 2_147_483_647,
+      surface: 'old-surface',
+      startedAt: 1,
+      childPids: [2_147_483_646],
+    }))
+
+    const lock = acquireRuntimeLock(root, 'tui')
+    const info = JSON.parse(readFileSync(path, 'utf8')) as { pid: number; surface: string }
+    assert.equal(info.pid, process.pid)
+    assert.equal(info.surface, 'tui')
+    lock.release()
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

@@ -69,6 +69,11 @@ export class DshRuntimeSupervisor extends EventEmitter {
     return this.child !== undefined
   }
 
+  /** PID of the currently supervised child process, if any. */
+  get pid(): number | undefined {
+    return this.child?.pid
+  }
+
   /** Start DSH and resolve only after the bundle's post-settlement URL line. */
   async start(): Promise<URL> {
     if (this.child !== undefined) throw new Error('DSH runtime is already running')
@@ -83,6 +88,7 @@ export class DshRuntimeSupervisor extends EventEmitter {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     this.child = child
+    if (child.pid !== undefined) this.emit('spawn', child.pid)
     const readiness = deferred<URL>()
     let settled = false
     const settleFailure = (error: Error): void => {

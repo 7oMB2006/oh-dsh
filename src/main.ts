@@ -43,7 +43,7 @@ import {
 } from './data-root.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
-import { acquireRuntimeLock } from './runtime-lock.ts'
+import { acquireRuntimeLock, type RuntimeLock } from './runtime-lock.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 import {
   bundledRuntimePaths,
@@ -68,6 +68,7 @@ let mainWindow: BrowserWindow | undefined
 let runtime: DshRuntimeSupervisor | undefined
 let runtimeUrl: URL | undefined
 let runtimeOrigin: string | undefined
+let runtimeLock: RuntimeLock | undefined
 let previewRuntime: DshRuntimeSupervisor | undefined
 let previewWindow: BrowserWindow | undefined
 let previewUrl: URL | undefined
@@ -470,7 +471,10 @@ async function startRuntime(): Promise<void> {
   const supervisor = new DshRuntimeSupervisor(runtimeOptions())
   runtime = supervisor
   supervisor.on('exit', handleRuntimeExit)
+  supervisor.on('spawn', (pid: number) => { runtimeLock?.setChildPids([pid]) })
   const url = await supervisor.start()
+  const childPid = supervisor.pid
+  if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
   runtimeUrl = url
   runtimeOrigin = url.origin
   if (mainWindow === undefined || mainWindow.isDestroyed()) mainWindow = createWindow()
@@ -863,13 +867,14 @@ async function bootstrap(): Promise<void> {
     applicationVersion: PRODUCT_VERSION,
     version: `DeepSeek Harness plugin distribution ${PRODUCT_VERSION}`,
   })
+  runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
+  process.once('exit', () => { runtimeLock?.release() })
   const gotLock = app.requestSingleInstanceLock()
   if (!gotLock) {
+    runtimeLock?.release()
     app.quit()
     return
   }
-  const runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
-  process.once('exit', () => { runtimeLock.release() })
   app.on('second-instance', (_event, argv) => {
     queuedPaths.push(...argv.slice(1).filter(argument => !argument.startsWith('-')))
     if (mainWindow === undefined || mainWindow.isDestroyed()) {

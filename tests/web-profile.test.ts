@@ -260,7 +260,7 @@ test('web launcher refuses a data root already owned by another surface', async 
         { DSH_OH_WEB_ROOT: packaged, PATH: process.env.PATH },
         { isTTY: false } as NodeJS.WriteStream,
       ),
-      /already using/,
+      /still using/,
     )
   } finally {
     owner.release()

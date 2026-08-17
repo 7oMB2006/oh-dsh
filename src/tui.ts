@@ -270,6 +270,8 @@ export async function main(
     )
     return await new Promise<number>((resolveExit, rejectExit) => {
       const child = spawnTui(spec.command, spec.args, spec.spawnOptions)
+      const childPid = child.pid
+      if (childPid !== undefined) runtimeLock.setChildPids([childPid])
       child.once('error', rejectExit)
       child.once('exit', (code, signal) => {
         resolveExit(code ?? (signal === null ? 1 : 128))

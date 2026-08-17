@@ -277,6 +277,7 @@ export async function main(
     onLog: (stream, line) => { printLine(logTail, `${stream === 'stderr' ? '[runtime]' : ''}${line}`) },
     readyTimeoutMs: 60_000,
   })
+  runtime.on('spawn', (pid: number) => { runtimeLock.setChildPids([pid]) })
 
   const MAX_UNEXPECTED_RESTARTS = 5
   const RESTART_DELAY_MS = 600
@@ -310,6 +311,8 @@ export async function main(
   }
   const startOnce = async (): Promise<void> => {
     const url = await runtime.start()
+    const childPid = runtime.pid
+    if (childPid !== undefined) runtimeLock.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
     if (options.open && browserOpened === false) {
