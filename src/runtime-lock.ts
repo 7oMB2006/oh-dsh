@@ -50,6 +50,30 @@ export interface RuntimeLock {
 
 const LOCK_FILE_NAME = '.runtime.lock'
 
+interface ReclaimLockInfo {
+  pid: number
+  processStart?: string
+  startedAt: number
+}
+
+function readReclaimInfo(path: string): ReclaimLockInfo | undefined {
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
+    if (typeof parsed !== 'object' || parsed === null) return undefined
+    const { pid, processStart, startedAt } = parsed as Record<string, unknown>
+    if (typeof pid !== 'number' || Number.isSafeInteger(pid) === false || pid <= 0) return undefined
+    if (processStart !== undefined && typeof processStart !== 'string') return undefined
+    if (typeof startedAt !== 'number' || Number.isFinite(startedAt) === false) return undefined
+    return {
+      pid,
+      ...(processStart === undefined ? {} : { processStart }),
+      startedAt,
+    }
+  } catch {
+    return undefined
+  }
+}
+
 function readLockInfo(path: string): RuntimeLockInfo | undefined {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
@@ -199,6 +223,13 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
         reclaimHandle = openSync(reclaimPath, 'wx', 0o600)
       } catch (reclaimError) {
         if ((reclaimError as NodeJS.ErrnoException).code !== 'EEXIST') throw reclaimError
+        const reclaimInfo = readReclaimInfo(reclaimPath)
+        if (reclaimInfo !== undefined
+          && pidMatchesStoredIdentity(reclaimInfo.pid, reclaimInfo.processStart)) {
+          // The original reclaimer is still alive; never steal its mutex.
+          sleepSync(20)
+          continue
+        }
         if (isStaleLockFile(reclaimPath)) {
           // Claim a stale reclaim lock by moving the exact inode we inspected.
           // If the file was replaced before the rename, restore it and retry
@@ -240,6 +271,13 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
         sleepSync(20)
         continue
       }
+      const reclaimProcessStart = readProcessStart(process.pid)
+      const reclaimInfo: ReclaimLockInfo = {
+        pid: process.pid,
+        ...(reclaimProcessStart === undefined ? {} : { processStart: reclaimProcessStart }),
+        startedAt: Date.now(),
+      }
+      writeSync(reclaimHandle, JSON.stringify(reclaimInfo))
       try {
         const current = readLockInfo(path)
         if (current !== undefined && hasLiveOwner(current)) {
