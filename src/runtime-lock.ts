@@ -17,7 +17,6 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
-  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -49,6 +48,7 @@ export interface RuntimeLock {
 }
 
 const LOCK_FILE_NAME = '.runtime.lock'
+const MAX_RECLAIM_WAIT_ATTEMPTS = 250
 
 interface ReclaimLockInfo {
   pid: number
@@ -198,7 +198,7 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
   const path = join(dataRoot, LOCK_FILE_NAME)
   const reclaimPath = `${path}.reclaim`
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_RECLAIM_WAIT_ATTEMPTS; attempt += 1) {
     let handle: number | undefined
     try {
       handle = openSync(path, 'wx', 0o600)
@@ -226,58 +226,36 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
         const reclaimInfo = readReclaimInfo(reclaimPath)
         if (reclaimInfo !== undefined
           && pidMatchesStoredIdentity(reclaimInfo.pid, reclaimInfo.processStart)) {
-          // The original reclaimer is still alive; never steal its mutex.
+          // The original reclaimer is still alive; wait for it to finish.
           sleepSync(20)
           continue
         }
         if (isStaleLockFile(reclaimPath)) {
-          // Claim a stale reclaim lock by moving the exact inode we inspected.
-          // If the file was replaced before the rename, restore it and retry
-          // instead of deleting a fresh mutex.
-          const backup = `${reclaimPath}.stale-${String(process.pid)}-${String(Date.now())}`
-          let claimed = false
-          try {
-            const before = statSync(reclaimPath)
-            renameSync(reclaimPath, backup)
-            const after = statSync(backup)
-            if (before.ino === after.ino && before.dev === after.dev) {
-              try {
-                unlinkSync(backup)
-              } catch {
-                // Best-effort cleanup of the claimed stale file.
-              }
-              claimed = true
-            } else {
-              try {
-                renameSync(backup, reclaimPath)
-              } catch {
-                throw new UsageError(
-                  `stale runtime reclaim lock at ${reclaimPath} changed during recovery; `
-                  + 'remove it manually if no other Oh-DSH surface is recovering',
-                )
-              }
-            }
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-              // Another reclaimer already removed it.
-            } else if (error instanceof UsageError) {
-              throw error
-            } else {
-              throw error
-            }
-          }
-          if (claimed) continue
+          // Without an atomic compare-and-swap we must not auto-remove a
+          // reclaim mutex; a delayed reclaimer could delete a fresh one.
+          throw new UsageError(
+            `stale runtime reclaim lock at ${reclaimPath} exists; `
+            + 'remove it manually if no other Oh-DSH surface is recovering',
+          )
         }
         sleepSync(20)
         continue
       }
-      const reclaimProcessStart = readProcessStart(process.pid)
       const reclaimInfo: ReclaimLockInfo = {
         pid: process.pid,
-        ...(reclaimProcessStart === undefined ? {} : { processStart: reclaimProcessStart }),
         startedAt: Date.now(),
       }
+      // Publish ownership before probing the start marker. If this process is
+      // killed during the probe, contenders still see a live reclaimer.
       writeSync(reclaimHandle, JSON.stringify(reclaimInfo))
+      const reclaimProcessStart = readProcessStart(process.pid)
+      const enrichedReclaim = readReclaimInfo(reclaimPath)
+      if (enrichedReclaim?.pid === process.pid) {
+        writeFileSync(reclaimPath, JSON.stringify({
+          ...enrichedReclaim,
+          ...(reclaimProcessStart === undefined ? {} : { processStart: reclaimProcessStart }),
+        }), { mode: 0o600 })
+      }
       try {
         const current = readLockInfo(path)
         if (current !== undefined && hasLiveOwner(current)) {

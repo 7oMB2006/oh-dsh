@@ -40,5 +40,5 @@ surfaces are allowed to start as read-only viewers instead of being rejected:
 - A second surface can inspect history without risking concurrent writes.
 - Writes from viewer mode fail with a clear read-only error.
 - Existing corrupt logs are not repaired automatically.
-- Stale reclaim locks are recovered only when the recorded owner is no longer
-  alive; a live reclaimer's mutex is never stolen.
+- Stale reclaim locks require manual cleanup because no atomic compare-and-swap
+  is available to safely take over a crash-left mutex.
