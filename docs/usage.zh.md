@@ -55,6 +55,8 @@ sudo apt install ./Oh-DSH-Desktop-*.deb
 未签名安装器可能触发 Windows SmartScreen。确认文件来自项目 Release 后，选择
 “更多信息”再选择“仍要运行”；安装过程可能请求管理员授权。
 
+窗口标题栏、菜单栏与工具条合并为一行；点击该行左角的菜单名即可打开应用菜单。
+
 ### Desktop 在线更新
 
 在应用菜单中选择 **Oh-DSH Desktop -> 检查更新…**。更新窗口只检查

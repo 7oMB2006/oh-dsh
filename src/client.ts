@@ -1,6 +1,6 @@
 /** Browser face for the native Oh-DSH Desktop bridge. */
 
-import type { DesktopBridge, DesktopCommand } from './contracts.ts'
+import { DESKTOP_TITLEBAR_HEIGHT, type DesktopBridge, type DesktopCommand } from './contracts.ts'
 import type { DesktopPanels } from '../plugins/panel-controls/src/client.ts'
 import type { PinnedSummary } from '../plugins/pinned-summary/src/client.ts'
 import type { WorkspaceTools } from '../plugins/sidebar/src/client.ts'
@@ -35,8 +35,6 @@ declare global {
   }
 }
 
-const DESKTOP_TITLEBAR_HEIGHT = 40
-
 const DESKTOP_CHROME_CSS = `
 html[data-oh-dsh-desktop='true'] {
   --oh-dsh-titlebar-height: ${DESKTOP_TITLEBAR_HEIGHT}px;
@@ -44,7 +42,7 @@ html[data-oh-dsh-desktop='true'] {
 
 html[data-oh-dsh-desktop='true'] body {
   box-sizing: border-box;
-  padding-top: var(--oh-dsh-titlebar-height);
+  padding-top: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
 }
 
 html[data-oh-dsh-desktop='true'] body::before {
@@ -54,10 +52,44 @@ html[data-oh-dsh-desktop='true'] body::before {
   top: 0;
   right: 0;
   left: 0;
-  height: var(--oh-dsh-titlebar-height);
+  height: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
   background: var(--dsw-alias-bg-base);
   -webkit-app-region: drag;
   user-select: none;
+}
+
+/* Keep the panel toolbar clear of the Windows window-controls overlay. */
+html[data-oh-dsh-desktop='true'] .oh-dsh-panel-toolbar {
+  right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 14px);
+}
+
+/* In-page menu bar: fills the blank strip corner on Windows with the real
+   application menu, popped up natively at the button. */
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar {
+  position: fixed;
+  z-index: 2147483647;
+  top: 0;
+  left: 6px;
+  display: flex;
+  align-items: stretch;
+  height: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
+  -webkit-app-region: drag;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar button {
+  -webkit-app-region: no-drag;
+  margin: 5px 0;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary, #1f2328);
+  font-size: 12px;
+  line-height: calc(env(titlebar-area-height, var(--oh-dsh-titlebar-height)) - 10px);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar button:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
 }
 
 html[data-oh-dsh-preview='true'] body::after {
@@ -130,13 +162,15 @@ html[data-oh-dsh-desktop='true']:has(
 /** Wait for the DSH services used by native menu commands. */
 export const inject = ['locale', 'workspaces', 'desktopPanels', 'pinnedSummary', 'workspaceTools']
 
-type DesktopShellMessage = 'preview.label'
+type DesktopShellMessage = 'menubar.label' | 'preview.label'
 
 const DESKTOP_SHELL_MESSAGES: LocaleMessages<DesktopShellMessage> = {
   en: {
+    'menubar.label': 'Application menu',
     'preview.label': 'Isolated plugin preview · {plugin}',
   },
   zh: {
+    'menubar.label': '应用菜单',
     'preview.label': '隔离插件预览 · {plugin}',
   },
 }
@@ -154,6 +188,32 @@ function installDesktopChrome(): () => void {
     delete document.documentElement.dataset.ohDshDesktop
     document.title = originalTitle
   }
+}
+
+/**
+ * Windows only: render the application menu's top-level labels inside the
+ * merged titlebar row. Buttons pop up the native submenu, so menu items,
+ * roles, and accelerators keep their single owner in the main process.
+ */
+function installMenuBar(bridge: DesktopBridge, t: Translate<DesktopShellMessage>): () => void {
+  const bar = document.createElement('nav')
+  bar.className = 'oh-dsh-menubar'
+  bar.setAttribute('aria-label', t('menubar.label'))
+  document.body.append(bar)
+  void bridge.menuBarLabels().then(labels => {
+    if (!bar.isConnected) return
+    for (const [index, label] of labels.entries()) {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = label
+      button.addEventListener('click', () => {
+        const rect = button.getBoundingClientRect()
+        void bridge.popupMenuBarMenu(index, rect.left, rect.bottom)
+      })
+      bar.append(button)
+    }
+  })
+  return () => { bar.remove() }
 }
 
 function installHeroBranding(): () => void {
@@ -311,13 +371,20 @@ export function apply(ctx: ClientContext): void {
     const removeDesktopChrome = installDesktopChrome()
     const removeHeroBranding = installHeroBranding()
     const unsubscribeLocale = locale.subscribe(renderPreviewLabel)
+    let removeMenuBar: (() => void) | undefined
     void bridge.getInfo().then(info => {
-      if (disposed || info.preview === null) return
+      if (disposed) return
+      if (info.preview === null) {
+        // Windows merges the menu into the titlebar row; the native menu
+        // stays installed, so Alt still reveals it.
+        if (info.platform === 'win32') removeMenuBar = installMenuBar(bridge, t)
+        return
+      }
       previewPluginId = info.preview.pluginId
       document.documentElement.dataset.ohDshPreview = 'true'
       renderPreviewLabel()
     }).catch((error: unknown) => {
-      console.error('oh-dsh-desktop: failed to read preview identity', error)
+      console.error('oh-dsh-desktop: failed to read desktop info', error)
     })
     const unsubscribe = bridge.onCommand((command) => {
       dispatch(command, workspaces, panels, pinnedSummary, workspaceTools)
@@ -325,6 +392,7 @@ export function apply(ctx: ClientContext): void {
     return () => {
       disposed = true
       unsubscribe()
+      removeMenuBar?.()
       unsubscribeLocale()
       removeHeroBranding()
       removeDesktopChrome()

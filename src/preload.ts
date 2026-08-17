@@ -10,6 +10,7 @@ const bridge: DesktopBridge = Object.freeze({
   getRuntimeSnapshot: async (): Promise<DesktopRuntimeSnapshot> => {
     return await ipcRenderer.invoke('desktop:get-runtime-snapshot') as DesktopRuntimeSnapshot
   },
+  menuBarLabels: async (): Promise<string[]> => await ipcRenderer.invoke('desktop:menu-bar-labels') as string[],
   onCommand: (listener: (command: DesktopCommand) => void): (() => void) => {
     const wrapped = (_event: Electron.IpcRendererEvent, command: DesktopCommand): void => { listener(command) }
     ipcRenderer.on('desktop:command', wrapped)
@@ -26,6 +27,9 @@ const bridge: DesktopBridge = Object.freeze({
       return await ipcRenderer.invoke('desktop:plugin-marketplace-snapshot') as MarketplaceSnapshot
     },
   }),
+  popupMenuBarMenu: async (index: number, cssX: number, cssY: number): Promise<void> => {
+    await ipcRenderer.invoke('desktop:menu-bar-popup', index, cssX, cssY)
+  },
 })
 
 contextBridge.exposeInMainWorld('dshDesktop', bridge)

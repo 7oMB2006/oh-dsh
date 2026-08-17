@@ -29,12 +29,13 @@ import {
   withGitHubCredentials,
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/protocol.ts'
-import type {
-  DesktopCommand,
-  DesktopInfo,
-  DesktopRuntimeSnapshot,
-  DesktopUpdateCommand,
-  DesktopUpdateState,
+import {
+  DESKTOP_TITLEBAR_HEIGHT,
+  type DesktopCommand,
+  type DesktopInfo,
+  type DesktopRuntimeSnapshot,
+  type DesktopUpdateCommand,
+  type DesktopUpdateState,
 } from './contracts.ts'
 import {
   desktopElectronDataRoot,
@@ -275,6 +276,18 @@ function windowIconPath(): string | undefined {
   return existsSync(development) ? development : undefined
 }
 
+function titleBarOverlayOptions(): { color: string; height: number; symbolColor: string } {
+  const dark = nativeTheme.shouldUseDarkColors
+  // The overlay declares its height in device-independent pixels, while the
+  // client strip measures CSS pixels under the default zoom factor; rounding
+  // up keeps the caption buttons inside the strip at any zoom.
+  return {
+    color: dark ? '#202020' : '#f7f7f5',
+    height: Math.ceil(DESKTOP_TITLEBAR_HEIGHT * DEFAULT_UI_ZOOM_FACTOR),
+    symbolColor: dark ? '#f0f0ee' : '#3d3d3b',
+  }
+}
+
 function createWindow(options: { preview?: boolean; title?: string } = {}): BrowserWindow {
   const icon = windowIconPath()
   const window = new BrowserWindow({
@@ -286,7 +299,16 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
     title: options.title ?? PRODUCT_NAME,
     ...(process.platform === 'darwin'
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 16 } }
-      : {}),
+      : process.platform === 'win32'
+        ? {
+          // Merge the native menu-bar and title-bar rows into the in-page
+          // titlebar strip: the Window Controls Overlay keeps native caption
+          // buttons and snap layouts while the strip owns the single row.
+          autoHideMenuBar: true,
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: titleBarOverlayOptions(),
+        }
+        : {}),
     ...(icon === undefined ? {} : { icon }),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#202020' : '#f7f7f5',
     webPreferences: {
@@ -836,11 +858,37 @@ function buildMenu(): void {
     },
     { role: 'windowMenu' },
   ]
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  applicationMenu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(applicationMenu)
 }
+
+/** The native application menu, popped up by the in-page Windows menu bar. */
+let applicationMenu: Menu | undefined
 
 function installIpc(): void {
   ipcMain.handle('desktop:choose-workspace', async () => await selectWorkspacePaths())
+  ipcMain.handle('desktop:menu-bar-labels', event => {
+    if (event.sender !== mainWindow?.webContents) return []
+    return applicationMenu?.items.map(item => item.label) ?? []
+  })
+  ipcMain.handle('desktop:menu-bar-popup', (event, index: unknown, cssX: unknown, cssY: unknown) => {
+    if (event.sender !== mainWindow?.webContents || applicationMenu === undefined) return
+    if (typeof index !== 'number' || typeof cssX !== 'number' || typeof cssY !== 'number') {
+      throw new Error('menu bar popup arguments must be numbers')
+    }
+    const submenu = applicationMenu.items[index]?.submenu
+    const window = mainWindow
+    if (submenu === undefined || window === undefined || window.isDestroyed()) return
+    // The client reports CSS pixels; popup()'s x/y are client-relative DIPs on
+    // Windows, and the webContents zoom factor is exactly how many DIPs one
+    // CSS pixel occupies.
+    const scale = window.webContents.getZoomFactor()
+    submenu.popup({
+      window,
+      x: Math.round(cssX * scale),
+      y: Math.round(cssY * scale),
+    })
+  })
   ipcMain.handle('desktop:update:get-state', async event => {
     assertUpdateWindowSender(event)
     return (await getUpdateManager()).getState()
@@ -937,6 +985,17 @@ async function bootstrap(): Promise<void> {
     if (app.isReady()) flushQueuedPaths()
   })
   await app.whenReady()
+  nativeTheme.on('updated', () => {
+    if (process.platform !== 'win32') return
+    for (const window of [mainWindow, previewWindow]) {
+      if (window === undefined || window.isDestroyed()) continue
+      try {
+        window.setTitleBarOverlay(titleBarOverlayOptions())
+      } catch {
+        // Not a window-controls-overlay window (splash/update); nothing to recolor.
+      }
+    }
+  })
 
   const info = desktopInfo()
   const logsDir = join(info.appDataPath, 'logs')

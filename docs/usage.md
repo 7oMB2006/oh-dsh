@@ -60,6 +60,9 @@ An unsigned installer may trigger Windows SmartScreen. After verifying that it
 came from the project Release, choose **More info**, then **Run anyway**. The
 installer may request administrator approval.
 
+The window title bar, menu bar, and tool strip are merged into a single row;
+open the application menu from the labels in the row's left corner.
+
 ### Desktop online updates
 
 Choose **Oh-DSH Desktop -> Check for Updates...** from the application menu.
