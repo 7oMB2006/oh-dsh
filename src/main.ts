@@ -41,6 +41,7 @@ import {
   migrateLegacyDesktopState,
   resolveOhDshHome,
 } from './data-root.ts'
+import { retireStaleMacBundles } from './mac-bundle-migration.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
@@ -96,6 +97,37 @@ function resourcesRoot(): string {
     join(currentDir, '..', '.stage'),
     app.isPackaged,
   )
+}
+
+function runningMacBundlePath(): string | undefined {
+  if (process.platform !== 'darwin' || !app.isPackaged) return undefined
+  // process.execPath is <bundle>/Contents/MacOS/<executable>.
+  const bundlePath = resolve(dirname(process.execPath), '..', '..')
+  // Only migrate when launched from the standard install location; a launch
+  // straight from the mounted DMG must never touch /Applications.
+  return bundlePath.startsWith('/Applications/') ? bundlePath : undefined
+}
+
+async function retireDuplicateMacBundles(): Promise<void> {
+  const runningBundlePath = runningMacBundlePath()
+  if (runningBundlePath === undefined) return
+  try {
+    const result = await retireStaleMacBundles({
+      runningBundlePath,
+      runningVersion: PRODUCT_VERSION,
+    })
+    for (const retired of result.retired) {
+      appendLog(
+        'desktop',
+        `retired stale macOS bundle ${retired.path} (v${retired.version}) → ${retired.trashPath}`,
+      )
+    }
+    for (const failure of result.failures) {
+      appendLog('desktop', `could not retire stale macOS bundle: ${failure}`)
+    }
+  } catch (error) {
+    appendLog('desktop', `macOS bundle retirement skipped: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 function runtimePaths(): BundledRuntimePaths {
@@ -890,6 +922,7 @@ async function bootstrap(): Promise<void> {
   mkdirSync(logsDir, { recursive: true })
   logStream = createWriteStream(join(logsDir, 'desktop.log'), { flags: 'a', mode: 0o600 })
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
+  await retireDuplicateMacBundles()
   await getUpdateManager()
   marketplace = createPluginMarketplace()
   marketplaceAgentGateway = await startMarketplaceAgentGateway(marketplace, {
