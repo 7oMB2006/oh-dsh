@@ -15,6 +15,9 @@ importers:
         specifier: 7.7.4
         version: 7.7.4
     devDependencies:
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: ^24.10.0
         version: 24.13.3
@@ -30,6 +33,15 @@ importers:
       esbuild:
         specifier: ^0.25.12
         version: 0.25.12
+      mdast-util-from-markdown:
+        specifier: ^2.0.3
+        version: 2.0.3(supports-color@7.2.0)
+      mdast-util-gfm:
+        specifier: ^3.1.0
+        version: 3.1.0(supports-color@7.2.0)
+      micromark-extension-gfm:
+        specifier: ^3.0.0
+        version: 3.0.0
       pnpm:
         specifier: 11.20.0
         version: 11.20.0

@@ -185,3 +185,6 @@ jobs:
 
       - name: Run Agent Notes gates
         run: pnpm run verify:agent-notes
+
+      - name: Run bilingual pairing gate
+        run: pnpm run verify-translation-pairing
