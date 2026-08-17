@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | [中文](2026-08-17-npm-release-host-dependencies.zh.md)
+[English](2026-08-17-npm-release-host-dependencies.md) | 中文
 
 ## Problem
 
@@ -22,7 +22,8 @@ Oh-DSH 将固定的 npm release assembly（DSH 0.1.0-rc.6）staging 到
 - npm release 的 host 依赖通过 `runtimeDependencyTarget` 从部署后的运行时
   store 链接：优先精确 release 版本，回退到任意已存储版本——fork 的 peer
   保留自己的版本线。
-- `scripts/dsh-runtime-rc6-lock.yaml` 基于纯净 release manifest 重新生成，
+- `scripts/dsh-runtime-<version>-lock.yaml`（按固定的
+  `DSH_SOURCE_SPEC.version` 命名）基于纯净 release manifest 重新生成，
   specifier 与 release 依赖图一致（caret 范围），而非注入后的精确 pin。
 
 ## Consequences
