@@ -249,7 +249,6 @@ function resolveNpmAssembly() {
   const parent = join(root, '.cache', 'dsh-source', `npm-${DSH_SOURCE_SPEC.version}`)
   const target = join(parent, 'assembly')
   const archive = join(parent, `${DSH_SOURCE_SPEC.version}.tgz`)
-  const marker = join(target, '.oh-dsh-source-integrity')
   mkdirSync(parent, { recursive: true })
   if (!existsSync(archive)) download(DSH_SOURCE_SPEC.tarball, archive)
   const actualIntegrity = `sha512-${sha512(archive)}`
@@ -258,21 +257,18 @@ function resolveNpmAssembly() {
       `DSH npm archive integrity mismatch: expected ${DSH_SOURCE_SPEC.integrity}, received ${actualIntegrity}`,
     )
   }
-  const cached = existsSync(marker)
-    ? (() => { try { return readFileSync(marker, 'utf8') === DSH_SOURCE_SPEC.integrity } catch { return false } })()
-    : false
-  if (!existsSync(join(target, 'package.json')) || !cached) {
-    acquireNpmAssembly(target, archive)
-    writeFileSync(
-      join(target, 'pnpm-workspace.yaml'),
-      'packages:\n  - .\n',
-    )
-    writeFileSync(marker, DSH_SOURCE_SPEC.integrity)
-  }
+  // The archive is integrity-checked above on every call, so the extraction
+  // is always re-run: a later stage mutates this tree (e.g. `pnpm install`
+  // into the assembly), and a reused cache would silently carry those
+  // mutations — or any other corruption — into the next release build.
+  acquireNpmAssembly(target, archive)
+  writeFileSync(
+    join(target, 'pnpm-workspace.yaml'),
+    'packages:\n  - .\n',
+  )
   validateSource(target)
   return target
 }
-
 /** Resolve an explicit development checkout or the pinned release source. */
 export function resolveDshSource() {
   if (process.env.DSH_SOURCE !== undefined) {
