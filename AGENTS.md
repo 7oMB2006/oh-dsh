@@ -36,6 +36,7 @@ See `docs/design.en.md` and `docs/design.md` for detailed boundaries.
 - `scripts/`: build, staging, packaging, and smoke checks.
 - `tests/`: reusable contract and regression tests.
 - `docs/`: bilingual design and operating documentation.
+- `.agents/`: agent skills and the Agent Notes decision record (`notes/`).
 
 # Change rules
 
@@ -50,6 +51,26 @@ See `docs/design.en.md` and `docs/design.md` for detailed boundaries.
 - Add tests only for reusable, non-trivial contracts or regressions.
 - Run `pnpm run typecheck`, `pnpm test`, and `pnpm run build` when code changes.
   Run the relevant surface smoke or package check for runtime changes.
+
+# Agent Notes
+
+- A non-trivial change MUST add or update an Agent Note in the same PR; only a
+  purely mechanical or local edit is exempt. An Agent Note records the
+  decision, the alternatives it rejected, and the consequences — the parts
+  code and docs cannot carry (see
+  [when to write one](.agents/notes/README.md#when-to-write-one)).
+- Follow the lifecycle and file format in
+  [.agents/notes/README.md](.agents/notes/README.md): `proposed/` for unbuilt
+  proposals, `implemented/` for shipped decisions kept current with what
+  shipped, `rejected/` for declined proposals. A decision already made starts
+  in `implemented/`.
+- Use [dsh-find-simplifications](.agents/skills/dsh-find-simplifications/SKILL.md)
+  when a change removes or collapses surface area, and
+  [dsh-archive-agent-notes](.agents/skills/dsh-archive-agent-notes/SKILL.md)
+  when an implemented note is unlikely to guide future work.
+- Archived notes under `.agents/notes/archived/` are frozen snapshots: never
+  edit, move, translate, or delete them, and do not treat them as authority
+  for current behavior.
 
 # Commits and contributions
 
