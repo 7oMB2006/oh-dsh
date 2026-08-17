@@ -11,12 +11,12 @@
  * @module oh-dsh/runtime-lock
  */
 
+import { spawnSync } from 'node:child_process'
 import {
   closeSync,
   mkdirSync,
   openSync,
   readFileSync,
-  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -30,7 +30,9 @@ export interface RuntimeLockInfo {
   pid: number
   surface: string
   startedAt: number
+  processStart?: string
   childPids?: number[]
+  childStarts?: string[]
 }
 
 /** An acquired data-root lock. */
@@ -48,20 +50,30 @@ function readLockInfo(path: string): RuntimeLockInfo | undefined {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
     if (typeof parsed !== 'object' || parsed === null) return undefined
-    const { pid, surface, startedAt, childPids } = parsed as Record<string, unknown>
+    const { pid, surface, startedAt, processStart, childPids, childStarts } =
+      parsed as Record<string, unknown>
     if (typeof pid !== 'number' || Number.isSafeInteger(pid) === false || pid <= 0) return undefined
     if (typeof surface !== 'string' || surface === '') return undefined
     if (typeof startedAt !== 'number' || Number.isFinite(startedAt) === false) return undefined
+    if (processStart !== undefined && typeof processStart !== 'string') return undefined
     if (childPids !== undefined) {
       if (Array.isArray(childPids) === false) return undefined
       if (childPids.some(value => typeof value !== 'number'
         || Number.isSafeInteger(value) === false || value <= 0)) return undefined
     }
+    if (childStarts !== undefined) {
+      if (Array.isArray(childStarts) === false) return undefined
+      if (childStarts.some(value => typeof value !== 'string')) return undefined
+    }
+    if (childPids !== undefined && childStarts !== undefined
+      && childStarts.length !== childPids.length) return undefined
     return {
       pid,
       surface,
       startedAt,
+      ...(processStart === undefined ? {} : { processStart }),
       ...(childPids === undefined ? {} : { childPids: [...childPids] }),
+      ...(childStarts === undefined ? {} : { childStarts: [...childStarts] }),
     }
   } catch {
     return undefined
@@ -79,9 +91,38 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Read a stable process-start marker for a PID. On POSIX systems `ps` exposes
+ * `lstart`, which lets us distinguish a reused PID from the original owner.
+ * Returns `undefined` when the platform cannot provide the marker; callers
+ * then fall back to PID-existence checks.
+ */
+function readProcessStart(pid: number): string | undefined {
+  try {
+    const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], {
+      encoding: 'utf8',
+      timeout: 2_000,
+    })
+    if (result.status !== 0) return undefined
+    const value = result.stdout.trim()
+    return value === '' ? undefined : value
+  } catch {
+    return undefined
+  }
+}
+
+function pidMatchesStoredIdentity(pid: number, expectedStart: string | undefined): boolean {
+  if (isProcessAlive(pid) === false) return false
+  if (expectedStart === undefined || expectedStart === '') return true
+  const actualStart = readProcessStart(pid)
+  return actualStart === undefined || actualStart === expectedStart
+}
+
 function hasLiveOwner(info: RuntimeLockInfo): boolean {
-  if (isProcessAlive(info.pid)) return true
-  return (info.childPids ?? []).some(pid => isProcessAlive(pid))
+  if (pidMatchesStoredIdentity(info.pid, info.processStart)) return true
+  const childPids = info.childPids ?? []
+  const childStarts = info.childStarts ?? []
+  return childPids.some((pid, index) => pidMatchesStoredIdentity(pid, childStarts[index]))
 }
 
 /**
@@ -108,18 +149,25 @@ function writeLockInfo(path: string, info: RuntimeLockInfo): void {
   writeFileSync(path, JSON.stringify(info), { mode: 0o600 })
 }
 
+function sleepSync(milliseconds: number): void {
+  const buffer = new SharedArrayBuffer(4)
+  const view = new Int32Array(buffer)
+  Atomics.wait(view, 0, 0, milliseconds)
+}
+
 /**
  * Acquire an exclusive lock for one Oh-DSH surface on a shared data root.
  *
  * The lock is a small JSON file created with `wx`, so concurrent acquisitions
  * cannot clobber each other. A lock whose owning PID and tracked runtime child
  * PIDs are no longer alive is considered stale and is replaced. Stale
- * reclamation uses an atomic rename, so concurrent reclaimers cannot delete a
- * freshly created live lock.
+ * reclamation is serialized by a separate reclaim lock so concurrent
+ * reclaimers cannot delete a freshly created live lock.
  */
 export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLock {
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
   const path = join(dataRoot, LOCK_FILE_NAME)
+  const reclaimPath = `${path}.reclaim`
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     let handle: number | undefined
@@ -138,28 +186,57 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
         )
       }
       // The lock is absent, left by a dead process and dead children, or old
-      // enough to be a stale unparsable file. Atomically claim it by renaming
-      // the old file out of the way; another reclaimer cannot unlink the next
-      // owner because the main path is absent until one of us creates it.
-      const backup = `${path}.stale-${String(process.pid)}-${String(Date.now())}-${String(attempt)}`
+      // enough to be a stale unparsable file. Serialize recovery with a
+      // separate reclaim lock: only one reclaimer can hold it, and it re-reads
+      // the main lock after acquiring it so a fresh live lock is never moved.
+      let reclaimHandle: number | undefined
       try {
-        renameSync(path, backup)
-        try {
-          unlinkSync(backup)
-        } catch {
-          // Best-effort cleanup of the claimed stale file.
+        reclaimHandle = openSync(reclaimPath, 'wx', 0o600)
+      } catch (reclaimError) {
+        if ((reclaimError as NodeJS.ErrnoException).code !== 'EEXIST') throw reclaimError
+        if (isStaleLockFile(reclaimPath)) {
+          try {
+            unlinkSync(reclaimPath)
+          } catch {
+            // Another reclaimer may have removed it already.
+          }
         }
-      } catch (renameError) {
-        if ((renameError as NodeJS.ErrnoException).code === 'ENOENT') continue
-        throw renameError
+        sleepSync(20)
+        continue
+      }
+      try {
+        const current = readLockInfo(path)
+        if (current !== undefined && hasLiveOwner(current)) {
+          throw new UsageError(lockOwnerMessage(current, dataRoot))
+        }
+        if (current === undefined && isStaleLockFile(path) === false) {
+          throw new UsageError(
+            `runtime lock at ${path} is being acquired or unreadable; `
+            + 'remove it manually if no other Oh-DSH surface is running',
+          )
+        }
+        try {
+          unlinkSync(path)
+        } catch (unlinkError) {
+          if ((unlinkError as NodeJS.ErrnoException).code !== 'ENOENT') throw unlinkError
+        }
+      } finally {
+        closeSync(reclaimHandle)
+        try {
+          unlinkSync(reclaimPath)
+        } catch {
+          // Best-effort cleanup of the reclaim lock.
+        }
       }
       continue
     }
 
+    const processStart = readProcessStart(process.pid)
     const info: RuntimeLockInfo = {
       pid: process.pid,
       surface,
       startedAt: Date.now(),
+      ...(processStart === undefined ? {} : { processStart }),
     }
     try {
       writeSync(handle, JSON.stringify(info))
@@ -176,6 +253,7 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
           writeLockInfo(path, {
             ...current,
             childPids: [...childPids],
+            childStarts: childPids.map(pid => readProcessStart(pid) ?? ''),
           })
         } catch {
           // Best-effort update: if the lock disappeared or was replaced, the

@@ -304,10 +304,10 @@ export async function main(
     if (restartTimer !== null) clearTimeout(restartTimer)
     await runtime.stop()
   }
-  const fail = (error: unknown): void => {
+  const fail = async (error: unknown): Promise<void> => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     process.stderr.write(`${logTail.slice(-20).join('\n')}\n`)
-    void stop()
+    await stop()
   }
   const startOnce = async (): Promise<void> => {
     const url = await runtime.start()
@@ -333,8 +333,7 @@ export async function main(
     restartTimer = setTimeout(() => {
       restartTimer = null
       void startOnce().catch((error: unknown) => {
-        fail(error)
-        process.exit(1)
+        void fail(error).finally(() => { process.exit(1) })
       })
     }, RESTART_DELAY_MS)
   }
@@ -365,7 +364,7 @@ export async function main(
     await new Promise<void>(() => {})
     return 0
   } catch (error) {
-    fail(error)
+    await fail(error)
     return 1
   } finally {
     runtimeLock.release()
