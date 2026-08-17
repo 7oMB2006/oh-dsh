@@ -5,6 +5,7 @@ import {
   type OhDshSurface,
 } from '../../shared/surface.ts'
 import { humanApprovalGuidance } from '../../shared/guardrails.ts'
+import { mountReadOnlyGuard } from '../../shared/read-only.ts'
 
 interface SystemPromptService {
   section(entry: { name: string; order: number; text: () => string }): unknown
@@ -41,6 +42,7 @@ function tuiPrompt(surface: OhDshSurface): string {
 
 /** Publish the terminal surface before skins and the upstream renderer mount. */
 export function apply(ctx: HostContext): void {
+  mountReadOnlyGuard(ctx)
   const surface = environmentSurface()
   process.env.OH_DSH_TUI_TITLE ??= TUI_PRODUCT_NAME
   ctx.provide(OH_DSH_SURFACE_SERVICE, surface)

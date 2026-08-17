@@ -9,6 +9,7 @@ import {
   type OhDshSurface,
 } from '../plugins/shared/surface.ts'
 import { humanApprovalGuidance } from '../plugins/shared/guardrails.ts'
+import { mountReadOnlyGuard } from '../plugins/shared/read-only.ts'
 
 interface SystemPromptService {
   section(entry: {
@@ -73,6 +74,7 @@ function desktopPrompt(capability: DesktopHostCapability): string {
 
 /** Mount the native desktop capability in the DSH graph. */
 export function apply(ctx: HostContext): void {
+  mountReadOnlyGuard(ctx)
   const capability = environmentCapability()
   ctx.provide('desktop', capability)
   // The unified three-surface contract: desktop shell (see

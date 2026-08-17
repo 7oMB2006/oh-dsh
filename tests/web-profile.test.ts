@@ -19,6 +19,7 @@ import {
   WEB_BUNDLES,
   WEB_PROFILE,
 } from '../src/profile.ts'
+import { acquireRuntimeLock } from '../src/runtime-lock.ts'
 import {
   DshRuntimeSupervisor,
   type DshRuntimeOptions,
@@ -234,6 +235,54 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     assert.equal(runtime.plan.env.OH_DSH_HOME, join(dataRoot, 'state'))
   } finally {
     process.chdir(previous)
+    rmSync(temp, { recursive: true, force: true })
+  }
+})
+
+test('web launcher starts read-only when another surface owns the root', async () => {
+  const temp = mkdtempSync(join(tmpdir(), 'dsh-web-lock-'))
+  const dataRoot = realpathSync(temp)
+  const packaged = join(dataRoot, 'package')
+  const nodeBinary = process.platform === 'win32'
+    ? join(packaged, 'node-runtime', 'node.exe')
+    : join(packaged, 'node-runtime', 'bin', 'node')
+  mkdirSync(dirname(nodeBinary), { recursive: true })
+  mkdirSync(join(packaged, 'dsh-runtime', 'lib'), { recursive: true })
+  writeFileSync(nodeBinary, '')
+  writeFileSync(join(packaged, 'dsh-runtime', 'lib', 'bin.js'), '')
+
+  class FailingRuntime extends DshRuntimeSupervisor {
+    readonly plan: DshRuntimeOptions
+
+    constructor(plan: DshRuntimeOptions) {
+      super(plan)
+      this.plan = plan
+    }
+
+    async start(): Promise<URL> {
+      throw new Error('test runtime never becomes ready')
+    }
+  }
+
+  const state = join(dataRoot, 'state')
+  const owner = acquireRuntimeLock(state, 'desktop')
+  let runtime: FailingRuntime | undefined
+  try {
+    const code = await main(
+      ['--data', state],
+      { DSH_OH_WEB_ROOT: packaged, PATH: process.env.PATH },
+      { isTTY: false } as NodeJS.WriteStream,
+      plan => {
+        runtime = new FailingRuntime(plan)
+        return runtime
+      },
+    )
+    assert.equal(code, 1)
+    assert.ok(runtime)
+    assert.equal(runtime.plan.env.OH_DSH_READ_ONLY, '1')
+    assert.equal(existsSync(join(state, 'profiles', 'web')), true)
+  } finally {
+    owner.release()
     rmSync(temp, { recursive: true, force: true })
   }
 })

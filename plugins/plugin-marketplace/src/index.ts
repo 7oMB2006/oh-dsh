@@ -49,6 +49,10 @@ export function apply(ctx: HostContext): void {
       surfaceCtx.logger.warn('plugin-marketplace: disabled inside an isolated preview runtime')
       return
     }
+    if (process.env.OH_DSH_READ_ONLY === '1') {
+      surfaceCtx.logger.warn('plugin-marketplace: disabled in read-only viewer mode')
+      return
+    }
     if (surface.dataRoot === '') {
       surfaceCtx.logger.warn('plugin-marketplace: no writable data root; host disabled')
       return

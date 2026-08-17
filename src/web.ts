@@ -13,6 +13,7 @@ import {
 } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
+import { tryAcquireRuntimeLock } from './runtime-lock.ts'
 import {
   DshRuntimeSupervisor,
   type DshRuntimeOptions,
@@ -231,19 +232,27 @@ export async function main(
   }
 
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  const migration = migrateLegacyWebState({
-    dataRoot,
-    ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
-      ? { legacyDefaultDataRoot: legacyWebDataRoot() }
-      : {}),
-  })
-  if (!migration.complete) {
-    throw new Error(
-      `legacy Web state migration under ${dataRoot} is incomplete; `
-      + 'restore unavailable link targets and retry',
-    )
+  const { lock: runtimeLock, readOnly } = tryAcquireRuntimeLock(dataRoot, 'web')
+  if (runtimeLock !== undefined) {
+    process.once('exit', () => { runtimeLock.release() })
   }
-  ensureWebProfile(dataRoot)
+  if (readOnly === false) {
+    const migration = migrateLegacyWebState({
+      dataRoot,
+      ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
+        ? { legacyDefaultDataRoot: legacyWebDataRoot() }
+        : {}),
+    })
+    if (!migration.complete) {
+      throw new Error(
+        `legacy Web state migration under ${dataRoot} is incomplete; `
+        + 'restore unavailable link targets and retry',
+      )
+    }
+  }
+  if (readOnly === false || !existsSync(join(dataRoot, 'profiles', WEB_PROFILE))) {
+    ensureWebProfile(dataRoot)
+  }
 
   const logTail: string[] = []
   const runtime = runtimeFactory({
@@ -264,6 +273,7 @@ export async function main(
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',
       OH_DSH_HOME: dataRoot,
+      OH_DSH_READ_ONLY: readOnly ? '1' : '0',
       OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
       OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
       OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
@@ -273,11 +283,12 @@ export async function main(
     onLog: (stream, line) => { printLine(logTail, `${stream === 'stderr' ? '[runtime]' : ''}${line}`) },
     readyTimeoutMs: 60_000,
   })
+  runtime.on('spawn', (pid: number) => { runtimeLock?.setChildPids([pid]) })
 
   const MAX_UNEXPECTED_RESTARTS = 5
   const RESTART_DELAY_MS = 600
   const marketplaceRestartPath = join(dataRoot, 'web', 'marketplace-restart')
-  let stopping = false
+  let stoppingPromise: Promise<void> | undefined
   let started = false
   let browserOpened = false
   let restarts = 0
@@ -293,19 +304,21 @@ export async function main(
     }
     return false
   }
-  const stop = async (): Promise<void> => {
-    if (stopping) return
-    stopping = true
+  const stop = (): Promise<void> => {
+    if (stoppingPromise !== undefined) return stoppingPromise
     if (restartTimer !== null) clearTimeout(restartTimer)
-    await runtime.stop()
+    stoppingPromise = runtime.stop().finally(() => { stoppingPromise = undefined })
+    return stoppingPromise
   }
-  const fail = (error: unknown): void => {
+  const fail = async (error: unknown): Promise<void> => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
     process.stderr.write(`${logTail.slice(-20).join('\n')}\n`)
-    void stop()
+    await stop()
   }
   const startOnce = async (): Promise<void> => {
     const url = await runtime.start()
+    const childPid = runtime.pid
+    if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
     if (options.open && browserOpened === false) {
@@ -314,7 +327,10 @@ export async function main(
     }
   }
   const onSignal = (): void => {
-    void stop().then(() => { process.exit(0) })
+    void stop().then(() => {
+      runtimeLock?.release()
+      process.exit(0)
+    })
   }
   process.once('SIGINT', onSignal)
   process.once('SIGTERM', onSignal)
@@ -323,13 +339,12 @@ export async function main(
     restartTimer = setTimeout(() => {
       restartTimer = null
       void startOnce().catch((error: unknown) => {
-        fail(error)
-        process.exit(1)
+        void fail(error).finally(() => { process.exit(1) })
       })
     }, RESTART_DELAY_MS)
   }
   runtime.on('exit', (exit: RuntimeExit) => {
-    if (stopping) return
+    if (stoppingPromise !== undefined) return
     if (started === false) return
     const detail = `code=${String(exit.code)}, signal=${String(exit.signal)}`
     if (consumeMarketplaceRestart()) {
@@ -338,6 +353,7 @@ export async function main(
       return
     }
     if (restarts >= MAX_UNEXPECTED_RESTARTS) {
+      runtimeLock?.release()
       process.stderr.write(
         `Oh-DSH Web stopped after repeated restarts (${detail})\n`
         + `${logTail.slice(-20).join('\n')}\n`,
@@ -354,7 +370,9 @@ export async function main(
     await new Promise<void>(() => {})
     return 0
   } catch (error) {
-    fail(error)
+    await fail(error)
     return 1
+  } finally {
+    runtimeLock?.release()
   }
 }
