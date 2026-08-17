@@ -54,7 +54,15 @@ See `docs/design.en.md` and `docs/design.md` for detailed boundaries.
 # Commits and contributions
 
 - Write commits, PR titles, PR bodies, and review replies in English.
-- Keep each commit atomic and use `<module>: <subject>`.
+- Keep each commit atomic and use exactly `<module>: <subject>`: a lowercase
+  module prefix, a colon and space, then an imperative subject. The module is
+  the area the commit changes (`marketplace`, `web`, `terminal`, `docs`,
+  `license`, `release`, ...), never a conventional-commit type. Do not write
+  `fix: ...`, `feat: ...`, or `fix(scope): ...` subjects; when a commit
+  touches several areas, use the primary module. PR titles follow the same
+  format.
+  Valid:   `marketplace: make preview cleanup junction-safe on Windows`
+  Invalid: `fix(marketplace): make preview cleanup junction-safe on Windows`
 - Include a body explaining why and impact. Keep every body line at most 72
   characters.
 - Sign every commit the current PR introduces with the contributor's own DCO
