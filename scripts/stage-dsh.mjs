@@ -27,6 +27,10 @@ import {
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
+import {
+  landlockLauncherPackageName,
+  restoreLandlockLauncher,
+} from './landlock-launcher.mjs'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
 
@@ -932,6 +936,30 @@ function ensureLinuxPtyBuild() {
   }
 }
 
+function ensureLinuxLandlockLauncher() {
+  if (nodePlatform !== 'linux') return
+  if (nodeArch !== 'x64') {
+    throw new Error(`unsupported Landlock launcher architecture: linux-${nodeArch}`)
+  }
+
+  const requireFromRoot = createRequire(join(root, 'package.json'))
+  let sourceManifestPath
+  try {
+    sourceManifestPath = requireFromRoot.resolve(`${landlockLauncherPackageName}/package.json`)
+  } catch (cause) {
+    throw new Error(
+      `${landlockLauncherPackageName} is missing; run pnpm install on linux-x64 before staging`,
+      { cause },
+    )
+  }
+
+  const launcher = restoreLandlockLauncher({
+    runtimeRoot: runtime,
+    sourcePackageRoot: dirname(sourceManifestPath),
+  })
+  console.log(`Restored Linux Landlock launcher: ${launcher}`)
+}
+
 if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
   throw new Error(`DSH source checkout not found: ${dshSource}`)
 }
@@ -1003,6 +1031,7 @@ copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PAR
 restoreExecutableHelpers()
 console.log('Normalizing runtime links')
 normalizeRuntimeLinks()
+ensureLinuxLandlockLauncher()
 assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()
 assertSelfContained(nodeRuntime, 'Node runtime')
