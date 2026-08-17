@@ -273,18 +273,6 @@ function resolveNpmAssembly() {
   return target
 }
 
-/** Add host-only DSH peers to an npm release assembly before installation. */
-export function prepareNpmAssembly(source, dependencies) {
-  if (DSH_SOURCE_SPEC.source !== 'npm') return
-  const manifestPath = join(source, 'package.json')
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  manifest.dependencies = {
-    ...manifest.dependencies,
-    ...Object.fromEntries(Object.entries(dependencies).map(([name, version]) => [name, version])),
-  }
-  writeFileSync(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`)
-}
-
 /** Resolve an explicit development checkout or the pinned release source. */
 export function resolveDshSource() {
   if (process.env.DSH_SOURCE !== undefined) {

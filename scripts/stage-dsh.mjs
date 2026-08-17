@@ -28,7 +28,6 @@ import {
 import { fileURLToPath } from 'node:url'
 import {
   DSH_SOURCE_SPEC,
-  prepareNpmAssembly,
   resolveDshSource,
   resolvePinnedPnpm,
 } from './dsh-source.mjs'
@@ -97,26 +96,6 @@ function download(url, target) {
   rmSync(target, { force: true })
   writeFileSync(target, readFileSync(temporary))
   rmSync(temporary, { force: true })
-}
-
-/** DSH packages Oh-DSH Host plugins import without declaring npm versions. */
-function collectHostDependencies() {
-  const manifests = [
-    join(root, 'package.json'),
-    join(root, 'web', 'package.json'),
-    ...readdirSync(join(root, 'plugins'), { withFileTypes: true })
-      .filter(entry => entry.isDirectory())
-      .map(entry => join(root, 'plugins', entry.name, 'package.json')),
-  ]
-  const dependencies = new Map()
-  for (const manifestPath of manifests) {
-    if (!existsSync(manifestPath)) continue
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-    for (const dependency of manifest.ohDsh?.hostDependencies ?? []) {
-      dependencies.set(dependency, DSH_SOURCE_SPEC.version)
-    }
-  }
-  return Object.fromEntries(dependencies)
 }
 
 /**
@@ -848,14 +827,20 @@ function runtimeDependencyTarget(dependency) {
 
   const store = join(runtime, 'node_modules', '.pnpm')
   const prefix = dependency.replace('/', '+')
+  let fallback = null
   for (const entry of readdirSync(store, { withFileTypes: true })) {
     if (!entry.isDirectory() || !entry.name.startsWith(`${prefix}@`)) continue
     const candidate = join(store, entry.name, 'node_modules', ...parts)
     const manifestPath = join(candidate, 'package.json')
     if (!existsSync(manifestPath)) continue
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-    if (manifest.name === dependency && manifest.version === DSH_SOURCE_SPEC.version) return candidate
+    if (manifest.name !== dependency) continue
+    // The release pins every DSH package to its own version, but a forked
+    // peer (e.g. @deepseek-ai/schemastery) keeps its own version line.
+    if (manifest.version === DSH_SOURCE_SPEC.version) return candidate
+    fallback ??= candidate
   }
+  if (fallback !== null) return fallback
   throw new Error(`DSH runtime is missing host dependency ${dependency}@${DSH_SOURCE_SPEC.version}`)
 }
 
@@ -1127,7 +1112,6 @@ rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 const pnpm = resolvePinnedPnpm(dshSource)
 if (npmRelease) {
-  prepareNpmAssembly(dshSource, collectHostDependencies())
   const releaseLockfile = join(root, 'scripts', 'dsh-runtime-rc6-lock.yaml')
   const assemblyLockfile = join(dshSource, 'pnpm-lock.yaml')
   if (existsSync(releaseLockfile)) copyFileSync(releaseLockfile, assemblyLockfile)
