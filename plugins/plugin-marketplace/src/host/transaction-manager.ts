@@ -7,10 +7,14 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  readlinkSync,
   renameSync,
+  rmdirSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
+import type { Stats } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parseMarketplaceCatalog } from '../catalog.ts'
 import type {
@@ -474,28 +478,92 @@ function defaultWarn(message: string): void {
 
 /**
  * Windows maps the read-only attribute to the owner write bit. Git packs and
- * some cloned files are created read-only, so `rmSync` fails with EPERM before
- * it can recurse into the tree. Clear that attribute before the retry while
- * never following symlinks out of the disposable tree.
+ * some cloned files are created read-only, so deletion can fail with EPERM.
+ * Clear that attribute before unlinking files or removing directories.
  */
-function clearReadOnlyAttributes(
+function makeWritable(
   path: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform,
 ): void {
   if (platform !== 'win32') return
   try {
     const stats = lstatSync(path)
-    if (stats.isDirectory()) {
-      chmodSync(path, stats.mode | 0o200)
-      for (const entry of readdirSync(path)) {
-        clearReadOnlyAttributes(join(path, entry), platform)
-      }
-    } else if (stats.isFile()) {
-      chmodSync(path, stats.mode | 0o200)
-    }
+    chmodSync(path, stats.mode | 0o200)
   } catch {
-    // Best-effort attribute pass; the removal retry below reports the real failure.
+    // Best-effort attribute pass; the caller reports the real failure.
   }
+}
+
+/**
+ * A directory junction on Windows is a reparse point that `lstat` may report
+ * as a plain directory. Detect those entries by attempting to read the link
+ * target so recursive cleanup unlinks the junction instead of descending into
+ * the bundled runtime it points at.
+ */
+function isLinkEntry(
+  path: string,
+  stats: Stats,
+): boolean {
+  if (stats.isSymbolicLink()) return true
+  if (!stats.isDirectory()) return false
+  try {
+    readlinkSync(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function removeLinkEntry(path: string): void {
+  try {
+    // unlink removes the reparse point/symlink itself on every platform and
+    // never descends into the target.
+    unlinkSync(path)
+  } catch (error) {
+    // Some Windows Node versions still require rmdir for a junction that
+    // lstat reports as a directory. Removing the junction still does not
+    // follow into the target.
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'EISDIR' || code === 'EPERM' || code === 'ENOTEMPTY') {
+      rmdirSync(path)
+      return
+    }
+    throw error
+  }
+}
+
+/**
+ * Recursively delete a disposable tree without ever descending through a
+ * symlink or Windows directory junction. This is the Windows-safe replacement
+ * for `rmSync(..., { recursive: true })`, which can follow junctions and
+ * delete files outside the tree (including the packaged dsh-runtime).
+ */
+function removeTreeWindows(
+  path: string,
+  platform: NodeJS.Platform,
+): void {
+  let stats: Stats
+  try {
+    stats = lstatSync(path)
+  } catch (error) {
+    // existsSync would return false for a dangling junction/symlink, so use
+    // lstat and only ignore a genuinely missing entry.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+    throw error
+  }
+  if (isLinkEntry(path, stats)) {
+    removeLinkEntry(path)
+    return
+  }
+  makeWritable(path, platform)
+  if (stats.isDirectory()) {
+    for (const entry of readdirSync(path)) {
+      removeTreeWindows(join(path, entry), platform)
+    }
+    rmdirSync(path)
+    return
+  }
+  unlinkSync(path)
 }
 
 function removeTree(
@@ -504,13 +572,11 @@ function removeTree(
   platform: NodeJS.Platform = process.platform,
 ): void {
   try {
-    rmSync(path, { force: true, recursive: true })
-    return
-  } catch {
-    if (platform === 'win32') clearReadOnlyAttributes(path, platform)
-  }
-  try {
-    rmSync(path, { force: true, recursive: true })
+    if (platform === 'win32') {
+      removeTreeWindows(path, platform)
+    } else {
+      rmSync(path, { force: true, recursive: true })
+    }
   } catch (error) {
     onWarn(`failed to clean plugin marketplace tree at ${path}: ${message(error)}`)
   }

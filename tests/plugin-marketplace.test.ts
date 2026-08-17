@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
 import { test } from 'node:test'
@@ -257,6 +257,54 @@ test('preview tree cleanup clears Windows read-only attributes before retrying',
     assert.equal(existsSync(previews), false)
   } finally {
     if (existsSync(previews)) chmodSync(previews, 0o755)
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('preview tree cleanup unlinks Windows junctions without deleting their targets', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-junction-'))
+  const previews = join(root, 'plugin-marketplace', 'previews')
+  const sandbox = join(previews, 'txn', 'dsh', 'profiles', 'desktop', 'node_modules')
+  const external = join(root, 'bundled-runtime')
+  const junction = join(sandbox, 'packaged-runtime')
+  try {
+    mkdirSync(sandbox, { recursive: true })
+    mkdirSync(external, { recursive: true })
+    writeFileSync(join(external, 'bin.js'), 'runtime')
+    symlinkSync(
+      process.platform === 'win32' ? external : join('..', '..', '..', '..', '..', '..', '..', 'bundled-runtime'),
+      junction,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    )
+    const warnings: string[] = []
+    removeWithin(root, previews, message => { warnings.push(message) }, 'win32')
+    assert.deepEqual(warnings, [])
+    assert.equal(existsSync(junction), false)
+    assert.equal(existsSync(join(external, 'bin.js')), true)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('preview tree cleanup removes dangling Windows junctions', () => {
+  const root = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-dangling-'))
+  const previews = join(root, 'plugin-marketplace', 'previews')
+  const danglingTarget = join(root, 'missing-runtime')
+  const dangling = join(previews, 'dangling-runtime')
+  try {
+    mkdirSync(previews, { recursive: true })
+    if (process.platform === 'win32') {
+      mkdirSync(danglingTarget, { recursive: true })
+      symlinkSync(danglingTarget, dangling, 'junction')
+      rmSync(danglingTarget, { recursive: true, force: true })
+    } else {
+      symlinkSync(danglingTarget, dangling, 'dir')
+    }
+    const warnings: string[] = []
+    removeWithin(root, previews, message => { warnings.push(message) }, 'win32')
+    assert.deepEqual(warnings, [])
+    assert.equal(existsSync(previews), false)
+  } finally {
     rmSync(root, { recursive: true, force: true })
   }
 })
