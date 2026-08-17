@@ -25,6 +25,9 @@ import {
 import { join } from 'node:path'
 import { UsageError } from './errors.ts'
 
+/** Thrown when another live Oh-DSH surface already owns the data root. */
+export class RuntimeLockContendedError extends UsageError {}
+
 /** Metadata stored in the data-root lock file. */
 export interface RuntimeLockInfo {
   pid: number
@@ -177,7 +180,7 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
       const info = readLockInfo(path)
       if (info !== undefined && hasLiveOwner(info)) {
-        throw new UsageError(lockOwnerMessage(info, dataRoot))
+        throw new RuntimeLockContendedError(lockOwnerMessage(info, dataRoot))
       }
       if (info === undefined && isStaleLockFile(path) === false) {
         throw new UsageError(
@@ -209,7 +212,7 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
       try {
         const current = readLockInfo(path)
         if (current !== undefined && hasLiveOwner(current)) {
-          throw new UsageError(lockOwnerMessage(current, dataRoot))
+          throw new RuntimeLockContendedError(lockOwnerMessage(current, dataRoot))
         }
         if (current === undefined && isStaleLockFile(path) === false) {
           throw new UsageError(
@@ -274,4 +277,23 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
   }
 
   throw new UsageError(`unable to acquire runtime lock at ${path}`)
+}
+
+/**
+ * Try to acquire the data-root lock. If another surface already owns it,
+ * return a read-only result instead of throwing, so the caller can start a
+ * viewer that may read shared history but must not write to active sessions.
+ */
+export function tryAcquireRuntimeLock(
+  dataRoot: string,
+  surface: string,
+): { lock?: RuntimeLock; readOnly: boolean } {
+  try {
+    return { lock: acquireRuntimeLock(dataRoot, surface), readOnly: false }
+  } catch (error) {
+    if (error instanceof RuntimeLockContendedError) {
+      return { lock: undefined, readOnly: true }
+    }
+    throw error
+  }
 }

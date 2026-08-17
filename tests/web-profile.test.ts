@@ -239,7 +239,7 @@ test('web launcher resolves a relative data root before spawning the runtime', a
   }
 })
 
-test('web launcher refuses a data root already owned by another surface', async () => {
+test('web launcher starts read-only when another surface owns the root', async () => {
   const temp = mkdtempSync(join(tmpdir(), 'dsh-web-lock-'))
   const dataRoot = realpathSync(temp)
   const packaged = join(dataRoot, 'package')
@@ -251,17 +251,35 @@ test('web launcher refuses a data root already owned by another surface', async 
   writeFileSync(nodeBinary, '')
   writeFileSync(join(packaged, 'dsh-runtime', 'lib', 'bin.js'), '')
 
+  class FailingRuntime extends DshRuntimeSupervisor {
+    readonly plan: DshRuntimeOptions
+
+    constructor(plan: DshRuntimeOptions) {
+      super(plan)
+      this.plan = plan
+    }
+
+    async start(): Promise<URL> {
+      throw new Error('test runtime never becomes ready')
+    }
+  }
+
   const state = join(dataRoot, 'state')
   const owner = acquireRuntimeLock(state, 'desktop')
+  let runtime: FailingRuntime | undefined
   try {
-    await assert.rejects(
-      main(
-        ['--data', state],
-        { DSH_OH_WEB_ROOT: packaged, PATH: process.env.PATH },
-        { isTTY: false } as NodeJS.WriteStream,
-      ),
-      /still using/,
+    const code = await main(
+      ['--data', state],
+      { DSH_OH_WEB_ROOT: packaged, PATH: process.env.PATH },
+      { isTTY: false } as NodeJS.WriteStream,
+      plan => {
+        runtime = new FailingRuntime(plan)
+        return runtime
+      },
     )
+    assert.equal(code, 1)
+    assert.ok(runtime)
+    assert.equal(runtime.plan.env.OH_DSH_READ_ONLY, '1')
     assert.equal(existsSync(join(state, 'profiles')), false)
   } finally {
     owner.release()

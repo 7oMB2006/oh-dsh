@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { acquireRuntimeLock } from '../src/runtime-lock.ts'
+import { acquireRuntimeLock, tryAcquireRuntimeLock } from '../src/runtime-lock.ts'
 
 const LOCK_FILE = '.runtime.lock'
 
@@ -133,6 +133,34 @@ test('acquireRuntimeLock replaces a stale owner whose child is also dead', () =>
     assert.equal(info.pid, process.pid)
     assert.equal(info.surface, 'tui')
     lock.release()
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('tryAcquireRuntimeLock owns a free data root', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-lock-'))
+  try {
+    const result = tryAcquireRuntimeLock(root, 'web')
+    assert.equal(result.readOnly, false)
+    assert.ok(result.lock)
+    result.lock?.release()
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('tryAcquireRuntimeLock returns read-only when another surface owns the root', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-runtime-lock-'))
+  try {
+    const owner = acquireRuntimeLock(root, 'desktop')
+    try {
+      const result = tryAcquireRuntimeLock(root, 'web')
+      assert.equal(result.readOnly, true)
+      assert.equal(result.lock, undefined)
+    } finally {
+      owner.release()
+    }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

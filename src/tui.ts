@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { defaultOhDshHome } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureTuiProfile, TUI_PROFILE } from './profile.ts'
-import { acquireRuntimeLock } from './runtime-lock.ts'
+import { tryAcquireRuntimeLock } from './runtime-lock.ts'
 import {
   bundledRuntimePaths,
   runtimeSearchPath,
@@ -256,21 +256,24 @@ export async function main(
   const cwd = resolve(options.cwd)
   if (!existsSync(cwd)) throw new UsageError(`workspace directory does not exist: ${cwd}`)
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  const runtimeLock = acquireRuntimeLock(dataRoot, 'tui')
-  process.once('exit', () => { runtimeLock.release() })
-  ensureTuiProfile(dataRoot)
+  const { lock: runtimeLock, readOnly } = tryAcquireRuntimeLock(dataRoot, 'tui')
+  if (runtimeLock !== undefined) {
+    process.once('exit', () => { runtimeLock.release() })
+  }
+  const runtimeEnv = { ...env, OH_DSH_READ_ONLY: readOnly ? '1' : '0' }
+  if (readOnly === false) ensureTuiProfile(dataRoot)
 
   const runOnce = async (current: TuiLaunchOptions): Promise<number> => {
     const spec = tuiLaunchSpec(
       { ...current, cwd, dataRoot },
-      env,
+      runtimeEnv,
       paths,
       resolveTuiVersion(root),
     )
     return await new Promise<number>((resolveExit, rejectExit) => {
       const child = spawnTui(spec.command, spec.args, spec.spawnOptions)
       const childPid = child.pid
-      if (childPid !== undefined) runtimeLock.setChildPids([childPid])
+      if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
       child.once('error', rejectExit)
       child.once('exit', (code, signal) => {
         resolveExit(code ?? (signal === null ? 1 : 128))
@@ -298,6 +301,6 @@ export async function main(
       next = { ...next, sessionId }
     }
   } finally {
-    runtimeLock.release()
+    runtimeLock?.release()
   }
 }

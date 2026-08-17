@@ -13,7 +13,7 @@ import {
 } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import { ensureWebProfile, WEB_PROFILE } from './profile.ts'
-import { acquireRuntimeLock } from './runtime-lock.ts'
+import { tryAcquireRuntimeLock } from './runtime-lock.ts'
 import {
   DshRuntimeSupervisor,
   type DshRuntimeOptions,
@@ -232,21 +232,25 @@ export async function main(
   }
 
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  const runtimeLock = acquireRuntimeLock(dataRoot, 'web')
-  process.once('exit', () => { runtimeLock.release() })
-  const migration = migrateLegacyWebState({
-    dataRoot,
-    ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
-      ? { legacyDefaultDataRoot: legacyWebDataRoot() }
-      : {}),
-  })
-  if (!migration.complete) {
-    throw new Error(
-      `legacy Web state migration under ${dataRoot} is incomplete; `
-      + 'restore unavailable link targets and retry',
-    )
+  const { lock: runtimeLock, readOnly } = tryAcquireRuntimeLock(dataRoot, 'web')
+  if (runtimeLock !== undefined) {
+    process.once('exit', () => { runtimeLock.release() })
   }
-  ensureWebProfile(dataRoot)
+  if (readOnly === false) {
+    const migration = migrateLegacyWebState({
+      dataRoot,
+      ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
+        ? { legacyDefaultDataRoot: legacyWebDataRoot() }
+        : {}),
+    })
+    if (!migration.complete) {
+      throw new Error(
+        `legacy Web state migration under ${dataRoot} is incomplete; `
+        + 'restore unavailable link targets and retry',
+      )
+    }
+    ensureWebProfile(dataRoot)
+  }
 
   const logTail: string[] = []
   const runtime = runtimeFactory({
@@ -267,6 +271,7 @@ export async function main(
       DSH_OH_WEB_VERSION: version,
       NODE_USE_ENV_PROXY: '1',
       OH_DSH_HOME: dataRoot,
+      OH_DSH_READ_ONLY: readOnly ? '1' : '0',
       OH_DSH_MARKETPLACE_CLI_ENTRY: paths.cliEntry,
       OH_DSH_MARKETPLACE_NODE_BINARY: paths.nodeBinary,
       OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
@@ -276,7 +281,7 @@ export async function main(
     onLog: (stream, line) => { printLine(logTail, `${stream === 'stderr' ? '[runtime]' : ''}${line}`) },
     readyTimeoutMs: 60_000,
   })
-  runtime.on('spawn', (pid: number) => { runtimeLock.setChildPids([pid]) })
+  runtime.on('spawn', (pid: number) => { runtimeLock?.setChildPids([pid]) })
 
   const MAX_UNEXPECTED_RESTARTS = 5
   const RESTART_DELAY_MS = 600
@@ -311,7 +316,7 @@ export async function main(
   const startOnce = async (): Promise<void> => {
     const url = await runtime.start()
     const childPid = runtime.pid
-    if (childPid !== undefined) runtimeLock.setChildPids([childPid])
+    if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
     if (options.open && browserOpened === false) {
@@ -321,7 +326,7 @@ export async function main(
   }
   const onSignal = (): void => {
     void stop().then(() => {
-      runtimeLock.release()
+      runtimeLock?.release()
       process.exit(0)
     })
   }
@@ -346,7 +351,7 @@ export async function main(
       return
     }
     if (restarts >= MAX_UNEXPECTED_RESTARTS) {
-      runtimeLock.release()
+      runtimeLock?.release()
       process.stderr.write(
         `Oh-DSH Web stopped after repeated restarts (${detail})\n`
         + `${logTail.slice(-20).join('\n')}\n`,
@@ -366,6 +371,6 @@ export async function main(
     await fail(error)
     return 1
   } finally {
-    runtimeLock.release()
+    runtimeLock?.release()
   }
 }

@@ -43,7 +43,7 @@ import {
 } from './data-root.ts'
 import { allowsRuntimeClipboardWrite, originOf } from './permissions.ts'
 import { BUNDLED_DESKTOP_PLUGINS, DESKTOP_PROFILE, ensureDesktopProfile } from './profile.ts'
-import { acquireRuntimeLock, type RuntimeLock } from './runtime-lock.ts'
+import { tryAcquireRuntimeLock, type RuntimeLock } from './runtime-lock.ts'
 import { DshRuntimeSupervisor, runDshCommand, type DshRuntimeOptions, type RuntimeExit } from './runtime.ts'
 import {
   bundledRuntimePaths,
@@ -69,6 +69,7 @@ let runtime: DshRuntimeSupervisor | undefined
 let runtimeUrl: URL | undefined
 let runtimeOrigin: string | undefined
 let runtimeLock: RuntimeLock | undefined
+let desktopReadOnly = false
 let previewRuntime: DshRuntimeSupervisor | undefined
 let previewWindow: BrowserWindow | undefined
 let previewUrl: URL | undefined
@@ -139,6 +140,7 @@ function runtimeEnvironment(
     DSH_DESKTOP_VERSION: info.version,
     DSH_HOME: overrides.dshHome ?? info.dshHome,
     OH_DSH_HOME: overrides.dshHome ?? info.dshHome,
+    OH_DSH_READ_ONLY: desktopReadOnly ? '1' : '0',
     NODE_USE_ENV_PROXY: '1',
     PATH: runtimeSearchPath(paths),
   }
@@ -861,18 +863,25 @@ async function bootstrap(): Promise<void> {
     app.quit()
     return
   }
-  runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
-  process.once('exit', () => { runtimeLock?.release() })
-  const migration = migrateLegacyDesktopState({
-    appDataRoot: app.getPath('appData'),
-    env: process.env,
-    ohDshHome,
-  })
-  if (!migration.complete) {
-    throw new Error(
-      `legacy Desktop state migration under ${ohDshHome} is incomplete; `
-      + 'restore unavailable link targets and restart',
-    )
+  const lockResult = tryAcquireRuntimeLock(ohDshHome, 'desktop')
+  const acquiredLock = lockResult.lock
+  runtimeLock = acquiredLock
+  desktopReadOnly = lockResult.readOnly
+  if (acquiredLock !== undefined) {
+    process.once('exit', () => { acquiredLock.release() })
+  }
+  if (desktopReadOnly === false) {
+    const migration = migrateLegacyDesktopState({
+      appDataRoot: app.getPath('appData'),
+      env: process.env,
+      ohDshHome,
+    })
+    if (!migration.complete) {
+      throw new Error(
+        `legacy Desktop state migration under ${ohDshHome} is incomplete; `
+        + 'restore unavailable link targets and restart',
+      )
+    }
   }
   app.on('second-instance', (_event, argv) => {
     queuedPaths.push(...argv.slice(1).filter(argument => !argument.startsWith('-')))
