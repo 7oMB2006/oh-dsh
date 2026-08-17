@@ -324,11 +324,22 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
         try {
           const current = readLockInfo(path)
           if (current?.pid !== process.pid) return
+          // Publish child PIDs before probing their start markers. If this
+          // process dies during the probe, contenders still see the live
+          // child and cannot reclaim the lock beside an orphan.
           writeLockInfo(path, {
             ...current,
             childPids: [...childPids],
-            childStarts: childPids.map(pid => readProcessStart(pid) ?? ''),
           })
+          const childStarts = childPids.map(pid => readProcessStart(pid) ?? '')
+          const enriched = readLockInfo(path)
+          if (enriched?.pid === process.pid) {
+            writeLockInfo(path, {
+              ...enriched,
+              childPids: [...childPids],
+              childStarts,
+            })
+          }
         } catch {
           // Best-effort update: if the lock disappeared or was replaced, the
           // owning process is no longer authoritative.
