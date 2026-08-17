@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-windows-native-titlebar-offset.md
-2026-08-17-windows-native-titlebar-offset.md: d543a7a395f2ce2f9f866b57c260a47ee7d066c0
-2026-08-17-windows-native-titlebar-offset.zh.md: e20fb0cc410e26da504f4b3f467cd823ff1c4470
+2026-08-17-windows-native-titlebar-offset.md: de58b09b138ef9a5725876f98015e7c2cee297ce
+2026-08-17-windows-native-titlebar-offset.zh.md: 1f594278ef0bb01809c6e1bd6fd4e5d7f62d9b51

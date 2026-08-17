@@ -1,11 +1,36 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { apply, desktopTitlebarHeight } from '../src/client.ts'
+import { apply, applyDesktopSessionLogShift, desktopTitlebarHeight } from '../src/client.ts'
 
 test('desktop titlebar offset follows native window chrome', () => {
   assert.equal(desktopTitlebarHeight('darwin'), 40)
   assert.equal(desktopTitlebarHeight('win32'), 0)
   assert.equal(desktopTitlebarHeight('linux'), 0)
+})
+
+test('desktop shifts Session log clear of the right header controls', () => {
+  const button = {
+    dataset: {} as Record<string, string>,
+    nextElementSibling: null,
+    parentElement: null,
+    style: { transform: '' },
+    closest: () => ({
+      previousElementSibling: {
+        querySelector: () => ({ getBoundingClientRect: () => ({ width: 96 }) }),
+      },
+    }),
+  }
+  const previousDocument = (globalThis as unknown as { document?: unknown }).document
+  ;(globalThis as unknown as { document: unknown }).document = {
+    querySelector: () => button,
+  }
+  try {
+    applyDesktopSessionLogShift()
+    assert.equal(button.style.transform, 'translateX(-106px)')
+  } finally {
+    if (previousDocument === undefined) delete (globalThis as unknown as { document?: unknown }).document
+    else (globalThis as unknown as { document: unknown }).document = previousDocument
+  }
 })
 
 function installFakeDesktopDom(platform: NodeJS.Platform = 'win32'): {
@@ -43,6 +68,7 @@ function installFakeDesktopDom(platform: NodeJS.Platform = 'win32'): {
     createElement: (): typeof style => style,
     documentElement,
     head: { append: (): void => {} },
+    querySelector: (): null => null,
     querySelectorAll: (): [] => [],
     title: '',
   } as unknown as Document

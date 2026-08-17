@@ -123,6 +123,62 @@ html[data-oh-dsh-desktop='true']:has(
 
 `
 
+const ORIGINAL_SESSION_LOG_TRANSFORM_KEY = 'ohDshOriginalSessionLogTransform'
+
+/** Move the Desktop session log clear of the right-side header controls. */
+export function applyDesktopSessionLogShift(): void {
+  const button = document.querySelector<HTMLElement>('[class*="sessionLogButton"]')
+  if (button === null) return
+
+  if (button.dataset[ORIGINAL_SESSION_LOG_TRANSFORM_KEY] === undefined) {
+    button.dataset[ORIGINAL_SESSION_LOG_TRANSFORM_KEY] = button.style.transform || ''
+  }
+
+  let rightWidth = 0
+  let sibling = button.nextElementSibling
+  while (sibling !== null && typeof HTMLElement !== 'undefined' && sibling instanceof HTMLElement) {
+    rightWidth += sibling.getBoundingClientRect().width
+    sibling = sibling.nextElementSibling
+  }
+
+  const utilities = button.closest<HTMLElement>('[class*="headerUtilities"]')
+  const titleCluster = utilities?.previousElementSibling
+  const actions = titleCluster?.querySelector<HTMLElement>('[class*="headerActions"]')
+  if (actions !== null && actions !== undefined) {
+    rightWidth = Math.max(rightWidth, actions.getBoundingClientRect().width)
+  }
+
+  button.style.transform = `translateX(-${rightWidth + 10}px)`
+}
+
+function installDesktopSessionLogShift(): () => void {
+  let observer: MutationObserver | undefined
+  let resizeObserver: ResizeObserver | undefined
+  const apply = (): void => {
+    applyDesktopSessionLogShift()
+    const button = document.querySelector<HTMLElement>('[class*="sessionLogButton"]')
+    const container = button?.parentElement
+    if (container === undefined || container === null || typeof ResizeObserver === 'undefined') return
+    resizeObserver?.disconnect()
+    resizeObserver = new ResizeObserver(applyDesktopSessionLogShift)
+    resizeObserver.observe(container)
+  }
+
+  observer = new MutationObserver(apply)
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+  apply()
+  return () => {
+    observer?.disconnect()
+    resizeObserver?.disconnect()
+    for (const button of document.querySelectorAll<HTMLElement>('[class*="sessionLogButton"]')) {
+      const original = button.dataset[ORIGINAL_SESSION_LOG_TRANSFORM_KEY]
+      if (original === undefined) continue
+      button.style.transform = original
+      delete button.dataset[ORIGINAL_SESSION_LOG_TRANSFORM_KEY]
+    }
+  }
+}
+
 /** Wait for the DSH services used by native menu commands. */
 export const inject = ['locale', 'workspaces', 'desktopPanels', 'pinnedSummary', 'workspaceTools']
 
@@ -311,6 +367,7 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     let disposed = false
     const removeDesktopChrome = installDesktopChrome(bridge.platform)
+    const removeSessionLogShift = installDesktopSessionLogShift()
     let previewPluginId: string | null = null
     const renderPreviewLabel = (): void => {
       if (previewPluginId === null) return
@@ -337,6 +394,7 @@ export function apply(ctx: ClientContext): void {
       unsubscribe()
       unsubscribeLocale()
       removeHeroBranding()
+      removeSessionLogShift()
       removeDesktopChrome()
       delete document.documentElement.dataset.ohDshPreview
       delete document.body.dataset.ohDshPreviewLabel
