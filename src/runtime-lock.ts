@@ -287,7 +287,7 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
 export function tryAcquireRuntimeLock(
   dataRoot: string,
   surface: string,
-): { lock?: RuntimeLock; readOnly: boolean } {
+): { lock: RuntimeLock | undefined; readOnly: boolean } {
   try {
     return { lock: acquireRuntimeLock(dataRoot, surface), readOnly: false }
   } catch (error) {
