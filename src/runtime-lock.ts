@@ -17,6 +17,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  renameSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -105,6 +106,7 @@ function readProcessStart(pid: number): string | undefined {
     const result = spawnSync('ps', ['-p', String(pid), '-o', 'lstart='], {
       encoding: 'utf8',
       timeout: 2_000,
+      env: { ...process.env, TZ: 'UTC', LC_ALL: 'C' },
     })
     if (result.status !== 0) return undefined
     const value = result.stdout.trim()
@@ -198,13 +200,42 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
       } catch (reclaimError) {
         if ((reclaimError as NodeJS.ErrnoException).code !== 'EEXIST') throw reclaimError
         if (isStaleLockFile(reclaimPath)) {
-          // Do not auto-remove a stale reclaim lock: without an atomic
-          // compare-and-swap a delayed reclaimer could delete a fresh mutex.
-          // Ask the user to remove the stale file explicitly.
-          throw new UsageError(
-            `stale runtime reclaim lock at ${reclaimPath} exists; `
-            + 'remove it manually if no other Oh-DSH surface is recovering',
-          )
+          // Claim a stale reclaim lock by moving the exact inode we inspected.
+          // If the file was replaced before the rename, restore it and retry
+          // instead of deleting a fresh mutex.
+          const backup = `${reclaimPath}.stale-${String(process.pid)}-${String(Date.now())}`
+          let claimed = false
+          try {
+            const before = statSync(reclaimPath)
+            renameSync(reclaimPath, backup)
+            const after = statSync(backup)
+            if (before.ino === after.ino && before.dev === after.dev) {
+              try {
+                unlinkSync(backup)
+              } catch {
+                // Best-effort cleanup of the claimed stale file.
+              }
+              claimed = true
+            } else {
+              try {
+                renameSync(backup, reclaimPath)
+              } catch {
+                throw new UsageError(
+                  `stale runtime reclaim lock at ${reclaimPath} changed during recovery; `
+                  + 'remove it manually if no other Oh-DSH surface is recovering',
+                )
+              }
+            }
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+              // Another reclaimer already removed it.
+            } else if (error instanceof UsageError) {
+              throw error
+            } else {
+              throw error
+            }
+          }
+          if (claimed) continue
         }
         sleepSync(20)
         continue

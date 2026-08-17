@@ -280,7 +280,7 @@ test('web launcher starts read-only when another surface owns the root', async (
     assert.equal(code, 1)
     assert.ok(runtime)
     assert.equal(runtime.plan.env.OH_DSH_READ_ONLY, '1')
-    assert.equal(existsSync(join(state, 'profiles')), false)
+    assert.equal(existsSync(join(state, 'profiles', 'web')), true)
   } finally {
     owner.release()
     rmSync(temp, { recursive: true, force: true })

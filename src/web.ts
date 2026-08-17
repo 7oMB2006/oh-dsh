@@ -249,6 +249,8 @@ export async function main(
         + 'restore unavailable link targets and retry',
       )
     }
+  }
+  if (readOnly === false || !existsSync(join(dataRoot, 'profiles', WEB_PROFILE))) {
     ensureWebProfile(dataRoot)
   }
 
@@ -286,7 +288,7 @@ export async function main(
   const MAX_UNEXPECTED_RESTARTS = 5
   const RESTART_DELAY_MS = 600
   const marketplaceRestartPath = join(dataRoot, 'web', 'marketplace-restart')
-  let stopping = false
+  let stoppingPromise: Promise<void> | undefined
   let started = false
   let browserOpened = false
   let restarts = 0
@@ -302,11 +304,11 @@ export async function main(
     }
     return false
   }
-  const stop = async (): Promise<void> => {
-    if (stopping) return
-    stopping = true
+  const stop = (): Promise<void> => {
+    if (stoppingPromise !== undefined) return stoppingPromise
     if (restartTimer !== null) clearTimeout(restartTimer)
-    await runtime.stop()
+    stoppingPromise = runtime.stop().finally(() => { stoppingPromise = undefined })
+    return stoppingPromise
   }
   const fail = async (error: unknown): Promise<void> => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
@@ -342,7 +344,7 @@ export async function main(
     }, RESTART_DELAY_MS)
   }
   runtime.on('exit', (exit: RuntimeExit) => {
-    if (stopping) return
+    if (stoppingPromise !== undefined) return
     if (started === false) return
     const detail = `code=${String(exit.code)}, signal=${String(exit.signal)}`
     if (consumeMarketplaceRestart()) {

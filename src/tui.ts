@@ -261,7 +261,9 @@ export async function main(
     process.once('exit', () => { runtimeLock.release() })
   }
   const runtimeEnv = { ...env, OH_DSH_READ_ONLY: readOnly ? '1' : '0' }
-  if (readOnly === false) ensureTuiProfile(dataRoot)
+  if (readOnly === false || !existsSync(join(dataRoot, 'profiles', TUI_PROFILE))) {
+    ensureTuiProfile(dataRoot)
+  }
 
   const runOnce = async (current: TuiLaunchOptions): Promise<number> => {
     const spec = tuiLaunchSpec(

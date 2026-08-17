@@ -469,7 +469,9 @@ function handleRuntimeExit(exit: RuntimeExit): void {
 
 async function startRuntime(): Promise<void> {
   const info = desktopInfo()
-  ensureDesktopProfile(info.dshHome)
+  if (desktopReadOnly === false || !existsSync(join(info.dshHome, 'profiles', DESKTOP_PROFILE))) {
+    ensureDesktopProfile(info.dshHome)
+  }
   const supervisor = new DshRuntimeSupervisor(runtimeOptions())
   runtime = supervisor
   supervisor.on('exit', handleRuntimeExit)
@@ -625,7 +627,8 @@ async function installLocalPlugin(): Promise<void> {
   }
 }
 
-function createPluginMarketplace(): PluginMarketplaceManager {
+function createPluginMarketplace(): PluginMarketplaceManager | undefined {
+  if (desktopReadOnly) return undefined
   const info = desktopInfo()
   ensureDesktopProfile(info.dshHome)
   const paths = runtimePaths()
@@ -708,7 +711,9 @@ function labels() {
 function buildMenu(): void {
   const text = labels()
   const info = desktopInfo()
-  const profile = ensureDesktopProfile(info.dshHome)
+  const profile = desktopReadOnly === false || !existsSync(join(info.dshHome, 'profiles', DESKTOP_PROFILE))
+    ? ensureDesktopProfile(info.dshHome)
+    : { dshHome: info.dshHome, profileDir: join(info.dshHome, 'profiles', DESKTOP_PROFILE) }
   const template: MenuItemConstructorOptions[] = [
     {
       label: PRODUCT_NAME,
@@ -908,9 +913,11 @@ async function bootstrap(): Promise<void> {
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
   await getUpdateManager()
   marketplace = createPluginMarketplace()
-  marketplaceAgentGateway = await startMarketplaceAgentGateway(marketplace, {
-    onError: error => { appendLog('desktop', `[marketplace-agent] ${String(error)}`) },
-  })
+  marketplaceAgentGateway = marketplace === undefined
+    ? undefined
+    : await startMarketplaceAgentGateway(marketplace, {
+        onError: error => { appendLog('desktop', `[marketplace-agent] ${String(error)}`) },
+      })
   installIpc()
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     callback(allowsRuntimeClipboardWrite({
