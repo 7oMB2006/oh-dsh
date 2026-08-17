@@ -255,6 +255,14 @@ Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重�
 
 ## 插件市场
 
+Desktop、Web 与 TUI 共用同一个插件市场：三端都能检索插件、准备
+candidate、隔离预览、应用、启用、更新和卸载。Desktop 与 Web 使用侧栏
+市场界面；TUI 在聊天中输入 `/plugins` 打开终端市场（也可按 `Ctrl+M`）。
+
+插件目录会标注每个插件的生效界面。安装本身在三端都可以成功；但如果插件
+声明只支持 Web / Desktop，在 TUI 中安装后不会在 TUI 生效，卡片和详情会
+明确显示这一点。
+
 推荐流程：
 
 1. 在未安装分类中选择插件。

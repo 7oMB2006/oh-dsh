@@ -8,10 +8,11 @@
  *   menus, the Electron bridge, and the full local capability set.
  * - `web` — the browser shell (`@oh-dsh/web`): the DSH web UI served over
  *   HTTP. The browser client graph matches desktop wherever the host
- *   services exist (skins, pinned summary, sidebar, terminal dock); only
- *   Electron-bound surfaces (native chrome, the marketplace bridge) differ.
- * - `tui` — the future terminal shell (`@oh-dsh/tui`): no browser client
- *   graph, and host plugins that need `webServer` never activate.
+ *   services exist (skins, pinned summary, sidebar, terminal dock, and the
+ *   plugin marketplace); only Electron-bound native chrome differs.
+ * - `tui` — the terminal shell (`@oh-dsh/tui`): no browser client graph.
+ *   Its plugin marketplace is mounted through the shared DSH command
+ *   registry and the downstream TUI renderer adapter.
  */
 
 /** The three interaction forms a shell can provide. */

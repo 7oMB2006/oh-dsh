@@ -83,11 +83,14 @@ const runtimeEnvironment = {
   DSH_OH_WEB_DATA: webData,
   DSH_OH_WEB_PROFILE: WEB_PROFILE,
   DSH_OH_WEB_VERSION: 'smoke',
+  OH_DSH_MARKETPLACE_CLI_ENTRY: cliEntry,
+  OH_DSH_MARKETPLACE_NODE_BINARY: nodeBinary,
+  OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
   PATH: runtimeSearchPath(paths),
 }
 
 // 1. The composed web profile tree mounts the web-capable Oh-DSH rows and
-// keeps the desktop-only rows out.
+// keeps the Electron shell row out.
 const dump = spawnSync(nodeBinary, [cliEntry, '--profile', WEB_PROFILE, '--dump-config'], {
   cwd: smokeRoot,
   encoding: 'utf8',
@@ -102,10 +105,11 @@ for (const row of [
   'oh-pinned-summary',
   'oh-sidebar',
   'oh-panel-controls',
+  'oh-plugin-marketplace',
 ]) {
   assert.match(dump.stdout, new RegExp(`\\b${row}\\b`), `composed web profile is missing row ${row}`)
 }
-for (const row of ['oh-desktop', 'oh-plugin-marketplace']) {
+for (const row of ['oh-desktop']) {
   assert.doesNotMatch(dump.stdout, new RegExp(`\\b${row}\\b`), `composed web profile must not mount desktop row ${row}`)
 }
 
@@ -173,6 +177,7 @@ try {
     '@oh-dsh/sidebar',
     '@oh-dsh/panel-controls',
     '@oh-dsh/vision',
+    '@oh-dsh/plugin-marketplace',
   ]) {
     const row = bootEntries.find(entry => entry.id === pluginId)
     assert.ok(row, `${pluginId} Host entry did not activate in the DSH client graph`)
@@ -217,14 +222,17 @@ try {
     'index.js',
   )), '@oh-dsh/vision Host bundle is missing')
 
-  // Electron-bound surfaces must stay out of the web client graph.
-  for (const pluginId of ['@oh-dsh/desktop', '@oh-dsh/plugin-marketplace']) {
-    assert.equal(
-      bootEntries.some(entry => entry.id === pluginId),
-      false,
-      `${pluginId} must not enroll in the Oh-DSH Web client graph`,
-    )
-  }
+  // Only the Electron shell must stay out of the web client graph.
+  assert.equal(
+    bootEntries.some(entry => entry.id === '@oh-dsh/desktop'),
+    false,
+    '@oh-dsh/desktop must not enroll in the Oh-DSH Web client graph',
+  )
+  assert.equal(
+    bootEntries.some(entry => entry.id === '@oh-dsh/plugin-marketplace'),
+    true,
+    '@oh-dsh/plugin-marketplace must enroll in the Oh-DSH Web client graph',
+  )
 
   // The skins preferences server mounts on the web server.
   const preferencesUrl = new URL('/oh-dsh/skins/preferences', base)
@@ -246,6 +254,23 @@ try {
   const persisted = await saved.json()
   assert.equal(persisted.activeId, 'oh-dsh-skin-porcelain')
   assert.equal(persisted.fallbackTheme, 'dark')
+
+  // The plugin marketplace host serves its transaction bridge on the web server.
+  const marketplaceUrl = new URL('/oh-dsh/plugin-marketplace', base)
+  const marketplaceSnapshotResponse = await fetch(marketplaceUrl)
+  const marketplaceSnapshot = await marketplaceSnapshotResponse.json()
+  assert.equal(marketplaceSnapshotResponse.status, 200)
+  assert.equal(Array.isArray(marketplaceSnapshot.catalog), true)
+  assert.equal(typeof marketplaceSnapshot.lifecycle, 'object')
+  const marketplaceDispatchResponse = await fetch(marketplaceUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      origin: base.origin,
+    },
+    body: JSON.stringify({ type: 'discard' }),
+  })
+  assert.equal(marketplaceDispatchResponse.status, 200, await marketplaceDispatchResponse.text())
 
   // The sidebar host serves the workspace Git API on the web server.
   const git = (...args) => {

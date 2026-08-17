@@ -6,6 +6,15 @@ export type MarketplaceMechanism = 'bundle' | 'repository' | 'discover' | 'unsup
 export type MarketplaceInstallMechanism = 'bundle' | 'repository'
 export type MarketplaceAction = 'install' | 'update' | 'enable' | 'disable' | 'uninstall'
 export type MarketplaceRuntimeRisk = 'profile-bundle' | 'trusted-host' | 'guided'
+export type MarketplaceSurfaceKind = 'desktop' | 'web' | 'tui'
+
+/** Where a catalog entry is expected to take effect after installation. */
+export interface MarketplaceSurfaceSupport {
+  declared: boolean
+  desktop: boolean
+  web: boolean
+  tui: boolean
+}
 export type MarketplaceTrust = 'organization' | 'community' | 'untrusted'
 export type MarketplaceRiskLevel = 'low' | 'elevated' | 'high' | 'blocked'
 export type MarketplaceRiskReason =
@@ -29,6 +38,8 @@ const PROTECTED_PLUGIN_IDS = new Set([
   'panel-controls',
   'pinned-summary',
   'plugin-marketplace',
+  'tui',
+  'tui-marketplace',
   'workspace-tools',
 ])
 
@@ -38,6 +49,8 @@ const PROTECTED_PLUGIN_PACKAGES = new Set([
   '@oh-dsh/desktop-sidebar',
   '@oh-dsh/panel-controls',
   '@oh-dsh/sidebar',
+  '@oh-dsh/tui',
+  '@oh-dsh/tui-marketplace',
   'dsh-better-sidebar',
 ])
 
@@ -46,7 +59,7 @@ const PROTECTED_PLUGIN_REPOSITORIES = new Set([
   'omdsh-dev/dsh-better-sidebar',
 ])
 
-/** Marketplace code cannot replace the desktop or its transaction owner. */
+/** Marketplace code cannot replace a shell or its transaction owner. */
 export function isProtectedMarketplacePlugin(
   pluginId: string,
   repository?: string,
@@ -72,6 +85,7 @@ export interface MarketplacePlugin {
   pushedAt: string | null
   repository: string
   runtimeRisk: MarketplaceRuntimeRisk
+  surfaces: MarketplaceSurfaceSupport
   tags: string[]
   title: string
   trust: MarketplaceTrust
@@ -119,6 +133,7 @@ export interface MarketplacePlan {
 export interface MarketplacePreview {
   action: MarketplaceAction
   pluginId: string
+  previewUrl: string | null
   resolvedCommit: string
   startedAt: string
   transactionId: string

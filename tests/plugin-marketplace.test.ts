@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, win32 } from 'node:path'
@@ -30,6 +31,19 @@ import {
   initialSessionNavigationState,
   transitionSessionNavigation,
 } from '../plugins/plugin-marketplace/src/client/session-navigation.ts'
+import {
+  createMarketplaceHttpBridge,
+  waitForMarketplaceRestart,
+} from '../plugins/plugin-marketplace/src/client/http.ts'
+import type {
+  MarketplacePreviewProxyContext,
+} from '../plugins/plugin-marketplace/src/host/preview-proxy.ts'
+import {
+  MarketplacePreviewProxy,
+  MARKETPLACE_WEB_PREVIEW_PATH,
+} from '../plugins/plugin-marketplace/src/host/preview-proxy.ts'
+import type { MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
+import { TuiMarketplaceController } from '../plugins/tui-marketplace/src/marketplace-controller.ts'
 
 const COMMIT = '0123456789abcdef0123456789abcdef01234567'
 const UPDATED_COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
@@ -46,6 +60,7 @@ function catalogDocument(): unknown {
         description: 'Bundle demo',
         bundle: true,
         repository: false,
+        surfaces: ['web', 'desktop'],
         tags: ['web-ui'],
         pushedAt: '2026-08-10T12:00:00Z',
       },
@@ -65,6 +80,7 @@ function catalogDocument(): unknown {
         note: 'Repository demo',
         bundle: false,
         repository: true,
+        surfaces: { desktop: true, web: true, tui: false },
       },
       {
         name: 'hybrid-demo',
@@ -177,7 +193,10 @@ class FakeRuntime implements MarketplaceRuntime {
 
   async startLive(): Promise<void> { this.liveStarts += 1 }
   async stopLive(): Promise<void> { this.liveStops += 1 }
-  async startPreview(input: MarketplacePreviewRuntimeInput): Promise<void> { this.previewStarts.push(input) }
+  async startPreview(input: MarketplacePreviewRuntimeInput): Promise<{ url?: string }> {
+    this.previewStarts.push(input)
+    return {}
+  }
   async stopPreview(): Promise<void> { this.previewStops += 1 }
 }
 
@@ -338,6 +357,18 @@ test('catalog parser keeps safe entries and labels unsupported managers', () => 
     'vlln/repository-demo',
   )
   assert.equal(catalog.plugins[0]?.url, 'https://github.com/dsh-external/bundle-demo')
+  assert.deepEqual(
+    catalog.plugins.find(plugin => plugin.id === 'bundle-demo')?.surfaces,
+    { declared: true, desktop: true, web: true, tui: false },
+  )
+  assert.deepEqual(
+    catalog.plugins.find(plugin => plugin.id === 'repository-demo')?.surfaces,
+    { declared: true, desktop: true, web: true, tui: false },
+  )
+  assert.deepEqual(
+    catalog.plugins.find(plugin => plugin.id === 'legacy-demo')?.surfaces,
+    { declared: false, desktop: true, web: true, tui: true },
+  )
 })
 
 test('community and registry catalogs preserve repositories across owners', () => {
@@ -759,6 +790,186 @@ test('Agent gateway authenticates and defers runtime-restarting applies', async 
   }
 })
 
+function listen(server: ReturnType<typeof createServer>): Promise<string> {
+  return new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      if (address === null || typeof address === 'string') {
+        reject(new Error('test server did not bind a TCP port'))
+        return
+      }
+      resolve(`http://127.0.0.1:${String(address.port)}`)
+    })
+  })
+}
+
+test('web preview proxy publishes the loopback child through the outer origin', async () => {
+  const target = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain' })
+    response.end(`preview:${_request.url ?? '/'}`)
+  })
+  const targetUrl = await listen(target)
+  const proxy = new MarketplacePreviewProxy()
+  const previewPath = proxy.register('tx-123', new URL(targetUrl))
+  assert.equal(
+    previewPath,
+    `${MARKETPLACE_WEB_PREVIEW_PATH}/tx-123/?oh-dsh-marketplace-preview=1`,
+  )
+  let mounted: Parameters<MarketplacePreviewProxyContext['webServer']['register']>[0] | undefined
+  proxy.mount({
+    webServer: {
+      register: route => {
+        mounted = route
+        return () => {}
+      },
+    },
+  })
+  assert.ok(mounted)
+  assert.equal(mounted?.kind, 'prefix')
+  const outer = createServer((request, response) => {
+    if (mounted === undefined) {
+      response.writeHead(500)
+      response.end()
+      return
+    }
+    void mounted.handler(request, response)
+  })
+  const outerUrl = await listen(outer)
+  try {
+    const response = await fetch(`${outerUrl}${MARKETPLACE_WEB_PREVIEW_PATH}/tx-123/assets/app.js?from=outer`)
+    assert.equal(response.status, 200)
+    assert.equal(await response.text(), 'preview:/assets/app.js?from=outer')
+    proxy.unregister('tx-123')
+    const missing = await fetch(`${outerUrl}${MARKETPLACE_WEB_PREVIEW_PATH}/tx-123/`)
+    assert.equal(missing.status, 404)
+  } finally {
+    await new Promise<void>(resolve => { target.close(() => { resolve() }) })
+    await new Promise<void>(resolve => { outer.close(() => { resolve() }) })
+  }
+})
+
+test('web restart wait observes the old host leave and the new host arrive', async () => {
+  let calls = 0
+  const fetcher = async () => {
+    calls += 1
+    if (calls <= 2) return new Response(null, { status: 200 })
+    if (calls === 3) throw new Error('old host exited')
+    return new Response(null, { status: 200 })
+  }
+  await waitForMarketplaceRestart(
+    '/oh-dsh/plugin-marketplace',
+    5_000,
+    5_000,
+    fetcher as unknown as typeof fetch,
+  )
+  assert.equal(calls, 4)
+})
+
+test('TUI marketplace collects explicit risk confirmations before preview', async () => {
+  const snapshot: MarketplaceSnapshot = {
+    auth: { detail: '', status: 'ready' },
+    busy: false,
+    catalog: [],
+    catalogGeneratedAt: null,
+    error: 'test snapshot is already loaded',
+    installed: [],
+    lastAction: null,
+    lifecycle: { candidate: null, current: { profile: 'tui', state: 'live' }, previous: null },
+    plan: {
+      action: 'install',
+      buildScripts: { prepare: 'node build.mjs' },
+      description: '',
+      manifestHash: '',
+      mechanism: 'bundle',
+      packageName: '@example/tui',
+      pluginId: 'tui-demo',
+      repository: 'example/tui-demo',
+      requirements: ['allow-build-scripts', 'accept-high-risk'],
+      resolvedCommit: COMMIT,
+      riskLevel: 'high',
+      riskReasons: ['install-scripts', 'trusted-host-code'],
+      source: `github:example/tui-demo#${COMMIT}`,
+      sourceReview: 'first-use',
+    },
+    preview: null,
+    sourceLocks: [],
+    undoAvailable: false,
+  }
+  const commands: unknown[] = []
+  const controller = new TuiMarketplaceController({
+    getSnapshot: async () => snapshot,
+    dispatch: async (command): Promise<MarketplaceSnapshot> => {
+      commands.push(command)
+      return {
+        ...snapshot,
+        preview: {
+          action: 'install',
+          pluginId: 'tui-demo',
+          previewUrl: null,
+          resolvedCommit: COMMIT,
+          startedAt: '',
+          transactionId: 'tx',
+        },
+      }
+    },
+  })
+  await controller.load()
+  commands.length = 0
+  await controller.preview()
+  assert.equal(controller.getSnapshot().confirmation, 'allow-build-scripts')
+  controller.acceptConfirmation()
+  assert.equal(controller.getSnapshot().confirmation, 'accept-high-risk')
+  controller.acceptConfirmation()
+  await new Promise<void>(resolve => { setImmediate(resolve) })
+  assert.deepEqual(commands, [{
+    type: 'preview',
+    confirmations: ['allow-build-scripts', 'accept-high-risk'],
+  }])
+})
+
+test('web HTTP bridge carries the shared marketplace protocol', async () => {
+  const snapshot = {
+    auth: { detail: '', status: 'ready' },
+    busy: false,
+    catalog: [],
+    catalogGeneratedAt: null,
+    error: 'test snapshot is already loaded',
+    installed: [],
+    lastAction: null,
+    lifecycle: { candidate: null, current: { profile: 'web', state: 'live' }, previous: null },
+    plan: null,
+    preview: null,
+    sourceLocks: [],
+    undoAvailable: false,
+  }
+  const calls: Array<{ body?: unknown; method?: string | null }> = []
+  const fetcher = async (_path: string, init?: RequestInit) => {
+    calls.push({ body: init?.body, method: init?.method ?? null })
+    if (init?.body !== undefined) {
+      return new Response(JSON.stringify(snapshot), {
+        headers: { 'content-type': 'application/json' },
+        status: 200,
+      })
+    }
+    return new Response(JSON.stringify(snapshot), {
+      headers: { 'content-type': 'application/json' },
+      status: 200,
+    })
+  }
+  const bridge = createMarketplaceHttpBridge(
+    '/oh-dsh/plugin-marketplace',
+    fetcher as unknown as typeof fetch,
+  )
+  assert.deepEqual(await bridge.getSnapshot(), snapshot)
+  assert.deepEqual(calls[0], { body: undefined, method: 'GET' })
+  assert.deepEqual(await bridge.dispatch({ type: 'discard' }), snapshot)
+  assert.deepEqual(calls[1], {
+    body: JSON.stringify({ type: 'discard' }),
+    method: 'POST',
+  })
+})
+
 test('marketplace navigation preserves the Settings footer geometry', () => {
   const client = readFileSync(new URL(
     '../plugins/plugin-marketplace/src/client/plugin.tsx',
@@ -1145,7 +1356,7 @@ test('the marketplace refuses to modify protected desktop plugins', async () => 
       action: 'install',
       pluginId: 'oh-dsh-desktop',
     })
-    assert.match(snapshot.error ?? '', /protected by the desktop/)
+    assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(
       snapshot.catalog.find(plugin => plugin.id === 'oh-dsh-desktop')?.protected,
@@ -1176,7 +1387,7 @@ test('the marketplace protects the upstream Better Sidebar alias', async () => {
       action: 'install',
       pluginId: 'dsh-better-sidebar',
     })
-    assert.match(snapshot.error ?? '', /protected by the desktop/)
+    assert.match(snapshot.error ?? '', /protected by Oh-DSH/)
     assert.equal(snapshot.preview, null)
     assert.equal(snapshot.catalog[0]?.protected, true)
     assert.equal(setup.platform.commands.length, 0)

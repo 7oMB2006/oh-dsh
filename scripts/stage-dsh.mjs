@@ -832,6 +832,12 @@ function installDesktopPackages() {
         [join(root, 'dist', 'plugins', 'tui', 'cordis.patch.yml'), 'dist/cordis.patch.yml'],
       ],
     },
+    {
+      manifest: join(root, 'plugins', 'tui-marketplace', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'tui-marketplace', 'index.js'), 'dist/index.js'],
+      ],
+    },
   ]
   const installedVersions = {}
   for (const spec of packages) {
@@ -955,6 +961,7 @@ for (const required of [
   'plugins/plugin-marketplace/client.js',
   'plugins/tui/index.js',
   'plugins/tui/cordis.patch.yml',
+  'plugins/tui-marketplace/index.js',
 ]) {
   if (!existsSync(join(root, 'dist', required))) {
     throw new Error(`desktop artifact missing: dist/${required}; run pnpm run build first`)

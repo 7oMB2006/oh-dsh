@@ -104,6 +104,7 @@ function pluginView(plugin: MarketplacePlugin): Record<string, unknown> {
     protected: plugin.protected,
     repository: plugin.repository,
     risk: plugin.runtimeRisk,
+    surfaces: plugin.surfaces,
     trust: plugin.trust,
     updateAvailable: plugin.updateAvailable,
     url: plugin.url,

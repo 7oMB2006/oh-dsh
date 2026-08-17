@@ -55,7 +55,7 @@ Git review, browser, files, sessions, and plugin state.
     </td>
     <td width="50%" valign="top">
       <h3>🧩 Plugin marketplace</h3>
-      <p>Browse, classify, install, enable, update, and uninstall plugins. Every change enters an isolated preview first, so you can inspect risk, apply it, or roll back safely.</p>
+      <p>Desktop, Web, and TUI can all search, preview, and install plugins through one shared transaction and recovery state. The catalog labels where a plugin actually takes effect: installation may succeed on every surface, but some plugins only work on Web or Desktop — not in TUI — and that distinction is shown explicitly.</p>
     </td>
   </tr>
   <tr>

@@ -11,8 +11,9 @@
 # wherever the host services exist: skins, pinned summary, the sidebar
 # (workspace, Git, review, preferences — its host is pure Node), the PTY
 # terminal dock (better-sidebar-runtime is also pure Node), and the
-# browser-side panel layout. Only the Electron-bound surfaces stay out: the
-# desktop shell chrome and the marketplace bridge.
+# browser-side panel layout and the plugin marketplace. Only the
+# Electron-bound desktop shell chrome stays out; the marketplace host now
+# serves its bridge through the same webServer.
 
 - insert:
     - id: oh-web
@@ -35,3 +36,6 @@
 
     - id: oh-panel-controls
       name: '@oh-dsh/panel-controls'
+
+    - id: oh-plugin-marketplace
+      name: '@oh-dsh/plugin-marketplace'

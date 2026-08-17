@@ -51,11 +51,32 @@ test('every bundled plugin adapts explicitly per surface', () => {
     'utf8',
   )
   assert.doesNotMatch(marketplace, /Electron bridge is unavailable'\)/)
-  assert.match(marketplace, /plugin-marketplace: skipped, the plugin marketplace is desktop-only/)
+  assert.doesNotMatch(marketplace, /desktop-only/)
+  assert.match(marketplace, /resolveClientBridge/)
+  assert.match(marketplace, /createMarketplaceHttpBridge/)
 
   const desktopHost = readFileSync(join(root, 'src/plugin.ts'), 'utf8')
   assert.match(desktopHost, /kind: 'desktop'/)
   assert.match(desktopHost, /OH_DSH_SURFACE_SERVICE/)
+
+  const marketplaceHost = readFileSync(
+    join(root, 'plugins/plugin-marketplace/src/index.ts'),
+    'utf8',
+  )
+  assert.match(marketplaceHost, /createSurfaceMarketplaceHost/)
+  assert.match(marketplaceHost, /mountMarketplaceWebBridge/)
+  assert.match(marketplaceHost, /mountMarketplaceTuiCommand/)
+  assert.match(marketplaceHost, /OH_DSH_MARKETPLACE_PREVIEW/)
+  assert.match(marketplaceHost, /previewProxy/)
+
+  const tuiMarketplace = readFileSync(
+    join(root, 'plugins/tui-marketplace/src/plugin.ts'),
+    'utf8',
+  )
+  assert.match(tuiMarketplace, /TuiMarketplaceController/)
+  assert.match(tuiMarketplace, /ctx\.on\('session\/event'/)
+  assert.match(tuiMarketplace, /command\/run/)
+  assert.match(tuiMarketplace, /name === 'plugins'/)
 
   const webHost = readFileSync(join(root, 'web/src/index.ts'), 'utf8')
   assert.match(webHost, /kind: 'web'/)

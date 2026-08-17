@@ -2,6 +2,8 @@ import type {
   MarketplaceInstalledPlugin,
   MarketplaceMechanism,
   MarketplacePlugin,
+  MarketplaceSurfaceKind,
+  MarketplaceSurfaceSupport,
 } from './protocol.ts'
 import {
   isProtectedMarketplacePlugin,
@@ -14,6 +16,7 @@ export interface MarketplaceCatalog {
 
 interface CatalogRepository {
   bundle?: unknown
+  surfaces?: unknown
   category?: unknown
   description?: unknown
   empty?: unknown
@@ -29,6 +32,7 @@ interface CatalogRepository {
 
 interface NormalizedCatalogRow {
   category: string
+  surfaces: MarketplaceSurfaceSupport
   description: string
   id: string
   mechanism: MarketplaceMechanism
@@ -80,6 +84,48 @@ function tags(value: unknown): string[] {
     : []
 }
 
+const SURFACE_KINDS = new Set<MarketplaceSurfaceKind>(['desktop', 'web', 'tui'])
+
+/**
+ * Normalize a catalog `surfaces` declaration. Array entries and object
+ * booleans are accepted; undeclared entries default to every surface with
+ * `declared: false` so callers can render the assumed/unverified state.
+ */
+function surfaces(value: unknown): MarketplaceSurfaceSupport {
+  const support: MarketplaceSurfaceSupport = {
+    declared: false,
+    desktop: true,
+    web: true,
+    tui: true,
+  }
+  if (Array.isArray(value)) {
+    const listed = value.filter((entry): entry is string => typeof entry === 'string')
+    if (listed.length === 0) return support
+    support.declared = true
+    support.desktop = false
+    support.web = false
+    support.tui = false
+    for (const entry of listed) {
+      const kind = entry.trim().toLowerCase() as MarketplaceSurfaceKind
+      if (SURFACE_KINDS.has(kind)) support[kind] = true
+    }
+    return support
+  }
+  if (isRecord(value)) {
+    const entries = Object.entries(value).filter((entry): entry is [MarketplaceSurfaceKind, boolean] =>
+      SURFACE_KINDS.has(entry[0] as MarketplaceSurfaceKind)
+      && typeof entry[1] === 'boolean')
+    if (entries.length === 0) return support
+    support.declared = true
+    support.desktop = false
+    support.web = false
+    support.tui = false
+    for (const [kind, enabled] of entries) support[kind] = enabled
+    return support
+  }
+  return support
+}
+
 function legacyRows(value: Record<string, unknown>): NormalizedCatalogRow[] | null {
   if (value.schema !== 'dsh-external-hub/v0.1' || !Array.isArray(value.repos)) return null
   return value.repos.flatMap(candidate => {
@@ -90,6 +136,7 @@ function legacyRows(value: Record<string, unknown>): NormalizedCatalogRow[] | nu
     const repository = repositoryName(row.repo) ?? repositoryName(row.url) ?? `dsh-external/${id}`
     return [{
       category: cleanString(row.category) ?? 'other',
+      surfaces: surfaces(row.surfaces),
       description: cleanString(row.note) ?? cleanString(row.description) ?? 'No description provided.',
       id,
       mechanism: mechanism(row),
@@ -117,6 +164,7 @@ function registryRows(value: Record<string, unknown>): NormalizedCatalogRow[] | 
       : mode === 'repository-plugin' ? 'repository' : 'unsupported'
     return [{
       category: cleanString(candidate.kind) ?? 'other',
+      surfaces: surfaces(candidate.surfaces),
       description: cleanString(candidate.description) ?? 'No description provided.',
       id,
       mechanism: installMechanism,
@@ -146,6 +194,7 @@ function communityRows(value: Record<string, unknown>): NormalizedCatalogRow[] |
       : cleanString(candidate.description)
     return [{
       category: cleanString(candidate.category) ?? 'other',
+      surfaces: surfaces(candidate.surfaces),
       description: description ?? 'No description provided.',
       id,
       mechanism: 'discover',
@@ -172,6 +221,7 @@ export function parseMarketplaceCatalog(
       category: row.category,
       currentCommit: null,
       description: row.description,
+      surfaces: row.surfaces,
       enabled: false,
       id: row.id,
       installed: installedIds.has(row.id),

@@ -117,13 +117,12 @@ test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
     'oh-pinned-summary',
     'oh-sidebar',
     'oh-panel-controls',
+    'oh-plugin-marketplace',
   ]) {
     assert.match(patch, new RegExp(`- id: ${row}`))
   }
-  // Electron-bound surfaces stay out of the web composition.
-  for (const desktopRow of ['oh-desktop', 'oh-plugin-marketplace']) {
-    assert.doesNotMatch(patch, new RegExp(`- id: ${desktopRow}\\b`))
-  }
+  // Only the Electron shell itself stays out of the web composition.
+  assert.doesNotMatch(patch, /- id: oh-desktop\b/)
 })
 
 test('web launcher defaults match the dsh-web-app bundle surface', () => {
