@@ -3,6 +3,7 @@ import type { DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot
 import type { MarketplaceCommand, MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
 
 const bridge: DesktopBridge = Object.freeze({
+  platform: process.platform,
   chooseWorkspace: async (): Promise<string[]> => {
     return await ipcRenderer.invoke('desktop:choose-workspace') as string[]
   },

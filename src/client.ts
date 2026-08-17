@@ -38,13 +38,9 @@ declare global {
 const DESKTOP_TITLEBAR_HEIGHT = 40
 
 const DESKTOP_CHROME_CSS = `
-html[data-oh-dsh-desktop='true'] {
-  --oh-dsh-titlebar-height: ${DESKTOP_TITLEBAR_HEIGHT}px;
-}
-
 html[data-oh-dsh-desktop='true'] body {
   box-sizing: border-box;
-  padding-top: var(--oh-dsh-titlebar-height);
+  padding-top: var(--oh-dsh-titlebar-height, 0px);
 }
 
 html[data-oh-dsh-desktop='true'] body::before {
@@ -54,7 +50,7 @@ html[data-oh-dsh-desktop='true'] body::before {
   top: 0;
   right: 0;
   left: 0;
-  height: var(--oh-dsh-titlebar-height);
+  height: var(--oh-dsh-titlebar-height, 0px);
   background: var(--dsw-alias-bg-base);
   -webkit-app-region: drag;
   user-select: none;
@@ -141,16 +137,29 @@ const DESKTOP_SHELL_MESSAGES: LocaleMessages<DesktopShellMessage> = {
   },
 }
 
-function installDesktopChrome(): () => void {
+/** Return the content offset required by the platform's native window chrome. */
+export function desktopTitlebarHeight(platform: NodeJS.Platform): number {
+  return platform === 'darwin' ? DESKTOP_TITLEBAR_HEIGHT : 0
+}
+
+function installDesktopChrome(platform: NodeJS.Platform): () => void {
   const originalTitle = document.title
+  const rootStyle = document.documentElement.style
+  const originalTitlebarHeight = rootStyle.getPropertyValue('--oh-dsh-titlebar-height')
   const style = document.createElement('style')
   style.dataset.ohDshDesktopChrome = 'true'
   style.textContent = DESKTOP_CHROME_CSS
   document.head.append(style)
+  rootStyle.setProperty(
+    '--oh-dsh-titlebar-height',
+    `${desktopTitlebarHeight(platform)}px`,
+  )
   document.documentElement.dataset.ohDshDesktop = 'true'
   document.title = 'Oh-DSH Desktop'
   return () => {
     style.remove()
+    if (originalTitlebarHeight === '') rootStyle.removeProperty('--oh-dsh-titlebar-height')
+    else rootStyle.setProperty('--oh-dsh-titlebar-height', originalTitlebarHeight)
     delete document.documentElement.dataset.ohDshDesktop
     document.title = originalTitle
   }
@@ -301,6 +310,7 @@ export function apply(ctx: ClientContext): void {
   } satisfies OhDshSurfaceView), undefined)
   ctx.effect(() => {
     let disposed = false
+    const removeDesktopChrome = installDesktopChrome(bridge.platform)
     let previewPluginId: string | null = null
     const renderPreviewLabel = (): void => {
       if (previewPluginId === null) return
@@ -308,11 +318,11 @@ export function apply(ctx: ClientContext): void {
         plugin: previewPluginId,
       })
     }
-    const removeDesktopChrome = installDesktopChrome()
     const removeHeroBranding = installHeroBranding()
     const unsubscribeLocale = locale.subscribe(renderPreviewLabel)
     void bridge.getInfo().then(info => {
-      if (disposed || info.preview === null) return
+      if (disposed) return
+      if (info.preview === null) return
       previewPluginId = info.preview.pluginId
       document.documentElement.dataset.ohDshPreview = 'true'
       renderPreviewLabel()

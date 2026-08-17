@@ -4,6 +4,7 @@ const { join } = require('node:path')
 const runtimeUrl = process.env.DSH_SMOKE_RUNTIME_URL ?? process.argv[2]
 const smokeSurface = process.env.DSH_SMOKE_SURFACE ?? 'desktop'
 const webSmoke = smokeSurface === 'web'
+const expectedDesktopTitlebarHeight = process.platform === 'darwin' ? '40px' : '0px'
 const timeoutMs = 20_000
 
 if (runtimeUrl === undefined) throw new Error('runtime URL is required')
@@ -262,6 +263,13 @@ void app.whenReady().then(async () => {
             viewportHeight: window.innerHeight,
           }
         })(),
+        desktopChrome: {
+          bodyPaddingTop: getComputedStyle(document.body).paddingTop,
+          platform: window.dshDesktop?.platform ?? null,
+          pseudoHeight: getComputedStyle(document.body, '::before').height,
+          titlebarHeight: getComputedStyle(document.documentElement)
+            .getPropertyValue('--oh-dsh-titlebar-height').trim(),
+        },
         ready: document.documentElement.dataset.ohDshDesktop === 'true',
         webReady: document.title === 'Oh-DSH Web',
       }
@@ -279,6 +287,18 @@ void app.whenReady().then(async () => {
       if (state.vision.error !== null) {
         settle(new Error(`Pasted image thumbnail failed: ${state.vision.error}`))
         return
+      }
+      if (!webSmoke && state.ready === true) {
+        if (state.desktopChrome.platform !== process.platform
+          || state.desktopChrome.bodyPaddingTop !== expectedDesktopTitlebarHeight
+          || state.desktopChrome.pseudoHeight !== expectedDesktopTitlebarHeight
+          || state.desktopChrome.titlebarHeight !== expectedDesktopTitlebarHeight) {
+          settle(new Error(
+            'Desktop titlebar chrome does not match the host platform: '
+            + JSON.stringify({ expected: expectedDesktopTitlebarHeight, actual: state.desktopChrome }),
+          ))
+          return
+        }
       }
       // DSH owns the native AttachmentRail layout. Keep this smoke check
       // agnostic to whether a surface places the rail inside the composer

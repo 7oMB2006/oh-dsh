@@ -20,6 +20,7 @@ const emptyMarketplaceSnapshot = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('dshDesktop', Object.freeze({
+  platform: process.platform,
   chooseWorkspace: async () => [],
   getInfo: async () => ({
     appDataPath: '',
