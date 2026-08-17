@@ -262,6 +262,7 @@ test('web launcher refuses a data root already owned by another surface', async 
       ),
       /still using/,
     )
+    assert.equal(existsSync(join(state, 'profiles')), false)
   } finally {
     owner.release()
     rmSync(temp, { recursive: true, force: true })

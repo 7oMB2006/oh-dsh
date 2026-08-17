@@ -849,6 +849,20 @@ async function bootstrap(): Promise<void> {
   app.setName(PRODUCT_NAME)
   const ohDshHome = resolveOhDshHome(process.env)
   const electronDataRoot = desktopElectronDataRoot(ohDshHome)
+  mkdirSync(electronDataRoot, { recursive: true, mode: 0o700 })
+  app.setPath('userData', electronDataRoot)
+  app.setAboutPanelOptions({
+    applicationName: PRODUCT_NAME,
+    applicationVersion: PRODUCT_VERSION,
+    version: `DeepSeek Harness plugin distribution ${PRODUCT_VERSION}`,
+  })
+  const gotLock = app.requestSingleInstanceLock()
+  if (!gotLock) {
+    app.quit()
+    return
+  }
+  runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
+  process.once('exit', () => { runtimeLock?.release() })
   const migration = migrateLegacyDesktopState({
     appDataRoot: app.getPath('appData'),
     env: process.env,
@@ -859,21 +873,6 @@ async function bootstrap(): Promise<void> {
       `legacy Desktop state migration under ${ohDshHome} is incomplete; `
       + 'restore unavailable link targets and restart',
     )
-  }
-  mkdirSync(electronDataRoot, { recursive: true, mode: 0o700 })
-  app.setPath('userData', electronDataRoot)
-  app.setAboutPanelOptions({
-    applicationName: PRODUCT_NAME,
-    applicationVersion: PRODUCT_VERSION,
-    version: `DeepSeek Harness plugin distribution ${PRODUCT_VERSION}`,
-  })
-  runtimeLock = acquireRuntimeLock(ohDshHome, 'desktop')
-  process.once('exit', () => { runtimeLock?.release() })
-  const gotLock = app.requestSingleInstanceLock()
-  if (!gotLock) {
-    runtimeLock?.release()
-    app.quit()
-    return
   }
   app.on('second-instance', (_event, argv) => {
     queuedPaths.push(...argv.slice(1).filter(argument => !argument.startsWith('-')))
@@ -989,4 +988,5 @@ void bootstrap().catch(async (error: unknown) => {
     await app.whenReady()
     await showSplash({ error: true, message: 'Oh-DSH Desktop 启动失败。', detail })
   }
+  app.quit()
 })

@@ -195,11 +195,13 @@ export function acquireRuntimeLock(dataRoot: string, surface: string): RuntimeLo
       } catch (reclaimError) {
         if ((reclaimError as NodeJS.ErrnoException).code !== 'EEXIST') throw reclaimError
         if (isStaleLockFile(reclaimPath)) {
-          try {
-            unlinkSync(reclaimPath)
-          } catch {
-            // Another reclaimer may have removed it already.
-          }
+          // Do not auto-remove a stale reclaim lock: without an atomic
+          // compare-and-swap a delayed reclaimer could delete a fresh mutex.
+          // Ask the user to remove the stale file explicitly.
+          throw new UsageError(
+            `stale runtime reclaim lock at ${reclaimPath} exists; `
+            + 'remove it manually if no other Oh-DSH surface is recovering',
+          )
         }
         sleepSync(20)
         continue

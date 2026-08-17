@@ -256,10 +256,9 @@ export async function main(
   const cwd = resolve(options.cwd)
   if (!existsSync(cwd)) throw new UsageError(`workspace directory does not exist: ${cwd}`)
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
-  ensureTuiProfile(dataRoot)
-
   const runtimeLock = acquireRuntimeLock(dataRoot, 'tui')
   process.once('exit', () => { runtimeLock.release() })
+  ensureTuiProfile(dataRoot)
 
   const runOnce = async (current: TuiLaunchOptions): Promise<number> => {
     const spec = tuiLaunchSpec(

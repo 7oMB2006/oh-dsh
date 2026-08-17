@@ -232,6 +232,8 @@ export async function main(
   }
 
   mkdirSync(dataRoot, { recursive: true, mode: 0o700 })
+  const runtimeLock = acquireRuntimeLock(dataRoot, 'web')
+  process.once('exit', () => { runtimeLock.release() })
   const migration = migrateLegacyWebState({
     dataRoot,
     ...(!hasOhDshHomeOverride(env) && dataRoot === defaultDataRoot
@@ -245,9 +247,6 @@ export async function main(
     )
   }
   ensureWebProfile(dataRoot)
-
-  const runtimeLock = acquireRuntimeLock(dataRoot, 'web')
-  process.once('exit', () => { runtimeLock.release() })
 
   const logTail: string[] = []
   const runtime = runtimeFactory({
