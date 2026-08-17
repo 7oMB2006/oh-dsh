@@ -21,9 +21,9 @@
 <p align="center">
   <a href="https://github.com/hust-open-atom-club/oh-dsh/releases/latest"><strong>Download</strong></a>
   ·
-  <a href="./docs/usage.en.md">Usage guide</a>
+  <a href="./docs/usage.md">Usage guide</a>
   ·
-  <a href="./docs/design.en.md">Design guide</a>
+  <a href="./docs/design.md">Design guide</a>
 </p>
 
 <p align="center">
@@ -133,7 +133,7 @@ describes its native attachments through the configured vision backend before
 the pinned text-only adapter serializes the same turn. It does not add a second
 composer bubble or reference protocol. TUI uses the same capability through
 workspace image paths or URLs. See the
-[image recognition guide](./docs/usage.en.md#image-recognition) for credentials
+[image recognition guide](./docs/usage.md#image-recognition) for credentials
 and backend configuration. The cloud/local keys and Vision settings are also
 available in the native Settings → Plugins → Plugin configuration → Vision
 card.
@@ -177,8 +177,8 @@ or only TUI with `pnpm run dist:tui`.
 
 ## Documentation
 
-- [Installation, operations, and troubleshooting](./docs/usage.en.md)
-- [Architecture, design, and plugin boundaries](./docs/design.en.md)
+- [Installation, operations, and troubleshooting](./docs/usage.md)
+- [Architecture, design, and plugin boundaries](./docs/design.md)
 
 ## Plugin recommendations
 
@@ -192,7 +192,7 @@ or only TUI with `pnpm run dist:tui`.
 
 Oh-DSH preserves upstream implementations and attribution, then provides the
 unified launcher, Profiles, data root, cross-surface skins, interface
-adaptations, and distribution packaging. See the [design guide](./docs/design.en.md)
+adaptations, and distribution packaging. See the [design guide](./docs/design.md)
 for the exact boundaries.
 
 ## License
