@@ -23,10 +23,10 @@ remove the installed window chrome. Teardown restores the prior inline value.
 Windows keeps its native Electron titlebar; this change does not introduce a
 second Windows window-controls implementation.
 
-The Desktop client also applies the Web surface's measured Session log offset so
-the download capsule yields space to the right-side header controls. The offset
-is derived from the rendered control width, refreshed after header mutations and
-resizes, and restored when the Desktop client effect is disposed.
+The Desktop client reserves a fixed top-right position for the Session log
+download capsule beside the fixed panel toolbar. The position is part of the
+Desktop chrome CSS rather than a runtime transform, so window resizing and
+header re-renders cannot accumulate drift. Web uses the same fixed placement.
 
 ## Alternatives considered
 
@@ -49,13 +49,13 @@ the top of the renderer viewport below native window chrome, and fixed Desktop
 surfaces use the same zero offset. The platform-dependent style is installed
 synchronously from the preload platform fact and is removed with the Desktop
 client effect.
-Desktop and Web keep the Session log control visible while the right-side header
-controls change size or are re-rendered.
+Desktop and Web keep the Session log control in the reserved slot beside the
+fixed panel toolbar without measuring or transforming it at runtime.
 
 ## Testing
 
-The platform offset, metadata failure-path, and Desktop Session log offset tests
-pass. `pnpm run typecheck`
+The platform offset, metadata failure-path, and fixed Desktop Session log
+placement tests pass. `pnpm run typecheck`
 and `pnpm run build` pass. `pnpm test` reports 180 tests: 177 passed, 1
 failed, and 2 skipped; it exits with failure because the pre-existing Windows
 environment cannot start `python3` in `tests/nix-collect-deps.test.ts` (9009).

@@ -18,9 +18,9 @@ Desktop 界面在异步元数据查询开始前就得到相同的值。该查询
 不会移除已经安装的窗口 chrome。销毁时恢复此前的内联值。Windows 继续使用 Electron
 原生标题栏；本次改动不再新增第二套 Windows 窗口控件实现。
 
-Desktop 客户端同时采用 Web 端已有的动态 Session log 偏移，让日志下载胶囊为右侧标题栏
-控件让出空间。偏移根据渲染后的控件宽度计算，在标题栏发生变更或尺寸变化后重新计算，并在
-Desktop 客户端 effect 销毁时恢复。
+Desktop 客户端在固定的右上角面板工具栏旁为 Session log 下载胶囊预留固定位置。该位置属于
+Desktop chrome CSS，而不是运行时 transform，因此窗口缩放和标题栏重新渲染都不会累积漂移。Web
+端使用相同的固定布局。
 
 ## 备选方案
 
@@ -39,11 +39,11 @@ Desktop 客户端 effect 销毁时恢复。
 macOS 保留自定义覆盖式标题栏。Windows 和 Linux 内容从原生窗口 chrome 下方的渲染器
 视口顶部开始，固定的 Desktop 界面也使用零偏移。平台相关样式根据 preload 提供的平台
 事实同步安装，并随 Desktop 客户端 effect 一起移除。
-Desktop 和 Web 在右侧标题栏控件改变尺寸或重新渲染时，都会保持 Session log 控件可见。
+Desktop 和 Web 都会把 Session log 控件放在固定面板工具栏旁的预留位置，不在运行时测量或变换它。
 
 ## 测试
 
-平台偏移、元数据失败路径和 Desktop Session log 偏移测试通过。`pnpm run typecheck` 和
+平台偏移、元数据失败路径和 Desktop 固定 Session log 位置测试通过。`pnpm run typecheck` 和
 `pnpm run build` 通过。
 `pnpm test` 报告 180 项：177 项通过、1 项失败、2 项跳过；命令因既有的 Windows
 环境无法在 `tests/nix-collect-deps.test.ts` 中启动 `python3`（9009）而以失败退出。

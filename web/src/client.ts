@@ -14,44 +14,12 @@ interface ClientContext {
 
 const WEB_CHROME_CSS = `
 html[data-oh-dsh-web='true'] [class*='sessionLogButton'] {
-  position: relative;
+  position: fixed;
+  z-index: 2147483647;
+  top: 7px;
+  right: 126px;
 }
 `
-
-const ORIGINAL_TRANSFORM_KEY = 'ohDshOriginalTransform'
-
-function applySessionLogShift(): void {
-  const button = document.querySelector<HTMLElement>('[class*="sessionLogButton"]')
-  if (button === null) return
-
-  // Remember the host's original inline transform so cleanup can restore it.
-  if (button.dataset[ORIGINAL_TRANSFORM_KEY] === undefined) {
-    button.dataset[ORIGINAL_TRANSFORM_KEY] = button.style.transform || ''
-  }
-
-  // Prefer the actual right-side card group in the header. The Session log
-  // button is usually in headerUtilities, while the cards/icons live in the
-  // preceding headerActions group.
-  let rightWidth = 0
-
-  // If the cards are rendered as siblings after the button, sum their widths.
-  let sibling = button.nextElementSibling
-  while (sibling instanceof HTMLElement) {
-    rightWidth += sibling.getBoundingClientRect().width
-    sibling = sibling.nextElementSibling
-  }
-
-  // Also measure the headerActions group when it is the right-side card row.
-  const utilities = button.closest<HTMLElement>('[class*="headerUtilities"]')
-  const titleCluster = utilities?.previousElementSibling
-  const actions = titleCluster?.querySelector<HTMLElement>('[class*="headerActions"]')
-  if (actions !== null && actions !== undefined) {
-    rightWidth = Math.max(rightWidth, actions.getBoundingClientRect().width)
-  }
-
-  // Move left by the total width of the cards on the right, plus a 10px gap.
-  button.style.transform = `translateX(-${rightWidth + 10}px)`
-}
 
 function installWebChrome(): () => void {
   const style = document.createElement('style')
@@ -60,47 +28,7 @@ function installWebChrome(): () => void {
   document.head.append(style)
   document.documentElement.dataset.ohDshWeb = 'true'
 
-  let mutationObserver: MutationObserver | undefined
-  let resizeObserver: ResizeObserver | undefined
-  let frame = 0
-
-  const apply = (): void => {
-    cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => {
-      applySessionLogShift()
-      const button = document.querySelector<HTMLElement>('[class*="sessionLogButton"]')
-      const container = button?.parentElement
-      if (container !== undefined && container !== null) {
-        resizeObserver?.disconnect()
-        resizeObserver = new ResizeObserver(() => {
-          cancelAnimationFrame(frame)
-          frame = requestAnimationFrame(applySessionLogShift)
-        })
-        resizeObserver.observe(container)
-      }
-    })
-  }
-
-  mutationObserver = new MutationObserver(apply)
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class'],
-  })
-  apply()
-
   return () => {
-    cancelAnimationFrame(frame)
-    mutationObserver?.disconnect()
-    resizeObserver?.disconnect()
-    for (const button of document.querySelectorAll<HTMLElement>('[class*="sessionLogButton"]')) {
-      const original = button.dataset[ORIGINAL_TRANSFORM_KEY]
-      if (original !== undefined) {
-        button.style.transform = original
-        delete button.dataset[ORIGINAL_TRANSFORM_KEY]
-      }
-    }
     style.remove()
     delete document.documentElement.dataset.ohDshWeb
   }

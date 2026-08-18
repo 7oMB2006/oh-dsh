@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { apply, applyDesktopSessionLogShift, desktopTitlebarHeight } from '../src/client.ts'
+import { apply, desktopTitlebarHeight } from '../src/client.ts'
 
 test('desktop titlebar offset follows native window chrome', () => {
   assert.equal(desktopTitlebarHeight('darwin'), 40)
@@ -8,34 +8,10 @@ test('desktop titlebar offset follows native window chrome', () => {
   assert.equal(desktopTitlebarHeight('linux'), 0)
 })
 
-test('desktop shifts Session log clear of the right header controls', () => {
-  const button = {
-    dataset: {} as Record<string, string>,
-    nextElementSibling: null,
-    parentElement: null,
-    style: { transform: '' },
-    closest: () => ({
-      previousElementSibling: {
-        querySelector: () => ({ getBoundingClientRect: () => ({ width: 96 }) }),
-      },
-    }),
-  }
-  const previousDocument = (globalThis as unknown as { document?: unknown }).document
-  ;(globalThis as unknown as { document: unknown }).document = {
-    querySelector: () => button,
-  }
-  try {
-    applyDesktopSessionLogShift()
-    assert.equal(button.style.transform, 'translateX(-106px)')
-  } finally {
-    if (previousDocument === undefined) delete (globalThis as unknown as { document?: unknown }).document
-    else (globalThis as unknown as { document: unknown }).document = previousDocument
-  }
-})
-
 function installFakeDesktopDom(platform: NodeJS.Platform = 'win32'): {
   getDesktopChromeEnabled: () => boolean
   getTitlebarHeight: () => string
+  getChromeCss: () => string
   restore: () => void
 } {
   const globalObject = globalThis as unknown as {
@@ -63,11 +39,12 @@ function installFakeDesktopDom(platform: NodeJS.Platform = 'win32'): {
     remove: (): void => {},
     textContent: '',
   }
+  let chromeCss = ''
   globalObject.document = {
     body,
     createElement: (): typeof style => style,
     documentElement,
-    head: { append: (): void => {} },
+    head: { append: (): void => { chromeCss = style.textContent } },
     querySelector: (): null => null,
     querySelectorAll: (): [] => [],
     title: '',
@@ -92,6 +69,7 @@ function installFakeDesktopDom(platform: NodeJS.Platform = 'win32'): {
   return {
     getDesktopChromeEnabled: () => documentElement.dataset.ohDshDesktop === 'true',
     getTitlebarHeight: () => values.get('--oh-dsh-titlebar-height') ?? '',
+    getChromeCss: () => chromeCss,
     restore: () => {
       if (previous.document === undefined) delete globalObject.document
       else globalObject.document = previous.document
@@ -137,6 +115,8 @@ test('installs the platform chrome before the asynchronous info lookup', async (
   try {
     assert.equal(dom.getTitlebarHeight(), '40px')
     assert.equal(dom.getDesktopChromeEnabled(), true)
+    assert.match(dom.getChromeCss(), /position: fixed/)
+    assert.match(dom.getChromeCss(), /right: 126px/)
     resolveInfo({
       appDataPath: '',
       dshHome: '',
