@@ -223,6 +223,12 @@ pkgs.stdenv.mkDerivation {
     chmod -R u+w $out/dsh-runtime
     chmod +x $out/dsh-runtime/lib/bin.js || true
 
+    # Keep Nix assembly behind the same configuration-client boundary as the
+    # regular staged runtime. The shared patch fails closed when upstream
+    # anchors change.
+    ${pkgs.nodejs_24}/bin/node ${../scripts/settings-boundary.mjs} \
+      $out/dsh-runtime
+
     # Node runtime: reuse the same nodejs that built the bundle. The DSH
     # runtime's HMR service requires --expose-internals (upstream releases
     # ship the flag baked into their launcher; we wrap node itself).

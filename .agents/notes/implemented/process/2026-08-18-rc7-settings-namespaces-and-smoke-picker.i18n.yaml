@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-18-rc7-settings-namespaces-and-smoke-picker.md
-2026-08-18-rc7-settings-namespaces-and-smoke-picker.md: 57367b8c11caf80bf549aa9e6af1ea1023870800
-2026-08-18-rc7-settings-namespaces-and-smoke-picker.zh.md: 71e90f7c9e890e7e5384f6cf762eb563fe60d1eb
+2026-08-18-rc7-settings-namespaces-and-smoke-picker.md: dca5d30202e316770f4631ca4a34c1668ed7e4ea
+2026-08-18-rc7-settings-namespaces-and-smoke-picker.zh.md: fdb525f2b8bd180d5bc22f5ad96a0721fa4b07fd

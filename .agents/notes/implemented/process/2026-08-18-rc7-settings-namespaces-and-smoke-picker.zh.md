@@ -6,18 +6,20 @@ Status: implemented
 
 ## Problem
 
-将固定运行时升级到 DSH 0.1.0-rc.7 暴露了三处适配：rc7 的 api-proxy 用动态
+将固定运行时升级到 DSH 0.1.0-rc.7 暴露了四处适配：rc7 的 api-proxy 用动态
 命名空间服务取代了固定设置白名单，移除了 rc.6 的配置客户端边界；rc7 包发布
 在 pnpm minimumReleaseAge 窗口内；hero 工作区选择器的交互对浏览器自动化
-发生了变化。
+发生了变化；固定 TUI 内嵌的 dsh-std 工作区要求 pnpm 11.21.0，而 Oh-DSH CI
+此前安装 pnpm 11.20.0。
 
 ## Decision
 
 - **设置命名空间边界**：rc7 的 dsh-host-apiproxy 通过 settings.describe()
   动态服务所有已注册命名空间，并接受对任意命名空间的设置写入；rc.6 的
   staging 补丁（exposeVisionSettingsNamespace）只是向上游白名单追加一个
-  命名空间，已无法表达该边界。staging 现在执行 restoreSettingsBoundary()，
-  在部署后的 api-proxy 上重建完整显式白名单：settings.describe 把命名空间
+  命名空间，已无法表达该边界。常规 staging 与 Nix assembly 现在调用同一个
+  restoreSettingsBoundary() 模块，在部署后的 api-proxy 上重建完整显式白名单：
+  settings.describe 把命名空间
   过滤到 Web 偏好、产品与插件白名单加上模型提供方命名空间，且每个设置写入
   （update/replace/mutate）对其他命名空间一律以 `settings-not-exposed`
   拒绝。白名单为 WEB_SETTINGS_NAMESPACES（agent-loop、shell、locale、
@@ -32,6 +34,10 @@ Status: implemented
 - **发布年龄策略**：固定 assembly 的 pnpm-workspace.yaml 现在镜像仓库的
   minimumReleaseAgeExclude（'@deepseek-ai/*'），新发布的 rc 版本无需等待
   年龄截止即可安装。
+- **包管理器对齐**：仓库依赖、CI 与 release 任务统一固定 pnpm 11.21.0，
+  与 TUI 内嵌 dsh-std 工作区一致。生命周期脚本直接复用已验证的包管理器，
+  不再在安装期间下载平台特定的 pnpm engine。peer 策略还记录了已验证的
+  React 19 TUI 桥接范围，兼容仍声明 React 18 peer 的 rc7 client 包。
 - **Smoke 选择器流程**：rc7 把 hero 工作区选择器的打开绑定到触发器
   textarea（点击卡片不再生效），且非可信点击偶尔不命中，因此
   scripts/smoke-client.cjs 在卡片与 textarea 之间交替点击、aria-expanded
@@ -42,9 +48,11 @@ Status: implemented
 
 ## Consequences
 
-- Staging 再次修改部署后的 api-proxy；由显式白名单而不是注册插件决定
-  命名空间是否到达配置客户端。
+- 所有 assembly 路径都通过同一个 fail-closed 模块修改部署后的 api-proxy；
+  由显式白名单而不是注册插件决定命名空间是否到达配置客户端。
 - rc 发布后可立即安装 assembly。
+- 全新 macOS x64 runner 不再因为 TUI prepare 内部切换包管理器版本而触发
+  身份验证失败。
 - Desktop 与 Web smoke 验证同一个真实 browse 交互，不依赖平台特定的
   选择器实现；有人值守时仍保留 rc7 的自动原生选择器判定。
 
@@ -57,4 +65,6 @@ Status: implemented
 - 证明 rc7 redaction fail-closed 后保留动态服务：上游 seam 并不承诺这一
   点，且每个版本都去证明不值得丢失边界；拒绝。
 - 等待发布年龄截止而非豁免：每次 rc 发布后最多阻塞一天；拒绝。
+- 关闭 pnpm engine 身份验证：在两层工作区使用同一版本即可解决问题时，
+  没有理由削弱仓库安全策略；拒绝。
 - 由 smoke 驱动原生 OS 目录对话框：平台相关且脆弱；拒绝。
