@@ -51,7 +51,9 @@ const PROTECTED_PLUGIN_PACKAGES = new Set([
   '@oh-dsh/sidebar',
   '@oh-dsh/tui',
   '@oh-dsh/tui-marketplace',
+  '@deepseek-harness-tui/dsh-tui',
   'dsh-better-sidebar',
+  'dsh-cc-tui',
 ])
 
 const PROTECTED_PLUGIN_REPOSITORIES = new Set([

@@ -11,12 +11,12 @@ releases and features are reviewed regularly.
 ## DeepSeek Harness
 
 - Project: <https://github.com/deepseek-ai/deepseek-harness>
-- Pinned npm release: `@deepseek-ai/dsh@0.1.0-rc.6`
+- Pinned npm release: `@deepseek-ai/dsh@0.1.0-rc.7`
 - Declared license: MIT
 
 Oh-DSH packages the published DSH CLI release as its runtime. The release
 tarball and SHA-512 integrity are pinned in `dsh-source.json`; the dependency
-closure is pinned in `scripts/dsh-runtime-rc6-lock.yaml`.
+closure is pinned in `scripts/dsh-runtime-0.1.0-rc.7-lock.yaml`.
 
 ## dsh-web-panel
 
@@ -30,8 +30,8 @@ separate Web Terminal or shell plugin is required.
 ## DSH-better-sidebar
 
 - Project: <https://github.com/omdsh-dev/DSH-better-sidebar>
-- Pinned release: `v0.9.0`
-- Pinned revision: `2e9db44a71bb75c9fa1185330541dce2582deee3`
+- Pinned release: `v0.13.0`
+- Pinned revision: `9ad0a49b8a7506109b704896ffea3d7349c21e63`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
   `@oh-dsh/sidebar`
@@ -79,13 +79,18 @@ packaged plugin.
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>
-- Upstream package: `dsh-cc-tui@0.4.1`
-- Pinned revision: `6a8956678fc3746ed14b62bfee066ee8fc68f3cb`
+- Upstream package: `@deepseek-harness-tui/dsh-tui@0.8.1`
+- Pinned revision: `180117716ed50a789edb56539e832b1d1f7839cf`
+- Ecosystem specification: <https://github.com/T-Auto/dsh-ecosystem-spec>
+- Pinned ecosystem revision: `7e49be23ecd42ee1b19a74b92bb2791c3406d7fc`
+- Protocol packages: <https://github.com/Yan-Zero/dsh-std>
+- Pinned protocol revision: `a2faa86243a5693ee4970e3d8b3aaf361edea298`
 - Declared license: MIT
 - Oh-DSH component: `@oh-dsh/tui`
 
 Oh-DSH bundles the pinned upstream renderer, session interaction, commands,
-and terminal compatibility layer. The small downstream component owns only
-the unified launcher, Profile defaults, data boundary, and release packaging.
-We thank the upstream maintainer and keep the original license with the
-packaged source artifacts.
+terminal compatibility layer, ecosystem specification, and dsh-std protocol
+packages. The small downstream components own only the unified launcher,
+marketplace scene, Profile defaults, data boundary, and release packaging. We
+thank the upstream maintainers and keep their licenses with the packaged
+source artifacts.

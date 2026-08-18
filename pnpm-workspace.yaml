@@ -2,6 +2,13 @@ packages:
   - .
   - plugins/*
   - upstream/dsh-TUI
+  - upstream/dsh-TUI/vendor/dsh-std/packages/command
+  - upstream/dsh-TUI/vendor/dsh-std/packages/connection
+  - upstream/dsh-TUI/vendor/dsh-std/packages/core
+  - upstream/dsh-TUI/vendor/dsh-std/packages/manifest
+  - upstream/dsh-TUI/vendor/dsh-std/packages/messages
+  - upstream/dsh-TUI/vendor/dsh-std/packages/presentation
+  - upstream/dsh-TUI/vendor/dsh-std/packages/storage
   - web
 
 minimumReleaseAgeExclude:

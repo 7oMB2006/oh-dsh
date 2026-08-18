@@ -49,7 +49,7 @@ export const WEB_BUNDLES = [
 /** Bundle order owned by the Oh-DSH terminal distribution. */
 export const TUI_BUNDLES = [
   '@deepseek-ai/dsh-base',
-  'dsh-cc-tui',
+  '@deepseek-harness-tui/dsh-tui',
   '@oh-dsh/tui',
 ] as const
 
