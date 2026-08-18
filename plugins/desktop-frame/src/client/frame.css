@@ -1,0 +1,81 @@
+.oh-dsh-desktop-frame {
+  position: relative;
+  display: grid;
+  grid-template-rows: 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.oh-dsh-desktop-frame[data-dragging] {
+  transition: none;
+}
+
+.oh-dsh-desktop-frame-sidebar {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--dsw-specific-sidebar-fill);
+  border-right: 1px solid var(--dsw-alias-border-l1);
+}
+
+.oh-dsh-desktop-frame-sidebar-content {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.oh-dsh-desktop-frame-center,
+.oh-dsh-desktop-frame-details {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.oh-dsh-desktop-frame-center {
+  display: flex;
+  flex-direction: column;
+}
+
+.oh-dsh-desktop-frame-details {
+  border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+.oh-dsh-desktop-frame[data-details-collapsed] .oh-dsh-desktop-frame-details {
+  border-left: none;
+}
+
+.oh-dsh-desktop-frame-overlay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  pointer-events: none;
+}
+
+.oh-dsh-desktop-frame-overlay > * {
+  pointer-events: auto;
+}
+
+.oh-dsh-desktop-frame-handle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  margin-left: -4px;
+  cursor: col-resize;
+  touch-action: none;
+  transition: left var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.oh-dsh-desktop-frame[data-dragging] .oh-dsh-desktop-frame-handle {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oh-dsh-desktop-frame,
+  .oh-dsh-desktop-frame-handle {
+    transition: none;
+  }
+}

@@ -42,54 +42,207 @@ html[data-oh-dsh-desktop='true'] {
 
 html[data-oh-dsh-desktop='true'] body {
   box-sizing: border-box;
-  padding-top: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
+  padding-top: var(--oh-dsh-titlebar-height);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 html[data-oh-dsh-desktop='true'] body::before {
   content: '';
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483645;
   top: 0;
   right: 0;
   left: 0;
-  height: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
-  background: var(--dsw-alias-bg-base);
-  -webkit-app-region: drag;
+  height: var(--oh-dsh-titlebar-height);
+  background: var(--dsw-specific-sidebar-fill);
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  pointer-events: none;
   user-select: none;
 }
 
 /* Keep the panel toolbar clear of the Windows window-controls overlay. */
 html[data-oh-dsh-desktop='true'] .oh-dsh-panel-toolbar {
-  right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 14px);
+  z-index: 2147483647;
+  top: 4px;
+  right: 154px;
+  -webkit-app-region: no-drag;
 }
 
 /* In-page menu bar: fills the blank strip corner on Windows with the real
    application menu, popped up natively at the button. */
 html[data-oh-dsh-desktop='true'] .oh-dsh-menubar {
   position: fixed;
-  z-index: 2147483647;
+  z-index: 2147483646;
   top: 0;
-  left: 6px;
+  right: 0;
+  left: 0;
   display: flex;
   align-items: stretch;
-  height: env(titlebar-area-height, var(--oh-dsh-titlebar-height));
+  height: var(--oh-dsh-titlebar-height);
+  padding-left: 12px;
+  box-sizing: border-box;
+  -webkit-app-region: no-drag;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  right: 270px;
+  bottom: 0;
+  left: 0;
   -webkit-app-region: drag;
 }
 
 html[data-oh-dsh-desktop='true'] .oh-dsh-menubar button {
   -webkit-app-region: no-drag;
+  height: calc(var(--oh-dsh-titlebar-height) - 10px);
   margin: 5px 0;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-primary, #1f2328);
-  font-size: 12px;
-  line-height: calc(env(titlebar-area-height, var(--oh-dsh-titlebar-height)) - 10px);
+  font-family: var(--dsw-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: 0;
+  line-height: calc(var(--oh-dsh-titlebar-height) - 10px);
 }
 
 html[data-oh-dsh-desktop='true'] .oh-dsh-menubar button:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar-items {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+  height: var(--oh-dsh-titlebar-height);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar-brand {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: var(--oh-dsh-titlebar-height);
+  margin: 0 10px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-menubar-brand img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0);
+  opacity: 0.72;
+}
+
+/* Match the app logo's resolved theme instead of forcing the whale to black. */
+html[data-oh-dsh-desktop='true'] body[data-ds-dark-theme] .oh-dsh-menubar-brand img {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  height: var(--oh-dsh-titlebar-height);
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button {
+  position: relative;
+  width: 46px;
+  height: var(--oh-dsh-titlebar-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='close']:hover {
+  background: #c42b3c;
+  color: #fff;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button::before,
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button::after {
+  position: absolute;
+  content: '';
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='minimize']::before {
+  top: 50%;
+  left: 18px;
+  width: 10px;
+  border-top: 1.7px solid currentColor;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='maximize']::before {
+  top: calc(50% - 5px);
+  left: 18px;
+  width: 10px;
+  height: 10px;
+  border: 1.7px solid currentColor;
+  border-radius: 2px;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='maximize'][data-maximized='true']::before {
+  top: calc(50% - 6px);
+  left: 19px;
+  width: 8px;
+  height: 8px;
+  border: 1.7px solid currentColor;
+  border-radius: 2px;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='maximize']::after {
+  display: none;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='maximize'][data-maximized='true']::after {
+  top: calc(50% - 3px);
+  left: 16px;
+  display: block;
+  width: 8px;
+  height: 8px;
+  border: 1.7px solid currentColor;
+  border-radius: 1px;
+  background: var(--dsw-specific-sidebar-fill);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='close']::before,
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='close']::after {
+  top: 50%;
+  left: 18px;
+  width: 10px;
+  border-top: 1.7px solid currentColor;
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='close']::before {
+  transform: rotate(45deg);
+}
+
+html[data-oh-dsh-desktop='true'] .oh-dsh-window-actions button[data-action='close']::after {
+  transform: rotate(-45deg);
 }
 
 html[data-oh-dsh-preview='true'] body::after {
@@ -162,16 +315,30 @@ html[data-oh-dsh-desktop='true']:has(
 /** Wait for the DSH services used by native menu commands. */
 export const inject = ['locale', 'workspaces', 'desktopPanels', 'pinnedSummary', 'workspaceTools']
 
-type DesktopShellMessage = 'menubar.label' | 'preview.label'
+type DesktopShellMessage =
+  | 'menubar.label'
+  | 'preview.label'
+  | 'window.close'
+  | 'window.maximize'
+  | 'window.minimize'
+  | 'window.restore'
 
 const DESKTOP_SHELL_MESSAGES: LocaleMessages<DesktopShellMessage> = {
   en: {
     'menubar.label': 'Application menu',
     'preview.label': 'Isolated plugin preview · {plugin}',
+    'window.close': 'Close window',
+    'window.maximize': 'Maximize window',
+    'window.minimize': 'Minimize window',
+    'window.restore': 'Restore window',
   },
   zh: {
     'menubar.label': '应用菜单',
     'preview.label': '隔离插件预览 · {plugin}',
+    'window.close': '关闭窗口',
+    'window.maximize': '最大化窗口',
+    'window.minimize': '最小化窗口',
+    'window.restore': '还原窗口',
   },
 }
 
@@ -195,14 +362,77 @@ function installDesktopChrome(): () => void {
  * merged titlebar row. Buttons pop up the native submenu, so menu items,
  * roles, and accelerators keep their single owner in the main process.
  */
-function installMenuBar(bridge: DesktopBridge, t: Translate<DesktopShellMessage>): () => void {
+function installMenuBar(
+  bridge: DesktopBridge,
+  locale: LocaleService,
+  t: Translate<DesktopShellMessage>,
+  includeMenu: boolean,
+): () => void {
   const bar = document.createElement('nav')
   bar.className = 'oh-dsh-menubar'
   bar.setAttribute('aria-label', t('menubar.label'))
+  const items = document.createElement('div')
+  items.className = 'oh-dsh-menubar-items'
+  const actions = document.createElement('div')
+  actions.className = 'oh-dsh-window-actions'
+  bar.append(items, actions)
   document.body.append(bar)
-  void bridge.menuBarLabels().then(labels => {
+
+  const addAction = (action: string, label: string, callback: () => void): HTMLButtonElement => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.dataset.action = action
+    button.setAttribute('aria-label', label)
+    button.title = label
+    button.addEventListener('click', callback)
+    actions.append(button)
+    return button
+  }
+  const minimize = addAction('minimize', t('window.minimize'), () => { void bridge.minimizeWindow() })
+  const maximize = addAction('maximize', t('window.maximize'), () => {
+    void bridge.toggleMaximizeWindow().then(value => {
+      maximize.dataset.maximized = String(value)
+      updateWindowActionLabels()
+    })
+  })
+  const close = addAction('close', t('window.close'), () => { void bridge.closeWindow() })
+  const updateWindowActionLabels = (): void => {
+    minimize.title = t('window.minimize')
+    minimize.setAttribute('aria-label', t('window.minimize'))
+    const maximizeLabel = maximize.dataset.maximized === 'true' ? t('window.restore') : t('window.maximize')
+    maximize.title = maximizeLabel
+    maximize.setAttribute('aria-label', maximizeLabel)
+    close.title = t('window.close')
+    close.setAttribute('aria-label', t('window.close'))
+  }
+  updateWindowActionLabels()
+  void bridge.isWindowMaximized().then(value => {
+    maximize.dataset.maximized = String(value)
+    updateWindowActionLabels()
+  })
+  bar.addEventListener('dblclick', event => {
+    if (event.target instanceof HTMLButtonElement) return
+    void bridge.toggleMaximizeWindow().then(value => {
+      maximize.dataset.maximized = String(value)
+      updateWindowActionLabels()
+    })
+  })
+
+  let menuLabels: string[] = []
+  let brand: HTMLButtonElement | undefined
+  const renderMenuBar = (): void => {
     if (!bar.isConnected) return
-    for (const [index, label] of labels.entries()) {
+    items.replaceChildren()
+    if (brand !== undefined) {
+      const productLabel = menuLabels[0]
+      if (productLabel !== undefined) {
+        brand.setAttribute('aria-label', productLabel)
+        brand.title = productLabel
+      }
+      items.append(brand)
+    }
+    for (const [index, label] of menuLabels.entries()) {
+      if (index === 0) continue
       const button = document.createElement('button')
       button.type = 'button'
       button.textContent = label
@@ -210,10 +440,47 @@ function installMenuBar(bridge: DesktopBridge, t: Translate<DesktopShellMessage>
         const rect = button.getBoundingClientRect()
         void bridge.popupMenuBarMenu(index, rect.left, rect.bottom)
       })
-      bar.append(button)
+      items.append(button)
     }
-  })
-  return () => { bar.remove() }
+  }
+  if (includeMenu) {
+    void bridge.brandIconDataUrl().then(icon => {
+      if (icon === null || !bar.isConnected) return
+      brand = document.createElement('button')
+      brand.className = 'oh-dsh-menubar-brand'
+      brand.type = 'button'
+      const image = document.createElement('img')
+      image.alt = ''
+      image.src = icon
+      image.draggable = false
+      brand.append(image)
+      brand.addEventListener('click', () => {
+        const rect = brand?.getBoundingClientRect()
+        if (rect === undefined) return
+        void bridge.popupMenuBarMenu(0, rect.left, rect.bottom)
+      })
+      renderMenuBar()
+    })
+  }
+  let refreshToken = 0
+  const refreshMenuBar = (): void => {
+    const token = ++refreshToken
+    updateWindowActionLabels()
+    if (!includeMenu) return
+    void bridge.setMenuLocale(locale.getSnapshot().active).then(labels => {
+      if (token !== refreshToken || !bar.isConnected) return
+      menuLabels = labels
+      renderMenuBar()
+    }).catch((error: unknown) => {
+      console.error('oh-dsh-desktop: failed to synchronize menu locale', error)
+    })
+  }
+  const unsubscribeLocale = locale.subscribe(refreshMenuBar)
+  refreshMenuBar()
+  return () => {
+    unsubscribeLocale()
+    bar.remove()
+  }
 }
 
 function installHeroBranding(): () => void {
@@ -374,12 +641,8 @@ export function apply(ctx: ClientContext): void {
     let removeMenuBar: (() => void) | undefined
     void bridge.getInfo().then(info => {
       if (disposed) return
-      if (info.preview === null) {
-        // Windows merges the menu into the titlebar row; the native menu
-        // stays installed, so Alt still reveals it.
-        if (info.platform === 'win32') removeMenuBar = installMenuBar(bridge, t)
-        return
-      }
+      if (info.platform === 'win32') removeMenuBar = installMenuBar(bridge, locale, t, info.preview === null)
+      if (info.preview === null) return
       previewPluginId = info.preview.pluginId
       document.documentElement.dataset.ohDshPreview = 'true'
       renderPreviewLabel()

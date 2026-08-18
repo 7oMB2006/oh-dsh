@@ -70,11 +70,17 @@ export interface DesktopUpdateBridge {
 }
 
 export interface DesktopBridge {
+  platform: NodeJS.Platform
+  closeWindow(): Promise<void>
   chooseWorkspace(): Promise<string[]>
+  brandIconDataUrl(): Promise<string | null>
   getInfo(): Promise<DesktopInfo>
   getRuntimeSnapshot(): Promise<DesktopRuntimeSnapshot>
+  minimizeWindow(): Promise<void>
   /** Top-level labels of the application menu, in menu order. */
   menuBarLabels(): Promise<string[]>
+  /** Apply the renderer's active locale and return refreshed top-level labels. */
+  setMenuLocale(locale: 'en' | 'zh'): Promise<string[]>
   onCommand(listener: (command: DesktopCommand) => void): () => void
   openExternal(url: string): Promise<void>
   pluginMarketplace: PluginMarketplaceBridge
@@ -83,4 +89,6 @@ export interface DesktopBridge {
    * corner at the given CSS-pixel position inside the main window.
    */
   popupMenuBarMenu(index: number, cssX: number, cssY: number): Promise<void>
+  toggleMaximizeWindow(): Promise<boolean>
+  isWindowMaximized(): Promise<boolean>
 }
