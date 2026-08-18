@@ -1,5 +1,8 @@
 import type { PluginMarketplaceBridge } from '../plugins/plugin-marketplace/src/protocol.ts'
 
+/** Height of the in-page desktop titlebar strip, in CSS pixels at zoom 1. */
+export const DESKTOP_TITLEBAR_HEIGHT = 40
+
 /** Commands sent from Electron's native chrome to the DSH client plugin. */
 export type DesktopCommand =
   | { type: 'focus-composer' }
@@ -62,16 +65,22 @@ export type DesktopUpdateCommand =
 
 export interface DesktopUpdateBridge {
   getState(): Promise<DesktopUpdateState>
-  command(command: DesktopUpdateCommand): Promise<DesktopUpdateState>
   onState(listener: (state: DesktopUpdateState) => void): () => void
+  command(command: DesktopUpdateCommand): Promise<DesktopUpdateState>
 }
 
-/** Browser-safe desktop bridge made available through contextBridge. */
 export interface DesktopBridge {
   chooseWorkspace(): Promise<string[]>
   getInfo(): Promise<DesktopInfo>
   getRuntimeSnapshot(): Promise<DesktopRuntimeSnapshot>
+  /** Top-level labels of the application menu, in menu order. */
+  menuBarLabels(): Promise<string[]>
   onCommand(listener: (command: DesktopCommand) => void): () => void
   openExternal(url: string): Promise<void>
   pluginMarketplace: PluginMarketplaceBridge
+  /**
+   * Pop up the native submenu of top-level menu `index` with its top-left
+   * corner at the given CSS-pixel position inside the main window.
+   */
+  popupMenuBarMenu(index: number, cssX: number, cssY: number): Promise<void>
 }
