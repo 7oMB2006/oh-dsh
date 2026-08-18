@@ -221,6 +221,20 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
   }
 })
 
+test('TUI marketplace restart markers are best-effort', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const plugin = readFileSync(
+    join(root, 'plugins', 'tui-marketplace', 'src', 'plugin.ts'),
+    'utf8',
+  )
+  const marker = plugin.slice(
+    plugin.indexOf('function writeRestartMarker'),
+    plugin.indexOf('/** Register the Oh-DSH marketplace'),
+  )
+  assert.match(marker, /try \{[\s\S]*writeFileSync/)
+  assert.match(marker, /catch \{[\s\S]*advisory/)
+})
+
 test('TUI refuses a non-interactive stream before touching the runtime', async () => {
   const stdout = output(false)
   const stderr = output(false)

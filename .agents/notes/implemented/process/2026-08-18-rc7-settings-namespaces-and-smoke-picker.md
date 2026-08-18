@@ -55,6 +55,9 @@ previously installed pnpm 11.20.0.
   SSH_CONNECTION to select rc7's documented browse backend, then exercise
   its real in-app dialog. This keeps packaged and source smokes deterministic
   without automating a native OS dialog.
+- **TUI marketplace restart marker**: the resume marker is advisory. Marker
+  persistence failures, such as a read-only or full data root, are ignored so
+  Apply and Undo still reach the shared marketplace transaction.
 
 ## Consequences
 
@@ -67,6 +70,8 @@ previously installed pnpm 11.20.0.
 - Desktop and Web smokes exercise the same real browse interaction without
   depending on a platform-specific chooser implementation; attended use
   keeps rc7's automatic native picker selection.
+- TUI marketplace actions remain usable when restart recovery metadata cannot
+  be written; a later launch simply has no resume marker to consume.
 
 ## Alternatives considered
 
@@ -84,3 +89,5 @@ previously installed pnpm 11.20.0.
   rejected.
 - Drive the native OS directory dialog from the smoke: platform-specific
   and fragile; rejected.
+- Let restart-marker persistence block Apply or Undo: the marker is recovery
+  metadata, not a transaction precondition; rejected.

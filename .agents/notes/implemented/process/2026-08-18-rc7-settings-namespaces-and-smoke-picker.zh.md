@@ -45,6 +45,9 @@ Status: implemented
   runtime 设置 SSH_CONNECTION，让 rc7 选择文档化的 browse 后端，再验证
   其真实应用内对话框。这样源码与打包 smoke 都无需自动操作原生 OS
   对话框即可确定运行。
+- **TUI marketplace 重启标记**：恢复标记是辅助信息。标记持久化失败，
+  例如数据根目录只读或磁盘已满时，会被忽略，Apply 与 Undo 仍会进入共享
+  marketplace 事务。
 
 ## Consequences
 
@@ -55,6 +58,8 @@ Status: implemented
   身份验证失败。
 - Desktop 与 Web smoke 验证同一个真实 browse 交互，不依赖平台特定的
   选择器实现；有人值守时仍保留 rc7 的自动原生选择器判定。
+- TUI marketplace 在无法写入恢复元数据时仍可执行；后续启动只是没有可消费
+  的恢复标记。
 
 ## Alternatives considered
 
@@ -68,3 +73,4 @@ Status: implemented
 - 关闭 pnpm engine 身份验证：在两层工作区使用同一版本即可解决问题时，
   没有理由削弱仓库安全策略；拒绝。
 - 由 smoke 驱动原生 OS 目录对话框：平台相关且脆弱；拒绝。
+- 让恢复标记写入失败阻断 Apply/Undo：恢复标记不是事务前置条件；拒绝。

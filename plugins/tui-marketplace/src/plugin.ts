@@ -16,11 +16,15 @@ export const name = 'oh-tui-marketplace'
 export const inject = ['pluginMarketplace', 'tuiScenes', 'tuiShortcuts']
 
 function writeRestartMarker(sessionId: string): void {
-  const dataRoot = process.env.OH_DSH_HOME ?? process.env.DSH_HOME
-  if (dataRoot === undefined || dataRoot === '') return
-  const directory = join(dataRoot, 'tui')
-  mkdirSync(directory, { recursive: true, mode: 0o700 })
-  writeFileSync(join(directory, 'marketplace-resume'), sessionId, { mode: 0o600 })
+  try {
+    const dataRoot = process.env.OH_DSH_HOME ?? process.env.DSH_HOME
+    if (dataRoot === undefined || dataRoot === '') return
+    const directory = join(dataRoot, 'tui')
+    mkdirSync(directory, { recursive: true, mode: 0o700 })
+    writeFileSync(join(directory, 'marketplace-resume'), sessionId, { mode: 0o600 })
+  } catch {
+    // The marker is advisory; a read-only or full data root must not block an action.
+  }
 }
 
 /** Register the Oh-DSH marketplace into the upstream TUI extension seams. */
