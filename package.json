@@ -99,7 +99,7 @@
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",
-    "pnpm": "11.20.0",
+    "pnpm": "11.21.0",
     "typescript": "^6.0.3",
     "yaml": "2.8.1"
   },
