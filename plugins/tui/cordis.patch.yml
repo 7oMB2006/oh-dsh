@@ -5,6 +5,9 @@
 - id: cc-tui
   disabled: true
 
+- id: dsh-tui
+  disabled: true
+
 - insert:
   - id: oh-tui
     name: '@oh-dsh/tui'
@@ -18,8 +21,12 @@
   - id: oh-vision
     name: '@oh-dsh/vision'
 
-  - id: oh-tui-renderer
+  - id: oh-tui-marketplace
     name: '@oh-dsh/tui-marketplace'
+
+  - id: oh-tui-renderer
+    name: '@deepseek-harness-tui/dsh-tui'
+    inject: [workspaceRegistry, agents, tuiWorkspaces, tuiScenes, tuiDialogs, tuiStatus, tuiShortcuts, tuiRenderers]
     config:
       sessionId: !!js process.env.OH_DSH_TUI_SESSION_ID ?? undefined
       provider: !!js process.env.OH_DSH_TUI_PROVIDER ?? 'deepseek-official'

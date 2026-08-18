@@ -76,7 +76,7 @@ test('every bundled plugin adapts explicitly per surface', () => {
   assert.match(tuiMarketplace, /TuiMarketplaceController/)
   assert.match(tuiMarketplace, /ctx\.on\('session\/event'/)
   assert.match(tuiMarketplace, /command\/run/)
-  assert.match(tuiMarketplace, /name === 'plugins'/)
+  assert.match(tuiMarketplace, /command === 'plugins'/)
 
   const webHost = readFileSync(join(root, 'web/src/index.ts'), 'utf8')
   assert.match(webHost, /kind: 'web'/)

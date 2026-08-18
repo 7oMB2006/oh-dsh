@@ -936,6 +936,8 @@ function installDesktopPackages() {
       manifest: join(root, 'upstream', 'dsh-TUI', 'package.json'),
       files: [
         [join(root, 'upstream', 'dsh-TUI', 'lib'), 'lib'],
+        [join(root, 'upstream', 'dsh-TUI', 'ecosystem-spec'), 'ecosystem-spec'],
+        [join(root, 'upstream', 'dsh-TUI', 'presets'), 'presets'],
         [join(root, 'upstream', 'dsh-TUI', 'skills'), 'skills'],
         [join(root, 'upstream', 'dsh-TUI', 'cordis.patch.yml'), 'cordis.patch.yml'],
         [join(root, 'upstream', 'dsh-TUI', 'cordis.yml'), 'cordis.yml'],
@@ -983,7 +985,9 @@ function installDesktopPackages() {
         copyFileSync(source, output)
       }
     }
-    if (manifest.name === 'dsh-cc-tui') adaptTuiRendererPackage(packageDir)
+    if (manifest.name === '@deepseek-harness-tui/dsh-tui') {
+      adaptTuiRendererPackage(packageDir)
+    }
     installedVersions[manifest.name] = manifest.version
   }
   const cliManifestPath = join(runtime, 'package.json')
