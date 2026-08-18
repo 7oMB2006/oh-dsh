@@ -8,6 +8,12 @@ const timeoutMs = 20_000
 
 if (runtimeUrl === undefined) throw new Error('runtime URL is required')
 
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', error => {
+    if (error.code !== 'EPIPE') throw error
+  })
+}
+
 app.disableHardwareAcceleration()
 // Keep requestAnimationFrame ticking in the hidden smoke window: the plugin
 // marketplace places its sidebar nav entry from a rAF callback, and hidden

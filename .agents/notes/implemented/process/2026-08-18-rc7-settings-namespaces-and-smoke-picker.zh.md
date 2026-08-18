@@ -35,17 +35,18 @@ Status: implemented
 - **Smoke 选择器流程**：rc7 把 hero 工作区选择器的打开绑定到触发器
   textarea（点击卡片不再生效），且非可信点击偶尔不命中，因此
   scripts/smoke-client.cjs 在卡片与 textarea 之间交替点击、aria-expanded
-  翻转为 true 后停止、绝不把已打开的 picker 再点关。这使 browse 交互
-  （CI）确定化，并让 native 交互（有桌面的 macOS/Windows）在 OS 对话框
-  完成时走通。
+  翻转为 true 后停止、绝不把已打开的 picker 再点关。无人值守的 smoke
+  runtime 设置 SSH_CONNECTION，让 rc7 选择文档化的 browse 后端，再验证
+  其真实应用内对话框。这样源码与打包 smoke 都无需自动操作原生 OS
+  对话框即可确定运行。
 
 ## Consequences
 
 - Staging 再次修改部署后的 api-proxy；由显式白名单而不是注册插件决定
   命名空间是否到达配置客户端。
 - rc 发布后可立即安装 assembly。
-- desktop/web smoke 在 rc7 上通过（本地验证 check:plugins 与 smoke:web
-  全绿；CI 在 Linux 上运行 browse 交互）。
+- Desktop 与 Web smoke 验证同一个真实 browse 交互，不依赖平台特定的
+  选择器实现；有人值守时仍保留 rc7 的自动原生选择器判定。
 
 ## Alternatives considered
 

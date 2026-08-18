@@ -42,9 +42,10 @@ hero workspace picker interaction changed for browser automation.
   trigger textarea (a card-level click no longer lands) and untrusted
   clicks land intermittently, so scripts/smoke-client.cjs alternates
   between the card and the textarea, stops clicking once aria-expanded
-  flips, and never toggles an open picker shut. This keeps the browse
-  interaction (CI) deterministic and makes the native interaction
-  (attended macOS/Windows) complete when the OS dialog resolves.
+  flips, and never toggles an open picker shut. Unattended smoke runtimes set
+  SSH_CONNECTION to select rc7's documented browse backend, then exercise
+  its real in-app dialog. This keeps packaged and source smokes deterministic
+  without automating a native OS dialog.
 
 ## Consequences
 
@@ -52,8 +53,9 @@ hero workspace picker interaction changed for browser automation.
   not the registering plugin, decides whether a namespace reaches
   configuration clients.
 - Assembly installs work immediately after an rc publish.
-- The desktop/web smokes pass on rc7 (verified locally: check:plugins and
-  smoke:web green; CI runs the browse interaction on Linux).
+- Desktop and Web smokes exercise the same real browse interaction without
+  depending on a platform-specific chooser implementation; attended use
+  keeps rc7's automatic native picker selection.
 
 ## Alternatives considered
 

@@ -100,6 +100,9 @@ const runtimeEnvironment = {
   OH_DSH_MARKETPLACE_NODE_BINARY: nodeBinary,
   OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
   PATH: runtimeSearchPath(paths),
+  // Exercise the in-app browse interaction in unattended automation instead
+  // of opening a platform-owned native chooser that CI cannot drive.
+  SSH_CONNECTION: 'oh-dsh-smoke',
 }
 
 // 1. The composed web profile tree mounts the web-capable Oh-DSH rows and
