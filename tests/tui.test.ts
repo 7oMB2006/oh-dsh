@@ -148,27 +148,26 @@ test('TUI launcher initializes its profile and attaches the packaged runtime', a
   }
 })
 
-test('TUI bundle mounts its surface and skins before the upstream renderer', () => {
+test('TUI bundle mounts Oh-DSH adapters before the upstream renderer', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..')
   const patch = readFileSync(
     join(root, 'plugins', 'tui', 'cordis.patch.yml'),
     'utf8',
   ).replace(/\r\n?/g, '\n')
   assert.match(patch, /- id: cc-tui\n  disabled: true/)
+  assert.match(patch, /- id: dsh-tui\n  disabled: true/)
   const surface = patch.indexOf("name: '@oh-dsh/tui'")
   const marketplace = patch.indexOf("name: '@oh-dsh/plugin-marketplace'")
   const skins = patch.indexOf("name: '@oh-dsh/skins'")
   const vision = patch.indexOf("name: '@oh-dsh/vision'")
-  const renderer = patch.indexOf("name: '@oh-dsh/tui-marketplace'")
-  assert.ok(surface >= 0 && surface < marketplace && marketplace < skins && skins < vision && vision < renderer)
-})
-
-test('TUI source adapter filter accepts both Windows and POSIX separators', () => {
-  const build = readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'build.mjs'),
-    'utf8',
-  )
-  assert.match(build, /upstream\[\\\\\/\]dsh-TUI\[\\\\\/\]src\[\\\\\/\]/)
+  const marketplaceScene = patch.indexOf("name: '@oh-dsh/tui-marketplace'")
+  const renderer = patch.indexOf("name: '@deepseek-harness-tui/dsh-tui'")
+  assert.ok(surface >= 0
+    && surface < marketplace
+    && marketplace < skins
+    && skins < vision
+    && vision < marketplaceScene
+    && marketplaceScene < renderer)
 })
 
 test('TUI upstream adapter removes legacy terminal branding and scopes storage', () => {
@@ -180,49 +179,60 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
   })
   try {
     adaptTuiRendererPackage(root)
+    const paths = readFileSync(join(lib, 'utils', 'paths.js'), 'utf8')
+    assert.match(paths, /OH_DSH_TUI_CONFIG_HOME/)
+    assert.match(paths, /LEGACY_DATA_DIR = DATA_DIR/)
+    assert.doesNotMatch(paths, /join\(homeDir\(\), '\.dsh-(?:tui|cc)'\)/)
     assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /Oh-DSH TUI/)
     assert.match(readFileSync(join(lib, 'components', 'LogoV2.js'), 'utf8'), /DSH_OH_TUI_VERSION/)
     assert.match(readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8'), /Oh-DSH TUI/)
-    assert.match(readFileSync(join(lib, 'customTheme.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
-    assert.match(readFileSync(join(lib, 'themePrefs.js'), 'utf8'), /OH_DSH_TUI_CONFIG_HOME/)
     const commands = readFileSync(join(lib, 'commands.js'), 'utf8')
     assert.match(commands, /Exit Oh-DSH TUI/)
-    assert.doesNotMatch(commands, /description: .*dsh-cc/)
-    const plugin = readFileSync(join(lib, 'plugin.js'), 'utf8')
+    assert.doesNotMatch(commands, /description: .*dsh-tui/)
+    const plugin = readFileSync(join(lib, 'dsh-adapter', 'plugin.js'), 'utf8')
     assert.match(plugin, /ohdsh tui --resume/)
-    assert.doesNotMatch(plugin, /dsh-cc --resume/)
+    assert.doesNotMatch(plugin, /dsh-tui --resume/)
     const messages = readFileSync(join(lib, 'i18n.js'), 'utf8')
-    assert.match(messages, /Oh-DSH TUI session export/)
-    assert.doesNotMatch(messages, /dsh-cc|~\/\.dsh-cc/)
-    const channel = readFileSync(join(lib, 'channel.js'), 'utf8')
+    assert.match(messages, /~\/\.ohdsh\/tui/)
+    assert.doesNotMatch(messages, /dsh-tui|~\/\.dsh-tui/)
+    const channel = readFileSync(join(lib, 'dsh-adapter', 'channel.js'), 'utf8')
     assert.match(channel, /oh-dsh-tui-export-/)
-    assert.doesNotMatch(channel, /dsh-cc-export-|join\(userHome, '\.dsh-cc\//)
-    const chat = readFileSync(join(lib, 'screens', 'Chat.js'), 'utf8')
-    assert.doesNotMatch(chat, /userHome}\\\\\.dsh-cc/)
+    assert.doesNotMatch(
+      channel,
+      /const fileName = `dsh-tui-export-|join\(userHome, '\.dsh-tui\//,
+    )
+    const compatibility = readFileSync(
+      join(lib, 'dsh-adapter', 'compat', 'sessionLog.js'),
+      'utf8',
+    )
+    assert.match(compatibility, /OH_DSH_TUI_CONFIG_HOME/)
     const themeProvider = readFileSync(
       join(lib, 'components', 'design-system', 'ThemeProvider.js'),
       'utf8',
     )
-    assert.doesNotMatch(themeProvider, /\[dsh-cc-tui\]|~\/\.dsh-cc/)
+    assert.doesNotMatch(themeProvider, /\[dsh-tui\]|~\/\.dsh-tui/)
     const customTheme = readFileSync(join(lib, 'customTheme.js'), 'utf8')
-    assert.doesNotMatch(customTheme, /\[dsh-cc-tui\]|~\/\.dsh-cc/)
-    for (const name of [
-      'activityPrefs.js',
-      'effortPrefs.js',
-      'history.js',
-      'modelPrefs.js',
-      'presetPrefs.js',
-      'sessionHistory.js',
-      'themePrefs.js',
-    ]) {
-      const preferences = readFileSync(join(lib, name), 'utf8')
-      assert.match(preferences, /OH_DSH_TUI_CONFIG_HOME/)
-      assert.doesNotMatch(preferences, /join\(homedir\(\), '\.dsh-cc'\)/)
-    }
+    assert.doesNotMatch(customTheme, /\[dsh-tui\]|~\/\.dsh-tui/)
+    const pluginStorage = readFileSync(join(lib, 'dsh-adapter', 'plugin-storage.js'), 'utf8')
+    assert.doesNotMatch(pluginStorage, /~\/\.dsh-tui/)
     assert.doesNotThrow(() => { adaptTuiRendererPackage(root) })
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('TUI marketplace restart markers are best-effort', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+  const plugin = readFileSync(
+    join(root, 'plugins', 'tui-marketplace', 'src', 'plugin.ts'),
+    'utf8',
+  )
+  const marker = plugin.slice(
+    plugin.indexOf('function writeRestartMarker'),
+    plugin.indexOf('/** Register the Oh-DSH marketplace'),
+  )
+  assert.match(marker, /try \{[\s\S]*writeFileSync/)
+  assert.match(marker, /catch \{[\s\S]*advisory/)
 })
 
 test('TUI refuses a non-interactive stream before touching the runtime', async () => {

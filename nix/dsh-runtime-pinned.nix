@@ -3,7 +3,8 @@
 # and `config/`, so only the dependency graph needs installation.
 
 { lib
-, buildNpmPackage
+, stdenv
+, fetchPnpmDeps
 , fetchurl
 , nodejs_24
 , pnpm
@@ -17,29 +18,39 @@ assert dshSourceSpec.source == "npm";
 let
   tarball = fetchurl {
     url = dshSourceSpec.tarball;
-    hash = lib.fakeHash; # filled in below after first build
+    hash = dshSourceSpec.integrity;
   };
 
-  # pnpm install needs the lockfile beside package.json; the npm tarball
-  # carries the package but not the lockfile.
+  # pnpm install needs the lockfile and supply-chain policy beside
+  # package.json; the npm tarball carries neither repository file.
   src = runCommand "dsh-runtime-pinned-src" { } ''
     mkdir -p $out
     tar -xzf ${tarball} -C $out --strip-components=1
+    cp ${../.npmrc} $out/.npmrc
     cp ${../scripts}/dsh-runtime-${dshSourceSpec.version}-lock.yaml $out/pnpm-lock.yaml
+    printf '%s\n' \
+      'packages:' \
+      '  - .' \
+      "" \
+      'minimumReleaseAgeExclude:' \
+      "  - '@deepseek-ai/*'" \
+      > $out/pnpm-workspace.yaml
   '';
 in
 
-buildNpmPackage rec {
+stdenv.mkDerivation rec {
   pname = "dsh-runtime-pinned";
   version = dshSourceSpec.version;
 
   inherit src;
 
-  nodejs = nodejs_24;
+  pnpmDeps = fetchPnpmDeps {
+    inherit pname version src;
+    fetcherVersion = 4;
+    hash = "sha256-Lm+eoGpYdm4zQg3Q4S/RvPtzMtxX//s50K29vB/hwYI=";
+  };
 
-  nativeBuildInputs = [ pnpm pnpmConfigHook ];
-
-  npmDepsHash = lib.fakeHash; # filled in below after first build
+  nativeBuildInputs = [ nodejs_24 pnpm pnpmConfigHook ];
 
   buildPhase = ''
     runHook preBuild

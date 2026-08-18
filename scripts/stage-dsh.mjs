@@ -37,6 +37,7 @@ import {
 } from './landlock-launcher.mjs'
 import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
+import { restoreSettingsBoundary } from './settings-boundary.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const npmRelease = DSH_SOURCE_SPEC.source === 'npm'
@@ -165,31 +166,6 @@ function recordExposedDependencies() {
 }
 
 
-
-/**
- * Expose the built-in Vision settings section through DSH's configuration
- * boundary. The pinned npm release ships a fixed API-proxy allowlist, so the
- * git-source build-time patch (build-dsh.mjs withVisionSettingsNamespace)
- * has no source to patch; adapt the deployed runtime instead.
- */
-function exposeVisionSettingsNamespace() {
-  const store = join(runtime, 'node_modules', '.pnpm')
-  const entry = readdirSync(store, { withFileTypes: true })
-    .find(candidate => candidate.isDirectory() && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
-  if (entry === undefined) {
-    throw new Error('dsh-host-apiproxy is missing from the staged runtime')
-  }
-  const indexPath = join(store, entry.name, 'node_modules', '@deepseek-ai', 'dsh-host-apiproxy', 'lib', 'index.js')
-  const source = readFileSync(indexPath, 'utf8')
-  const before = '"web-search-deepseek"'
-  if (source.includes('"oh-dsh-vision"')) return
-  if (source.includes(before) === false) {
-    throw new Error('dsh-host-apiproxy settings allowlist shape changed; cannot expose the vision namespace')
-  }
-  const next = source.replace(before, before + ',\n\t"oh-dsh-vision"')
-  writeFileSync(indexPath, next)
-  console.log('Exposing vision settings namespace to configuration clients')
-}
 
 function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -961,6 +937,8 @@ function installDesktopPackages() {
       manifest: join(root, 'upstream', 'dsh-TUI', 'package.json'),
       files: [
         [join(root, 'upstream', 'dsh-TUI', 'lib'), 'lib'],
+        [join(root, 'upstream', 'dsh-TUI', 'ecosystem-spec'), 'ecosystem-spec'],
+        [join(root, 'upstream', 'dsh-TUI', 'presets'), 'presets'],
         [join(root, 'upstream', 'dsh-TUI', 'skills'), 'skills'],
         [join(root, 'upstream', 'dsh-TUI', 'cordis.patch.yml'), 'cordis.patch.yml'],
         [join(root, 'upstream', 'dsh-TUI', 'cordis.yml'), 'cordis.yml'],
@@ -1008,7 +986,9 @@ function installDesktopPackages() {
         copyFileSync(source, output)
       }
     }
-    if (manifest.name === 'dsh-cc-tui') adaptTuiRendererPackage(packageDir)
+    if (manifest.name === '@deepseek-harness-tui/dsh-tui') {
+      adaptTuiRendererPackage(packageDir)
+    }
     installedVersions[manifest.name] = manifest.version
   }
   const cliManifestPath = join(runtime, 'package.json')
@@ -1183,7 +1163,6 @@ if (npmRelease) {
   console.log('Exposing npm release packages for profile resolution')
   exposeHoistedPackages()
   recordExposedDependencies()
-  exposeVisionSettingsNamespace()
 } else {
   console.log('Relinking workspace packages')
   rewriteWorkspaceLinks()
@@ -1201,6 +1180,7 @@ if (npmRelease) {
 restoreExecutableHelpers()
 console.log('Normalizing runtime links')
 normalizeRuntimeLinks()
+restoreSettingsBoundary(runtime)
 ensureLinuxLandlockLauncher()
 assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()

@@ -7,43 +7,6 @@ import type {
   PluginMarketplaceBridge,
 } from '../../plugin-marketplace/src/protocol.ts'
 
-export interface MarketplaceOpenStore {
-  getSnapshot(): boolean
-  open(): void
-  close(): void
-  subscribe(listener: () => void): () => void
-  toggle(): void
-}
-
-export function createMarketplaceOpenStore(): MarketplaceOpenStore {
-  let open = false
-  const listeners = new Set<() => void>()
-  const emit = (): void => {
-    for (const listener of listeners) listener()
-  }
-  return {
-    getSnapshot: () => open,
-    open: () => {
-      if (open) return
-      open = true
-      emit()
-    },
-    close: () => {
-      if (open === false) return
-      open = false
-      emit()
-    },
-    subscribe: (listener) => {
-      listeners.add(listener)
-      return () => { listeners.delete(listener) }
-    },
-    toggle: () => {
-      open = open === false
-      emit()
-    },
-  }
-}
-
 export type TuiMarketplaceScreen = 'list' | 'detail'
 
 export interface TuiMarketplaceState {

@@ -22,119 +22,103 @@ function replaceEvery(path, before, after) {
   writeFileSync(path, source.split(before).join(after))
 }
 
-function scopePreferenceFile(lib, name, declaration = 'PREFS_DIR') {
-  replaceOnce(
-    join(lib, name),
-    `const ${declaration} = join(homedir(), '.dsh-cc');`,
-    `const ${declaration} = process.env.OH_DSH_TUI_CONFIG_HOME ?? join(homedir(), '.ohdsh', 'tui');`,
-  )
-}
-
 /**
- * Apply the deliberately small Oh-DSH adapter to a copied upstream package.
- * The submodule remains pristine; exact-match guards fail the build when an
- * upstream update moves a seam that needs a fresh review.
+ * Apply the small Oh-DSH adapter to a copied upstream package. Exact-match
+ * guards make an upstream layout change fail packaging instead of silently
+ * restoring a second data root or the upstream launcher identity.
  */
 export function adaptTuiRendererPackage(packageDir) {
   const lib = join(packageDir, 'lib', 'types')
+  const paths = join(lib, 'utils', 'paths.js')
   replaceOnce(
-    join(lib, 'components', 'LogoV2.js'),
-    "sweep('✦ dsh-cc', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
+    paths,
+    "export const DATA_DIR = join(homeDir(), '.dsh-tui');",
+    "export const DATA_DIR = process.env.OH_DSH_TUI_CONFIG_HOME ?? join(homeDir(), '.ohdsh', 'tui');",
+  )
+  replaceOnce(
+    paths,
+    "export const LEGACY_DATA_DIR = join(homeDir(), '.dsh-cc');",
+    'export const LEGACY_DATA_DIR = DATA_DIR;',
+  )
+
+  const logo = join(lib, 'components', 'LogoV2.js')
+  replaceOnce(
+    logo,
+    "sweep('✦ dsh-TUI', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
     "sweep(process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
   )
   replaceOnce(
-    join(lib, 'components', 'LogoV2.js'),
+    logo,
     "'  v' + VERSION",
     "'  v' + (process.env.DSH_OH_TUI_VERSION ?? VERSION)",
   )
+
+  const chat = join(lib, 'screens', 'Chat.js')
   replaceOnce(
-    join(lib, 'screens', 'Chat.js'),
-    'useTerminalTitle(`${titlePrefix} 🐋 ${channel.sessionTitle}`);',
-    "useTerminalTitle(`${titlePrefix} ${process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI'} · ${channel.sessionTitle}`);",
+    chat,
+    '`${titlePrefix} 🐋 ${channel.sessionTitle}`',
+    "`${titlePrefix} ${process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI'} · ${channel.sessionTitle}`",
   )
-  replaceOnce(
-    join(lib, 'customTheme.js'),
-    "export const CUSTOM_THEME_DIR = join(homedir(), '.dsh-cc', 'themes');",
-    "export const CUSTOM_THEME_DIR = join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(homedir(), '.ohdsh', 'tui'), 'themes');",
-  )
-  for (const name of [
-    'activityPrefs.js',
-    'effortPrefs.js',
-    'i18n.js',
-    'modelPrefs.js',
-    'presetPrefs.js',
-    'themePrefs.js',
-  ]) {
-    scopePreferenceFile(lib, name)
-  }
-  scopePreferenceFile(lib, 'history.js', 'HISTORY_DIR')
-  scopePreferenceFile(lib, 'sessionHistory.js', 'DIR')
 
   const commands = join(lib, 'commands.js')
-  replaceOnce(
-    commands,
-    "description: 'Show the dsh-cc configuration source'",
-    "description: 'Show the Oh-DSH TUI configuration source'",
-  )
-  replaceOnce(
-    commands,
-    "description: 'Practice programming with dsh-cc'",
-    "description: 'Practice programming with Oh-DSH TUI'",
-  )
-  replaceOnce(
-    commands,
-    "description: 'Exit dsh-cc'",
-    "description: 'Exit Oh-DSH TUI'",
-  )
+  for (const [before, after] of [
+    ['Show the dsh-tui configuration source', 'Show the Oh-DSH TUI configuration source'],
+    ['Update dsh-tui and restart', 'Update Oh-DSH TUI and restart'],
+    ['Practice programming with dsh-tui', 'Practice programming with Oh-DSH TUI'],
+    ['Exit dsh-tui', 'Exit Oh-DSH TUI'],
+  ]) {
+    replaceEvery(commands, before, after)
+  }
 
-  const plugin = join(lib, 'plugin.js')
-  replaceEvery(plugin, 'dsh-cc --resume', 'ohdsh tui --resume')
-  replaceOnce(plugin, 'Resume with -c (or command below):', 'Resume with:')
+  const plugin = join(lib, 'dsh-adapter', 'plugin.js')
   replaceEvery(
     plugin,
-    'cc-tui requires an interactive terminal',
+    'dsh-tui requires an interactive terminal',
     'Oh-DSH TUI requires an interactive terminal',
   )
+  replaceEvery(plugin, 'dsh-tui: exit after error:', 'Oh-DSH TUI: exit after error:')
+  replaceEvery(plugin, 'dsh-tui crashed:', 'Oh-DSH TUI crashed:')
   replaceEvery(
     plugin,
-    'cc-tui: exit after error:',
-    'Oh-DSH TUI: exit after error:',
+    'Updating @deepseek-harness-tui/dsh-tui and restarting…',
+    'Updating Oh-DSH TUI and restarting…',
   )
-  replaceEvery(plugin, 'cc-tui crashed:', 'Oh-DSH TUI crashed:')
+  replaceOnce(
+    plugin,
+    "const boot = profile === undefined ? 'dsh --config cordis.yml' : `dsh --profile ${profile}`;\n    return process.platform === 'win32'\n        ? `dsh-tui --resume ${sessionId}`\n        : `DSH_TUI_RESUME_SESSION=${sessionId} ${boot}`;",
+    'return `ohdsh tui --resume ${sessionId}`;',
+  )
+  replaceEvery(plugin, 'dsh-tui --resume', 'ohdsh tui --resume')
 
-  const messages = join(lib, 'i18n.js')
-  replaceEvery(messages, '~/.dsh-cc', '~/.ohdsh/tui')
-  replaceEvery(messages, 'dsh-cc.cmd / dsh --config <上述任一配置>', 'ohdsh tui')
-  replaceEvery(messages, 'dsh-cc.cmd / dsh --config <either config above>', 'ohdsh tui')
-  replaceEvery(messages, 'dsh-cc', 'Oh-DSH TUI')
-
-  const channel = join(lib, 'channel.js')
+  const channel = join(lib, 'dsh-adapter', 'channel.js')
   replaceOnce(
     channel,
-    '`dsh-cc-export-${Date.now()}.md`',
+    '`dsh-tui-export-${Date.now()}.md`',
     '`oh-dsh-tui-export-${Date.now()}.md`',
   )
   replaceOnce(
     channel,
-    "join(userHome, '.dsh-cc/cordis.yml')",
+    "join(userHome, '.dsh-tui/cordis.yml')",
     "join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(userHome, '.ohdsh', 'tui'), 'cordis.yml')",
   )
+
+  const compatibility = join(lib, 'dsh-adapter', 'compat', 'sessionLog.js')
   replaceOnce(
-    channel,
-    "join(userHome, '.dsh-cc/sessions')",
-    "join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(userHome, '.ohdsh', 'tui'), 'sessions')",
+    compatibility,
+    "roots.push(join(home, '.dsh-tui', 'sessions'));",
+    "roots.push(join(process.env.OH_DSH_TUI_CONFIG_HOME ?? join(home, '.ohdsh', 'tui'), 'sessions'));",
   )
 
-  replaceOnce(
-    join(lib, 'screens', 'Chat.js'),
-    '`${userHome}\\\\.dsh-cc\\\\cordis.yml`',
-    '`${process.env.OH_DSH_TUI_CONFIG_HOME ?? `${userHome}\\\\.ohdsh\\\\tui`}\\\\cordis.yml`',
-  )
+  const messages = join(lib, 'i18n.js')
+  replaceEvery(messages, '~/.dsh-tui', '~/.ohdsh/tui')
+  replaceEvery(messages, 'dsh-tui', 'Oh-DSH TUI')
 
   const customTheme = join(lib, 'customTheme.js')
-  replaceEvery(customTheme, '[dsh-cc-tui]', '[Oh-DSH TUI]')
-  replaceEvery(customTheme, '~/.dsh-cc', '~/.ohdsh/tui')
+  replaceEvery(customTheme, '[dsh-tui]', '[Oh-DSH TUI]')
+  replaceEvery(customTheme, '~/.dsh-tui', '~/.ohdsh/tui')
   const themeProvider = join(lib, 'components', 'design-system', 'ThemeProvider.js')
-  replaceEvery(themeProvider, '[dsh-cc-tui]', '[Oh-DSH TUI]')
-  replaceEvery(themeProvider, '~/.dsh-cc', '~/.ohdsh/tui')
+  replaceEvery(themeProvider, '[dsh-tui]', '[Oh-DSH TUI]')
+  replaceEvery(themeProvider, '~/.dsh-tui', '~/.ohdsh/tui')
+  const pluginStorage = join(lib, 'dsh-adapter', 'plugin-storage.js')
+  replaceEvery(pluginStorage, '~/.dsh-tui', '~/.ohdsh/tui')
 }

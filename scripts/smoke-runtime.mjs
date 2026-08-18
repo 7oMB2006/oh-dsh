@@ -51,6 +51,9 @@ const runtimeEnvironment = {
   DSH_DESKTOP_VERSION: 'smoke',
   DSH_HOME: dshHome,
   PATH: runtimeSearchPath(paths),
+  // Exercise the in-app browse interaction in unattended automation instead
+  // of opening a platform-owned native chooser that CI cannot drive.
+  SSH_CONNECTION: 'oh-dsh-smoke',
 }
 
 const pluginRoot = join(smokeRoot, 'smoke-plugin')
