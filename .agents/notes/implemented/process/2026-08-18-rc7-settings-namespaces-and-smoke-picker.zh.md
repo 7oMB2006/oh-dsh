@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-将固定运行时升级到 DSH 0.1.0-rc.7 暴露了四处适配：rc7 的 api-proxy 用动态
+将固定运行时升级到 DSH 0.1.0-rc.7 暴露了五处适配：rc7 的 api-proxy 用动态
 命名空间服务取代了固定设置白名单，移除了 rc.6 的配置客户端边界；rc7 包发布
 在 pnpm minimumReleaseAge 窗口内；hero 工作区选择器的交互对浏览器自动化
 发生了变化；固定 TUI 内嵌的 dsh-std 工作区要求 pnpm 11.21.0，而 Oh-DSH CI
@@ -48,6 +48,8 @@ Status: implemented
 - **TUI marketplace 重启标记**：恢复标记是辅助信息。标记持久化失败，
   例如数据根目录只读或磁盘已满时，会被忽略，Apply 与 Undo 仍会进入共享
   marketplace 事务。
+- **TUI profile 迁移**：`dsh-cc-tui` 是旧版 profile 自带的 bundle，而不是
+  用户扩展。升级 profile 时移除这个已淘汰条目，同时保留其他所有非自有 bundle。
 
 ## Consequences
 
@@ -60,6 +62,7 @@ Status: implemented
   选择器实现；有人值守时仍保留 rc7 的自动原生选择器判定。
 - TUI marketplace 在无法写入恢复元数据时仍可执行；后续启动只是没有可消费
   的恢复标记。
+- 现有 TUI profile 会收敛到已发布的 renderer，同时不会丢失用户安装的 bundle。
 
 ## Alternatives considered
 
@@ -74,3 +77,5 @@ Status: implemented
   没有理由削弱仓库安全策略；拒绝。
 - 由 smoke 驱动原生 OS 目录对话框：平台相关且脆弱；拒绝。
 - 让恢复标记写入失败阻断 Apply/Undo：恢复标记不是事务前置条件；拒绝。
+- 把 `dsh-cc-tui` 当作非自有 bundle 保留：它由旧版 TUI profile 提供，可能指向
+  新运行时中不存在的 renderer；拒绝。

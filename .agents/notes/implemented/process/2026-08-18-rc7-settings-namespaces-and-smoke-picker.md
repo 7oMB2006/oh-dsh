@@ -6,7 +6,7 @@ English | [中文](2026-08-18-rc7-settings-namespaces-and-smoke-picker.zh.md)
 
 ## Problem
 
-Upgrading the pinned runtime to DSH 0.1.0-rc.7 surfaced four adaptations:
+Upgrading the pinned runtime to DSH 0.1.0-rc.7 surfaced five adaptations:
 rc7's api-proxy replaced its fixed settings allowlist with dynamic
 namespace serving, removing the rc.6 configuration-client boundary; rc7
 packages are published inside pnpm's minimumReleaseAge window; and the
@@ -58,6 +58,9 @@ previously installed pnpm 11.20.0.
 - **TUI marketplace restart marker**: the resume marker is advisory. Marker
   persistence failures, such as a read-only or full data root, are ignored so
   Apply and Undo still reach the shared marketplace transaction.
+- **TUI profile migration**: `dsh-cc-tui` was a former owned bundle, not a
+  user extension. Profile upgrades remove that superseded entry while keeping
+  every other non-owned bundle intact.
 
 ## Consequences
 
@@ -72,6 +75,8 @@ previously installed pnpm 11.20.0.
   keeps rc7's automatic native picker selection.
 - TUI marketplace actions remain usable when restart recovery metadata cannot
   be written; a later launch simply has no resume marker to consume.
+- Existing TUI profiles converge on the released renderer without dropping
+  user-installed bundles.
 
 ## Alternatives considered
 
@@ -91,3 +96,6 @@ previously installed pnpm 11.20.0.
   and fragile; rejected.
 - Let restart-marker persistence block Apply or Undo: the marker is recovery
   metadata, not a transaction precondition; rejected.
+- Preserve `dsh-cc-tui` as an unowned bundle: it was shipped by the old TUI
+  profile and can point at a renderer that is absent from the new runtime;
+  rejected.

@@ -53,6 +53,9 @@ export const TUI_BUNDLES = [
   '@oh-dsh/tui',
 ] as const
 
+/** Bundles that were owned by the TUI profile and are retired on upgrade. */
+const TUI_SUPERSEDED_BUNDLES = ['dsh-cc-tui'] as const
+
 interface ProfileManifest {
   name?: string
   private?: boolean
@@ -91,9 +94,14 @@ function writeJsonAtomic(path: string, value: unknown): void {
   renameSync(temporary, path)
 }
 
-function requiredBundles(existing: readonly string[], owned: readonly string[]): string[] {
+function requiredBundles(
+  existing: readonly string[],
+  owned: readonly string[],
+  superseded: readonly string[] = [],
+): string[] {
   const required = new Set<string>(owned)
-  return [...owned, ...existing.filter(bundle => !required.has(bundle))]
+  const retired = new Set<string>(superseded)
+  return [...owned, ...existing.filter(bundle => !required.has(bundle) && !retired.has(bundle))]
 }
 
 /** One packaged distribution surface: its profile name, bundles, and manifest identity. */
@@ -101,6 +109,7 @@ export interface ProfileSpec {
   bundles: readonly string[]
   manifestName: string
   name: string
+  supersededBundles?: readonly string[]
 }
 
 /** Profile facts for the packaged desktop surface. */
@@ -122,6 +131,7 @@ export const TUI_PROFILE_SPEC: ProfileSpec = Object.freeze({
   bundles: TUI_BUNDLES,
   manifestName: 'dsh-profile-tui',
   name: TUI_PROFILE,
+  supersededBundles: TUI_SUPERSEDED_BUNDLES,
 })
 
 /**
@@ -148,7 +158,7 @@ export function ensureProfile(spec: ProfileSpec, dshHome: string): DesktopProfil
       ...manifest.dsh,
       profile: {
         ...manifest.dsh?.profile,
-        bundles: requiredBundles(currentBundles, spec.bundles),
+        bundles: requiredBundles(currentBundles, spec.bundles, spec.supersededBundles),
       },
     },
   }
