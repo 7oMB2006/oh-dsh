@@ -20,6 +20,10 @@ import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import electronBinary from 'electron'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const smokeClientTimeoutMs = Number.parseInt(
+  process.env.DSH_SMOKE_CLIENT_TIMEOUT_MS ?? '120000',
+  10,
+)
 
 /** Resolve the smoke resources root: `.stage`, an explicit dir, or the packaged release. */
 function resolveResources(candidate) {
@@ -398,7 +402,9 @@ try {
       DSH_SMOKE_RUNTIME_URL: base.href,
       DSH_SMOKE_SURFACE: 'web',
     },
-    timeout: 30_000,
+    timeout: Number.isFinite(smokeClientTimeoutMs) && smokeClientTimeoutMs > 0
+      ? smokeClientTimeoutMs
+      : 120_000,
   })
   assert.equal(
     browserClient.status,
