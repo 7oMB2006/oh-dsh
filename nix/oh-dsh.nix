@@ -39,6 +39,12 @@ let
     else
       throw "unknown dshSource: ${dshSource}";
 
+  dshRuntimeRoot =
+    if dshSource == "llm-agents" then
+      "${dshRuntime}/lib/node_modules/@deepseek-ai/dsh"
+    else
+      "${dshRuntime}/lib/dsh";
+
   # ---------------------------------------------------------------------------
   # Oh-DSH front-end bundle. The same build produces all surface adapters;
   # the outer derivation controls which launchers and renderers are exposed.
@@ -58,23 +64,50 @@ let
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "2e9db44a71bb75c9fa1185330541dce2582deee3";
-    hash = "sha256-VQ8lyHNtcTHrOum21Z4dZyZgrxexmUY7yEN8kjao838=";
+    rev = "9ad0a49b8a7506109b704896ffea3d7349c21e63";
+    hash = "sha256-8ppL9KD9wKEWIxqV7xo5o0pCEX1SxnMrZc0w9JFRi4w=";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "6a8956678fc3746ed14b62bfee066ee8fc68f3cb";
-    hash = "sha256-dxR0MdhKY+HHbLOZscCpNaww1Clfxc781HxmBg8kpcg=";
+    rev = "180117716ed50a789edb56539e832b1d1f7839cf";
+    hash = "sha256-bz2S2Nf8vfRCC+3XnzreWLoX7v1RwuIlbKIEU8hlvH0=";
+  };
+  tuiRelease = pkgs.fetchurl {
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.8.1.tgz";
+    hash = "sha512-SwVgjKriOr/lyyFP8BGwzsJxdJWMIInD8X52hUhbCalRUCp9FO3aXj4gDWOf5Bxc2C3O9nh3guKBEt6QdJk9rQ==";
+  };
+  tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
+    owner = "T-Auto";
+    repo = "dsh-ecosystem-spec";
+    rev = "7e49be23ecd42ee1b19a74b92bb2791c3406d7fc";
+    hash = "sha256-xEQyrFxdjyaHDzH2WhLd+ZuG42I4NvSeTa1f+tXp1AI=";
+  };
+  tuiStdSrc = pkgs.fetchFromGitHub {
+    owner = "Yan-Zero";
+    repo = "dsh-std";
+    rev = "a2faa86243a5693ee4970e3d8b3aaf361edea298";
+    hash = "sha256-J9DhM2kV8gLIBEpRxQxHp4x+Lw3B0DfxTE0/q/ghVMc=";
   };
 
   # fetchPnpmDeps and the real build MUST see the same workspace graph.
   source = pkgs.runCommand "oh-dsh-source" { } ''
     cp -r ${cleanSource} $out
     chmod -R u+w $out
+    mkdir -p $out/upstream
     rm -rf $out/upstream/DSH-better-sidebar $out/upstream/dsh-TUI
     cp -r ${betterSidebarSrc} $out/upstream/DSH-better-sidebar
     cp -r ${tuiSrc} $out/upstream/dsh-TUI
+    chmod -R u+w $out/upstream/dsh-TUI
+    rm -rf $out/upstream/dsh-TUI/dsh-ecosystem-spec \
+      $out/upstream/dsh-TUI/vendor/dsh-std
+    mkdir -p $out/upstream/dsh-TUI/vendor
+    cp -r ${tuiEcosystemSpecSrc} \
+      $out/upstream/dsh-TUI/dsh-ecosystem-spec
+    cp -r ${tuiStdSrc} $out/upstream/dsh-TUI/vendor/dsh-std
+    mkdir -p $out/upstream/dsh-TUI-release
+    tar -xzf ${tuiRelease} --strip-components=1 \
+      -C $out/upstream/dsh-TUI-release
   '';
 
   ohDshBundle = pkgs.stdenv.mkDerivation rec {
@@ -86,7 +119,7 @@ let
     pnpmDeps = pkgs.fetchPnpmDeps {
       inherit pname version src;
       fetcherVersion = 4;
-      hash = "sha256-P4vlfU8sdQXprLEvp9hkb5O3CIExvJcxkSqjDDczQak=";
+      hash = "sha256-cBVO2NX3kWvl9HFjB4MRR/Eg6ekuQNvxT3KHfalfHw4=";
     };
 
     nativeBuildInputs = [
@@ -123,13 +156,19 @@ let
         cp "$p" "$out/lib/oh-dsh/manifests/$name.json"
       done
       cp web/package.json $out/lib/oh-dsh/manifests/web.json
-      cp upstream/dsh-TUI/package.json $out/lib/oh-dsh/manifests/tui-renderer.json
+      cp upstream/dsh-TUI-release/package.json \
+        $out/lib/oh-dsh/manifests/tui-renderer.json
 
       # Copy the pinned renderer and apply the guarded Oh-DSH adaptation.
       mkdir -p $out/lib/oh-dsh/tui-renderer
-      cp -r upstream/dsh-TUI/lib upstream/dsh-TUI/skills \
-        upstream/dsh-TUI/cordis.patch.yml upstream/dsh-TUI/cordis.yml \
-        upstream/dsh-TUI/LICENSE $out/lib/oh-dsh/tui-renderer/
+      cp -r upstream/dsh-TUI-release/lib \
+        upstream/dsh-TUI-release/skills \
+        upstream/dsh-TUI-release/ecosystem-spec \
+        upstream/dsh-TUI-release/presets \
+        upstream/dsh-TUI-release/cordis.patch.yml \
+        upstream/dsh-TUI-release/cordis.yml \
+        upstream/dsh-TUI-release/LICENSE \
+        $out/lib/oh-dsh/tui-renderer/
       node -e "import('./scripts/tui-upstream-adapter.mjs').then(({ adaptTuiRendererPackage }) => adaptTuiRendererPackage('$out/lib/oh-dsh/tui-renderer'))"
 
       # Collect runtime dependency closures that the DSH runtime may not ship.
@@ -140,8 +179,18 @@ let
         $out/lib/oh-dsh/extra-deps
       ${pkgs.python3}/bin/python3 ${./collect-deps.py} \
         node_modules/.pnpm \
-        upstream/dsh-TUI/package.json \
+        upstream/dsh-TUI-release/package.json \
         $out/lib/oh-dsh/extra-deps
+
+      # The published TUI release carries its dsh-std packages as compiled
+      # bundled dependencies. Prefer those artifacts over unbuilt workspace
+      # sources when assembling the offline Nix runtime.
+      rm -rf $out/lib/oh-dsh/extra-deps/@dsh-std
+      cp -r upstream/dsh-TUI-release/node_modules/@dsh-std \
+        $out/lib/oh-dsh/extra-deps/@dsh-std
+      for dep in $out/lib/oh-dsh/extra-deps/@dsh-std/*; do
+        ln -s ../.. "$dep/node_modules"
+      done
 
       runHook postInstall
     '';
@@ -170,7 +219,7 @@ pkgs.stdenv.mkDerivation {
 
     # DSH runtime
     mkdir -p $out/dsh-runtime
-    cp -r ${dshRuntime}/lib/dsh/* $out/dsh-runtime/
+    cp -r ${dshRuntimeRoot}/. $out/dsh-runtime/
     chmod -R u+w $out/dsh-runtime
     chmod +x $out/dsh-runtime/lib/bin.js || true
 
