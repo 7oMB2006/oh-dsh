@@ -391,10 +391,27 @@ try {
     })
   })
 
-  const browserClient = spawnSync(electronBinary, [
-    '--no-sandbox',
-    join(root, 'scripts', 'smoke-client.cjs'),
-  ], {
+  // Linux GitHub-hosted runners do not provide a window server. Electron can
+  // otherwise wait indefinitely while creating its first BrowserWindow, so
+  // run the client under the runner-provided Xvfb when it is available.
+  const smokeClient = join(root, 'scripts', 'smoke-client.cjs')
+  const electronCommand = process.platform === 'linux'
+    && existsSync('/usr/bin/xvfb-run')
+    ? '/usr/bin/xvfb-run'
+    : electronBinary
+  const electronArgs = electronCommand === '/usr/bin/xvfb-run'
+    ? [
+      '--auto-servernum',
+      '--server-args=-screen 0 1280x800x24',
+      electronBinary,
+      '--no-sandbox',
+      smokeClient,
+    ]
+    : [
+      '--no-sandbox',
+      smokeClient,
+    ]
+  const browserClient = spawnSync(electronCommand, electronArgs, {
     cwd: root,
     encoding: 'utf8',
     env: {
