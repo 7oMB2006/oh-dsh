@@ -11,19 +11,28 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { restoreSettingsBoundary } from '../scripts/settings-boundary.mjs'
 
-function fixture() {
+function fixture(layout = 'pnpm') {
   const root = mkdtempSync(join(tmpdir(), 'oh-dsh-settings-boundary-'))
-  const index = join(
-    root,
-    'node_modules',
-    '.pnpm',
-    '@deepseek-ai+dsh-host-apiproxy@0.1.0-rc.7',
-    'node_modules',
-    '@deepseek-ai',
-    'dsh-host-apiproxy',
-    'lib',
-    'index.js',
-  )
+  const index = layout === 'hoisted'
+    ? join(
+      root,
+      'node_modules',
+      '@deepseek-ai',
+      'dsh-host-apiproxy',
+      'lib',
+      'index.js',
+    )
+    : join(
+      root,
+      'node_modules',
+      '.pnpm',
+      '@deepseek-ai+dsh-host-apiproxy@0.1.0-rc.7',
+      'node_modules',
+      '@deepseek-ai',
+      'dsh-host-apiproxy',
+      'lib',
+      'index.js',
+    )
   mkdirSync(dirname(index), { recursive: true })
   writeFileSync(index, [
     'const DEFAULT_MAX_MESSAGES = 50;',
@@ -45,6 +54,16 @@ test('settings boundary patches every assembled runtime idempotently', () => {
     assert.match(once, /WEB_SETTINGS_NAMESPACES/)
     assert.match(once, /ctx\.llm\.listConfigurableProviders\(\)/)
     assert.match(once, /settings-not-exposed/)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('settings boundary patches hoisted runtimes used by Windows release builds', () => {
+  const { root, index } = fixture('hoisted')
+  try {
+    restoreSettingsBoundary(root)
+    assert.match(readFileSync(index, 'utf8'), /WEB_SETTINGS_NAMESPACES/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

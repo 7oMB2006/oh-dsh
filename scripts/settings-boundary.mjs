@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -52,21 +52,36 @@ const CONSTANT_ANCHOR = 'const DEFAULT_MAX_MESSAGES = 50;'
 
 function apiProxyIndex(runtimeRoot) {
   const store = join(runtimeRoot, 'node_modules', '.pnpm')
-  const entry = readdirSync(store, { withFileTypes: true })
-    .find(candidate => candidate.isDirectory()
-      && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
-  if (entry === undefined) {
-    throw new Error('dsh-host-apiproxy is missing from the staged runtime')
+  if (existsSync(store)) {
+    const entry = readdirSync(store, { withFileTypes: true })
+      .find(candidate => candidate.isDirectory()
+        && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
+    if (entry !== undefined) {
+      return join(
+        store,
+        entry.name,
+        'node_modules',
+        '@deepseek-ai',
+        'dsh-host-apiproxy',
+        'lib',
+        'index.js',
+      )
+    }
   }
-  return join(
-    store,
-    entry.name,
+
+  // Windows release staging uses pnpm's hoisted linker, which exposes
+  // packages directly under node_modules instead of .pnpm.
+  const hoisted = join(
+    runtimeRoot,
     'node_modules',
     '@deepseek-ai',
     'dsh-host-apiproxy',
     'lib',
     'index.js',
   )
+  if (existsSync(hoisted)) return hoisted
+
+  throw new Error('dsh-host-apiproxy is missing from the staged runtime')
 }
 
 /**
