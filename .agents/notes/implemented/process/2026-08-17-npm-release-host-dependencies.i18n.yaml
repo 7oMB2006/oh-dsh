@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-17-npm-release-host-dependencies.md
+2026-08-17-npm-release-host-dependencies.md: d9c19ef0e82e2708aa6d5fd998f932e40d582ee9
+2026-08-17-npm-release-host-dependencies.zh.md: 77560aa8f02c9c54ff950a4fa106ed9d9cf88384

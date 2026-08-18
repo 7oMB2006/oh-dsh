@@ -1,9 +1,17 @@
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
-import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
+import { DSH_SOURCE_SPEC, resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
 
 const dshSource = resolveDshSource()
+
+// npm release packages ship compiled `lib/` and web frontend assets, so the
+// source-workspace build step has no work to do.
+if (DSH_SOURCE_SPEC.source === 'npm') {
+  console.log(`Using prebuilt DSH npm release ${DSH_SOURCE_SPEC.version}; skipping source build`)
+  process.exit(0)
+}
+
 const pnpm = resolvePinnedPnpm(dshSource)
 
 /**

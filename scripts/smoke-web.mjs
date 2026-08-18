@@ -12,6 +12,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DSH_SOURCE_SPEC } from './dsh-source.mjs'
 import { ensureWebProfile, WEB_PROFILE } from '../src/profile.ts'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
 import { resolveProductVersion } from '../src/version.ts'
@@ -75,6 +76,18 @@ async function freePort() {
 }
 
 ensureWebProfile(dshHome)
+
+const versionResult = spawnSync(nodeBinary, [cliEntry, '--version'], {
+  cwd: smokeRoot,
+  encoding: 'utf8',
+  env: { ...process.env, DSH_HOME: dshHome },
+})
+assert.equal(versionResult.status, 0, versionResult.stderr || versionResult.stdout)
+assert.equal(
+  versionResult.stdout.trim(),
+  DSH_SOURCE_SPEC.version,
+  `staged DSH runtime must match ${DSH_SOURCE_SPEC.version}`,
+)
 
 const runtimeEnvironment = {
   ...process.env,

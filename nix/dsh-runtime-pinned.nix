@@ -1,50 +1,61 @@
-# Build the pinned deepseek-harness runtime from source, matching the
-# revision recorded in this repository's dsh-source.json.
+# Build the pinned deepseek-harness runtime from the npm release recorded in
+# this repository's dsh-source.json. The npm package ships compiled `lib/`
+# and `config/`, so only the dependency graph needs installation.
 
 { lib
 , buildNpmPackage
-, fetchFromGitHub
-, nodejs_22
+, fetchurl
+, nodejs_24
+, pnpm
+, pnpmConfigHook
+, runCommand
 , dshSourceSpec
 }:
+
+assert dshSourceSpec.source == "npm";
+
+let
+  tarball = fetchurl {
+    url = dshSourceSpec.tarball;
+    hash = lib.fakeHash; # filled in below after first build
+  };
+
+  # pnpm install needs the lockfile beside package.json; the npm tarball
+  # carries the package but not the lockfile.
+  src = runCommand "dsh-runtime-pinned-src" { } ''
+    mkdir -p $out
+    tar -xzf ${tarball} -C $out --strip-components=1
+    cp ${../scripts}/dsh-runtime-${dshSourceSpec.version}-lock.yaml $out/pnpm-lock.yaml
+  '';
+in
 
 buildNpmPackage rec {
   pname = "dsh-runtime-pinned";
   version = dshSourceSpec.version;
 
-  src = fetchFromGitHub {
-    owner = "deepseek-ai";
-    repo = "deepseek-harness";
-    rev = dshSourceSpec.revision;
-    hash = lib.fakeHash; # filled in below after first build
-  };
+  inherit src;
 
-  nodejs = nodejs_22;
+  nodejs = nodejs_24;
+
+  nativeBuildInputs = [ pnpm pnpmConfigHook ];
 
   npmDepsHash = lib.fakeHash; # filled in below after first build
 
-  # The deepseek-harness release tarball ships compiled lib/ output; building
-  # from git requires the full monorepo build. Keep this as a source build
-  # so the pinned variant tracks the exact revision in dsh-source.json.
   buildPhase = ''
     runHook preBuild
-    npm run build --if-present
+    pnpm install --frozen-lockfile --ignore-scripts
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib/dsh
-    cp -r lib config package.json node_modules $out/lib/dsh/ 2>/dev/null || true
-    # Fallback: if no lib/ was produced, copy the whole tree.
-    if [ ! -d $out/lib/dsh/lib ]; then
-      cp -r . $out/lib/dsh/
-    fi
+    cp -r lib config package.json node_modules $out/lib/dsh/
     runHook postInstall
   '';
 
   meta = with lib; {
-    description = "Pinned DeepSeek Harness runtime (${dshSourceSpec.version})";
+    description = "Pinned DeepSeek Harness npm runtime (${dshSourceSpec.version})";
     license = licenses.mit;
     platforms = platforms.unix;
   };

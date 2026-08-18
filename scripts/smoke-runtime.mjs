@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronBinary from 'electron'
+import { DSH_SOURCE_SPEC } from './dsh-source.mjs'
 import { bundledRuntimePaths, runtimeSearchPath } from '../src/runtime-paths.ts'
 import {
   BUNDLED_DESKTOP_CLIENT_PLUGINS,
@@ -81,6 +82,7 @@ const versionResult = spawnSync(nodeBinary, [cliEntry, '--version'], {
 })
 assert.equal(versionResult.status, 0, versionResult.stderr || versionResult.stdout)
 const dshVersion = versionResult.stdout.trim()
+assert.equal(dshVersion, DSH_SOURCE_SPEC.version, `staged DSH runtime must match ${DSH_SOURCE_SPEC.version}`)
 
 const git = (...args) => {
   const result = spawnSync('git', args, {

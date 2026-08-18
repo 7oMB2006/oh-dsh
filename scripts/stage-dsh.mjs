@@ -26,7 +26,11 @@ import {
   sep,
 } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { resolveDshSource, resolvePinnedPnpm } from './dsh-source.mjs'
+import {
+  DSH_SOURCE_SPEC,
+  resolveDshSource,
+  resolvePinnedPnpm,
+} from './dsh-source.mjs'
 import {
   landlockLauncherPackageName,
   restoreLandlockLauncher,
@@ -35,6 +39,7 @@ import { resolveNodeDistributionPlatform } from '../src/node-platform.ts'
 import { adaptTuiRendererPackage } from './tui-upstream-adapter.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+const npmRelease = DSH_SOURCE_SPEC.source === 'npm'
 const dshSource = resolveDshSource()
 const stage = join(root, '.stage')
 const runtime = join(stage, 'dsh-runtime')
@@ -55,8 +60,9 @@ const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
 const nodeExecutable = join(nodeCache, isWindowsNode ? 'node.exe' : join('bin', 'node'))
 
-if (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
-  || !existsSync(join(dshSource, 'apps', 'cli', 'lib', 'bin.js'))) {
+if (!npmRelease
+  && (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
+    || !existsSync(join(dshSource, 'apps', 'cli', 'lib', 'bin.js')))) {
   throw new Error(`DSH build artifacts are missing at ${dshSource}; run pnpm run build:dsh first`)
 }
 
@@ -90,6 +96,99 @@ function download(url, target) {
   rmSync(target, { force: true })
   writeFileSync(target, readFileSync(temporary))
   rmSync(temporary, { force: true })
+}
+
+/**
+ * Legacy `pnpm deploy` hoists peer packages under
+ * `node_modules/.pnpm/node_modules` but does not create top-level links for
+ * every package. `healProfilesModuleFallback` resolves profiles through the
+ * installation's top-level `node_modules`, so re-export that hoisted graph
+ * one level up.
+ */
+function exposeHoistedPackages() {
+  const hoist = join(runtime, 'node_modules', '.pnpm', 'node_modules')
+  const prefix = join(runtime, 'node_modules')
+  if (!existsSync(hoist)) return
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const source = join(directory, entry.name)
+      if (entry.isSymbolicLink()) {
+        const target = join(prefix, relative(hoist, source))
+        if (existsSync(target)) continue
+        mkdirSync(dirname(target), { recursive: true })
+        const logical = resolve(dirname(source), readlinkSync(source))
+        portableSymlink(relative(realpathSync(dirname(target)), logical), target)
+      } else if (entry.isDirectory()) {
+        visit(source)
+      }
+    }
+  }
+  visit(hoist)
+}
+
+/**
+ * Record every exposed package as a direct runtime dependency so the
+ * profile-module fallback links the complete boot graph into each writable
+ * profile (`healProfilesModuleFallback` walks this manifest).
+ */
+function recordExposedDependencies() {
+  const manifestPath = join(runtime, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const dependencies = { ...manifest.dependencies }
+  const prefix = join(runtime, 'node_modules')
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name)
+      if (entry.isSymbolicLink()) {
+        const real = realpathSync(path)
+        const packagePath = join(real, 'package.json')
+        if (!existsSync(packagePath)) continue
+        const packageManifest = JSON.parse(readFileSync(packagePath, 'utf8'))
+        if (typeof packageManifest.name !== 'string' || typeof packageManifest.version !== 'string') continue
+        dependencies[packageManifest.name] = packageManifest.version
+      } else if (entry.isDirectory()) {
+        const packagePath = join(path, 'package.json')
+        if (existsSync(packagePath)) {
+          const packageManifest = JSON.parse(readFileSync(packagePath, 'utf8'))
+          if (typeof packageManifest.name === 'string' && typeof packageManifest.version === 'string') {
+            dependencies[packageManifest.name] = packageManifest.version
+          }
+          continue
+        }
+        visit(path)
+      }
+    }
+  }
+  visit(prefix)
+  manifest.dependencies = dependencies
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`)
+}
+
+
+
+/**
+ * Expose the built-in Vision settings section through DSH's configuration
+ * boundary. The pinned npm release ships a fixed API-proxy allowlist, so the
+ * git-source build-time patch (build-dsh.mjs withVisionSettingsNamespace)
+ * has no source to patch; adapt the deployed runtime instead.
+ */
+function exposeVisionSettingsNamespace() {
+  const store = join(runtime, 'node_modules', '.pnpm')
+  const entry = readdirSync(store, { withFileTypes: true })
+    .find(candidate => candidate.isDirectory() && candidate.name.startsWith('@deepseek-ai+dsh-host-apiproxy@'))
+  if (entry === undefined) {
+    throw new Error('dsh-host-apiproxy is missing from the staged runtime')
+  }
+  const indexPath = join(store, entry.name, 'node_modules', '@deepseek-ai', 'dsh-host-apiproxy', 'lib', 'index.js')
+  const source = readFileSync(indexPath, 'utf8')
+  const before = '"web-search-deepseek"'
+  if (source.includes('"oh-dsh-vision"')) return
+  if (source.includes(before) === false) {
+    throw new Error('dsh-host-apiproxy settings allowlist shape changed; cannot expose the vision namespace')
+  }
+  const next = source.replace(before, before + ',\n\t"oh-dsh-vision"')
+  writeFileSync(indexPath, next)
+  console.log('Exposing vision settings namespace to configuration clients')
 }
 
 function sha256(path) {
@@ -745,11 +844,50 @@ function installCompiledPackageDependencies(sourceManifestPath, packageDir) {
   }
 }
 
+function runtimeDependencyTarget(dependency) {
+  const parts = dependency.split('/')
+  const link = join(runtime, 'node_modules', ...parts)
+  if (existsSync(join(link, 'package.json'))) return link
+  const hoisted = join(runtime, 'node_modules', '.pnpm', 'node_modules', ...parts)
+  if (existsSync(join(hoisted, 'package.json'))) return hoisted
+
+  const store = join(runtime, 'node_modules', '.pnpm')
+  const prefix = dependency.replace('/', '+')
+  let fallback = null
+  for (const entry of readdirSync(store, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith(`${prefix}@`)) continue
+    const candidate = join(store, entry.name, 'node_modules', ...parts)
+    const manifestPath = join(candidate, 'package.json')
+    if (!existsSync(manifestPath)) continue
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (manifest.name !== dependency) continue
+    // The release pins every DSH package to its own version, but a forked
+    // peer (e.g. @deepseek-ai/schemastery) keeps its own version line.
+    if (manifest.version === DSH_SOURCE_SPEC.version) return candidate
+    fallback ??= candidate
+  }
+  if (fallback !== null) return fallback
+  throw new Error(`DSH runtime is missing host dependency ${dependency}@${DSH_SOURCE_SPEC.version}`)
+}
+
 function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) {
   const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
-  const sourcePackages = discoverSourcePackages()
   for (const dependency of manifest.ohDsh?.hostDependencies ?? []) {
-    const source = sourcePackages.get(dependency)
+    if (npmRelease) {
+      const target = runtimeDependencyTarget(dependency)
+      if (isWindowsNode) {
+        const expected = JSON.parse(readFileSync(join(target, 'package.json'), 'utf8'))
+        if (!packageMatches(runtimePackageDirectory(dependency), expected)) {
+          throw new Error(`${manifest.name} cannot resolve staged DSH peer ${dependency}`)
+        }
+        continue
+      }
+      const link = join(packageDir, 'node_modules', ...dependency.split('/'))
+      mkdirSync(dirname(link), { recursive: true })
+      portableSymlink(relative(dirname(link), target), link)
+      continue
+    }
+    const source = discoverSourcePackages().get(dependency)
     if (source === undefined) {
       throw new Error(`${manifest.name} cannot resolve DSH peer ${dependency}`)
     }
@@ -960,7 +1098,7 @@ function ensureLinuxLandlockLauncher() {
   console.log(`Restored Linux Landlock launcher: ${launcher}`)
 }
 
-if (!existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
+if (!npmRelease && !existsSync(join(dshSource, 'apps', 'cli', 'package.json'))) {
   throw new Error(`DSH source checkout not found: ${dshSource}`)
 }
 for (const required of [
@@ -999,6 +1137,25 @@ for (const required of [
 rmSync(stage, { recursive: true, force: true })
 mkdirSync(stage, { recursive: true })
 const pnpm = resolvePinnedPnpm(dshSource)
+if (npmRelease) {
+  const releaseLockfile = join(root, 'scripts', `dsh-runtime-${DSH_SOURCE_SPEC.version}-lock.yaml`)
+  const assemblyLockfile = join(dshSource, 'pnpm-lock.yaml')
+  if (existsSync(releaseLockfile)) copyFileSync(releaseLockfile, assemblyLockfile)
+  console.log('Installing pinned DSH npm release assembly')
+  run(process.execPath, [
+    pnpm.cliEntry,
+    '--reporter=silent',
+    '--ignore-scripts',
+    'install',
+    ...existsSync(releaseLockfile) ? ['--frozen-lockfile'] : [],
+  ], {
+    cwd: dshSource,
+    env: {
+      ...process.env,
+      PATH: `${pnpm.binDir}${delimiter}${process.env.PATH ?? ''}`,
+    },
+  })
+}
 console.log(`Deploying pinned DSH runtime (${isWindowsNode ? 'hoisted copy' : 'copy import'} mode)`)
 run(process.execPath, [
   pnpm.cliEntry,
@@ -1019,15 +1176,28 @@ run(process.execPath, [
   },
 })
 
-if (isWindowsNode) ensureWindowsWorkspacePackages()
+if (isWindowsNode && !npmRelease) ensureWindowsWorkspacePackages()
 replaceDeprecatedDomExceptionShim()
 assertDeprecatedLockBranchesAreNotShipped()
-console.log('Relinking workspace packages')
-rewriteWorkspaceLinks()
-relinkInstallationWorkspacePackages()
+if (npmRelease) {
+  console.log('Exposing npm release packages for profile resolution')
+  exposeHoistedPackages()
+  recordExposedDependencies()
+  exposeVisionSettingsNamespace()
+} else {
+  console.log('Relinking workspace packages')
+  rewriteWorkspaceLinks()
+  relinkInstallationWorkspacePackages()
+}
 console.log('Installing desktop packages')
 installDesktopPackages()
-copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
+if (npmRelease) {
+  // The npm assembly carries only the CLI package; install the packaged
+  // DSH notices beside it. Oh-DSH notices are updated in this repository.
+  copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
+} else {
+  copyFileSync(join(dshSource, 'THIRD_PARTY_NOTICES.md'), join(runtime, 'THIRD_PARTY_NOTICES.md'))
+}
 restoreExecutableHelpers()
 console.log('Normalizing runtime links')
 normalizeRuntimeLinks()

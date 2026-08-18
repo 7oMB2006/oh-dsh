@@ -8,6 +8,16 @@ compatible features to its own persistence, layout, localization, and theme
 contracts. Direct upstream sources are tracked as pinned submodules. Upstream
 releases and features are reviewed regularly.
 
+## DeepSeek Harness
+
+- Project: <https://github.com/deepseek-ai/deepseek-harness>
+- Pinned npm release: `@deepseek-ai/dsh@0.1.0-rc.6`
+- Declared license: MIT
+
+Oh-DSH packages the published DSH CLI release as its runtime. The release
+tarball and SHA-512 integrity are pinned in `dsh-source.json`; the dependency
+closure is pinned in `scripts/dsh-runtime-rc6-lock.yaml`.
+
 ## dsh-web-panel
 
 - Historical project: dsh-web-panel (its previous public locator is no longer available)
