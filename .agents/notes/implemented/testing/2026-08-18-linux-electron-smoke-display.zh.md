@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | [English](2026-08-18-linux-electron-smoke-display.md)
+[English](2026-08-18-linux-electron-smoke-display.md) | 中文
 
 ## Problem
 
