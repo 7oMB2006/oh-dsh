@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | 中文
+[English](2026-08-18-windows-hoisted-settings-boundary.md) | 中文
 
 ## Problem
 

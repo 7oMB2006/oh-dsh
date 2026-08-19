@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/testing/2026-08-18-linux-electron-smoke-display.md
 2026-08-18-linux-electron-smoke-display.md: 5eaabf545e8552c6a1492f43917f6300cfadb4b2
-2026-08-18-linux-electron-smoke-display.zh.md: d99d8d366d2c4d89dcd3b7e5cfa879b011af7d40
+2026-08-18-linux-electron-smoke-display.zh.md: 0b2351e03aae50fd7e425b11b01d523b30041108
