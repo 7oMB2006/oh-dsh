@@ -54,6 +54,7 @@ test('settings boundary patches every assembled runtime idempotently', () => {
     assert.match(once, /WEB_SETTINGS_NAMESPACES/)
     assert.match(once, /ctx\.llm\.listConfigurableProviders\(\)/)
     assert.match(once, /settings-not-exposed/)
+    assert.match(once, /"agent-presets"/)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
