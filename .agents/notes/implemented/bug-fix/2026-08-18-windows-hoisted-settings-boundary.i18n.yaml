@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-windows-hoisted-settings-boundary.md
 2026-08-18-windows-hoisted-settings-boundary.md: 3d4f4f9df5b0234ea2144e97d03ddde86e6ad72d
-2026-08-18-windows-hoisted-settings-boundary.zh.md: 8dea49fd4eb503b128297142be27e10a59b5ad25
+2026-08-18-windows-hoisted-settings-boundary.zh.md: 47062c1223061f87965be2fefccc496a8ea3791e

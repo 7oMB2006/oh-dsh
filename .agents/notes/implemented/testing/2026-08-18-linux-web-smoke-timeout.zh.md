@@ -2,7 +2,7 @@
 
 Status: implemented
 
-English | 中文
+[English](2026-08-18-linux-web-smoke-timeout.md) | 中文
 
 ## Problem
 
