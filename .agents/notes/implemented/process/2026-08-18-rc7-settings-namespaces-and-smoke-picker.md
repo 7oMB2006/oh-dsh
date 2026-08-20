@@ -29,7 +29,14 @@ previously installed pnpm 11.20.0.
   `settings-not-exposed`. The allowlist is WEB_SETTINGS_NAMESPACES
   (agent-loop, shell, locale, permission, ui-conversation, ui-theme,
   web-search-deepseek), PRODUCT_SETTINGS_NAMESPACES (ui-onboarding,
-  settings) and oh-dsh-vision, matching the rc.6 exposedNamespaces() union.
+  agent-presets, settings) and oh-dsh-vision. `agent-presets` was initially
+  omitted because the rc.6 union lacked it; the pinned rc.7 client writes the
+  default agent preset through that namespace (ui-agent-preset
+  writeDefaultPreset), so every default-mode switch was refused with
+  `settings-not-exposed` — a code the rc.7 wire schema does not declare,
+  which crashed the client's response parse into a raw Zod issue dump
+  instead of showing the message. The allowlist now carries it, and
+  tests/settings-boundary.test.ts pins the namespace in the patched output.
   This keeps the configuration-client boundary recorded in
   [2026-07-30-config-plane-boundaries.md](../architecture/2026-07-30-config-plane-boundaries.md),
   [2026-08-10-web-plugin-configuration.md](../feature/2026-08-10-web-plugin-configuration.md),

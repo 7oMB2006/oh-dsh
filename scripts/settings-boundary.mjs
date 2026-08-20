@@ -11,6 +11,7 @@ const ALLOWLIST = [
   'ui-theme',
   'web-search-deepseek',
   'ui-onboarding',
+  'agent-presets',
   'settings',
   'oh-dsh-vision',
 ]
