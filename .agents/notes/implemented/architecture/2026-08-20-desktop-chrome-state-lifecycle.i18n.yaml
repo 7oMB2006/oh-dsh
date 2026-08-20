@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-20-desktop-chrome-state-lifecycle.md
-2026-08-20-desktop-chrome-state-lifecycle.md: 7a58c16999eff3e844b315d7a6c3f262d896eda4
-2026-08-20-desktop-chrome-state-lifecycle.zh.md: b6aa869e3ad76191010a4bf3158164750c2a1c10
+2026-08-20-desktop-chrome-state-lifecycle.md: 88b971006e76a0282866958e7b8a12fbe86707d6
+2026-08-20-desktop-chrome-state-lifecycle.zh.md: 1c126ee17ae91f7892a2e70c2c27fc4c90b4be6e
