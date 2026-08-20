@@ -24,8 +24,13 @@ Status: implemented
   （update/replace/mutate）对其他命名空间一律以 `settings-not-exposed`
   拒绝。白名单为 WEB_SETTINGS_NAMESPACES（agent-loop、shell、locale、
   permission、ui-conversation、ui-theme、web-search-deepseek）、
-  PRODUCT_SETTINGS_NAMESPACES（ui-onboarding、settings）以及
-  oh-dsh-vision，与 rc.6 的 exposedNamespaces() 并集一致。这让
+  PRODUCT_SETTINGS_NAMESPACES（ui-onboarding、agent-presets、settings）
+  以及 oh-dsh-vision。`agent-presets` 最初因 rc.6 并集没有它而被遗漏；
+  固定的 rc.7 client 通过该命名空间写入默认 agent preset（ui-agent-preset
+  的 writeDefaultPreset），导致每次默认模式切换都以 `settings-not-exposed`
+  被拒——该错误码不在 rc.7 wire schema 声明之内，client 的响应解析因此
+  崩溃，界面直接展示原始 Zod issue 转储而非错误消息。白名单现已包含它，
+  tests/settings-boundary.test.ts 也在补丁输出中固定了该命名空间。这让
   [2026-07-30-config-plane-boundaries.md](../architecture/2026-07-30-config-plane-boundaries.md)、
   [2026-08-10-web-plugin-configuration.md](../feature/2026-08-10-web-plugin-configuration.md)
   与
