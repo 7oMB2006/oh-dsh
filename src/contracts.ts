@@ -69,6 +69,11 @@ export interface DesktopUpdateBridge {
   command(command: DesktopUpdateCommand): Promise<DesktopUpdateState>
 }
 
+/** Current native window state delivered to the renderer. */
+export interface DesktopWindowState {
+  maximized: boolean
+}
+
 export interface DesktopBridge {
   platform: NodeJS.Platform
   closeWindow(): Promise<void>
@@ -82,6 +87,8 @@ export interface DesktopBridge {
   /** Apply the renderer's active locale and return refreshed top-level labels. */
   setMenuLocale(locale: 'en' | 'zh'): Promise<string[]>
   onCommand(listener: (command: DesktopCommand) => void): () => void
+  /** Subscribe to native maximize and restore events. */
+  onWindowState(listener: (state: DesktopWindowState) => void): () => void
   openExternal(url: string): Promise<void>
   pluginMarketplace: PluginMarketplaceBridge
   /**

@@ -391,8 +391,7 @@ function installMenuBar(
   const minimize = addAction('minimize', t('window.minimize'), () => { void bridge.minimizeWindow() })
   const maximize = addAction('maximize', t('window.maximize'), () => {
     void bridge.toggleMaximizeWindow().then(value => {
-      maximize.dataset.maximized = String(value)
-      updateWindowActionLabels()
+      updateMaximizedState(value)
     })
   })
   const close = addAction('close', t('window.close'), () => { void bridge.closeWindow() })
@@ -405,10 +404,20 @@ function installMenuBar(
     close.title = t('window.close')
     close.setAttribute('aria-label', t('window.close'))
   }
-  updateWindowActionLabels()
-  void bridge.isWindowMaximized().then(value => {
+  let windowStateVersion = 0
+  const updateMaximizedState = (value: boolean): void => {
     maximize.dataset.maximized = String(value)
     updateWindowActionLabels()
+  }
+  const unsubscribeWindowState = bridge.onWindowState(state => {
+    windowStateVersion += 1
+    updateMaximizedState(state.maximized)
+  })
+  const initialWindowStateVersion = windowStateVersion
+  updateWindowActionLabels()
+  void bridge.isWindowMaximized().then(value => {
+    if (windowStateVersion !== initialWindowStateVersion) return
+    updateMaximizedState(value)
   })
   bar.addEventListener('dblclick', event => {
     if (event.target instanceof HTMLButtonElement) return
@@ -478,6 +487,7 @@ function installMenuBar(
   const unsubscribeLocale = locale.subscribe(refreshMenuBar)
   refreshMenuBar()
   return () => {
+    unsubscribeWindowState()
     unsubscribeLocale()
     bar.remove()
   }

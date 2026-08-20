@@ -50,6 +50,7 @@ test('desktop win32 menu bar renders in the merged row but pops the native menu'
   assert.match(preload, /desktop:menu-bar-popup/)
   assert.match(preload, /desktop:window-close/)
   assert.match(preload, /desktop:window-toggle-maximize/)
+  assert.match(preload, /desktop:window-state/)
 
   // The main process serves labels and pops the built application menu's own
   // submenus — no second menu definition beside buildMenu().
@@ -57,6 +58,9 @@ test('desktop win32 menu bar renders in the merged row but pops the native menu'
   assert.match(main, /Menu\.setApplicationMenu\(applicationMenu\)/)
   assert.match(main, /'desktop:menu-bar-labels'/)
   assert.match(main, /'desktop:set-menu-locale'/)
+  assert.match(main, /'desktop:window-state'/)
+  assert.match(main, /window\.on\('maximize', sendWindowState\)/)
+  assert.match(main, /window\.on\('unmaximize', sendWindowState\)/)
   assert.match(main, /buildMenu\(raw\)/)
   assert.match(main, /file: '文件'/)
   assert.match(main, /file: 'File'/)
@@ -72,6 +76,8 @@ test('desktop win32 menu bar renders in the merged row but pops the native menu'
   assert.match(client, /if \(!includeMenu\) return/)
   assert.match(client, /setMenuLocale\(locale\.getSnapshot\(\)\.active\)/)
   assert.match(client, /const unsubscribeLocale = locale\.subscribe\(refreshMenuBar\)/)
+  assert.match(client, /const unsubscribeWindowState = bridge\.onWindowState\(/)
+  assert.match(client, /unsubscribeWindowState\(\)/)
   assert.match(client, /\.oh-dsh-menubar \{[\s\S]*?-webkit-app-region: no-drag;/)
   assert.match(client, /\.oh-dsh-menubar::before \{[\s\S]*?right: 270px[\s\S]*?-webkit-app-region: drag;/)
   assert.match(client, /\.oh-dsh-menubar button \{[\s\S]*?-webkit-app-region: no-drag;/)

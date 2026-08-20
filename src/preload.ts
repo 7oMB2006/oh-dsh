@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot } from './contracts.ts'
+import type { DesktopBridge, DesktopCommand, DesktopInfo, DesktopRuntimeSnapshot, DesktopWindowState } from './contracts.ts'
 import type { MarketplaceCommand, MarketplaceSnapshot } from '../plugins/plugin-marketplace/src/protocol.ts'
 
 const bridge: DesktopBridge = Object.freeze({
@@ -26,6 +26,11 @@ const bridge: DesktopBridge = Object.freeze({
     const wrapped = (_event: Electron.IpcRendererEvent, command: DesktopCommand): void => { listener(command) }
     ipcRenderer.on('desktop:command', wrapped)
     return () => { ipcRenderer.removeListener('desktop:command', wrapped) }
+  },
+  onWindowState: (listener: (state: DesktopWindowState) => void): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: DesktopWindowState): void => { listener(state) }
+    ipcRenderer.on('desktop:window-state', wrapped)
+    return () => { ipcRenderer.removeListener('desktop:window-state', wrapped) }
   },
   openExternal: async (url: string): Promise<void> => {
     await ipcRenderer.invoke('desktop:open-external', url)

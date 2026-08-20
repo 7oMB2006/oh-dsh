@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('dshDesktop', Object.freeze({
     status: 'ready',
   }),
   onCommand: () => () => {},
+  onWindowState: () => () => {},
   openExternal: async () => {},
   pluginMarketplace: Object.freeze({
     dispatch: async () => emptyMarketplaceSnapshot,

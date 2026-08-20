@@ -176,28 +176,32 @@ function DragHandle(props: {
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
+  const activePointerId = useRef<number | null>(null)
   const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd })
   callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd }
   const [dragging, setDragging] = useState(false)
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
+    activePointerId.current = event.pointerId
     origin.current = event.clientX
     latest.current = event.clientX
     callbacks.current.onStart()
     setDragging(true)
   }, [])
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    if (event.pointerId !== activePointerId.current || !event.currentTarget.hasPointerCapture(event.pointerId)) return
     latest.current = event.clientX
     frame.current ??= requestAnimationFrame(() => {
       frame.current = null
       callbacks.current.onDrag(latest.current - origin.current)
     })
   }, [])
-  const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-    event.currentTarget.releasePointerCapture(event.pointerId)
+  const endDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>): void => {
+    const pointerId = activePointerId.current
+    if (pointerId === null || event.pointerId !== pointerId) return
+    activePointerId.current = null
+    if (event.currentTarget.hasPointerCapture(pointerId)) event.currentTarget.releasePointerCapture(pointerId)
     if (frame.current !== null) cancelAnimationFrame(frame.current)
     frame.current = null
     callbacks.current.onDrag(latest.current - origin.current)
@@ -212,7 +216,9 @@ function DragHandle(props: {
       style={{ left: props.left }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
     />
   )
 }

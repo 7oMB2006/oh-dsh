@@ -35,6 +35,7 @@ import {
   type DesktopInfo,
   type DesktopRuntimeSnapshot,
   type DesktopUpdateCommand,
+  type DesktopWindowState,
   type DesktopUpdateState,
 } from './contracts.ts'
 import type { OhDshLocale } from '../plugins/shared/i18n.ts'
@@ -312,6 +313,11 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
   })
   window.webContents.setZoomFactor(DEFAULT_UI_ZOOM_FACTOR)
   window.once('ready-to-show', () => { window.show() })
+  const sendWindowState = (): void => {
+    window.webContents.send('desktop:window-state', { maximized: window.isMaximized() } satisfies DesktopWindowState)
+  }
+  window.on('maximize', sendWindowState)
+  window.on('unmaximize', sendWindowState)
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
     if (previewWindow === window) {
