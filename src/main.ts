@@ -448,6 +448,9 @@ async function openUpdateWindow(): Promise<void> {
     minHeight: 480,
     ...(mainWindow !== undefined && !mainWindow.isDestroyed() ? { parent: mainWindow } : {}),
     modal: false,
+    // Keep this child window out of macOS fullscreen spaces: closing it while the
+    // parent is fullscreen can trigger an AppKit crash (#119).
+    fullscreenable: false,
     show: false,
     title: 'Software updates',
     webPreferences: {
