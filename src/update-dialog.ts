@@ -17,6 +17,7 @@ const progress = document.querySelector<HTMLElement>('[data-field="progress"]')!
 const progressText = document.querySelector<HTMLElement>('[data-field="progress-text"]')!
 const error = document.querySelector<HTMLElement>('[data-field="error"]')!
 const errorIllustration = document.querySelector<HTMLElement>('[data-field="error-illustration"]')!
+const brandIcon = document.querySelector<HTMLImageElement>('[data-field="brand-icon"]')!
 const updateButton = document.querySelector<HTMLButtonElement>('[data-action="download"]')!
 const cancelButton = document.querySelector<HTMLButtonElement>('[data-action="cancel"]')!
 const retryButton = document.querySelector<HTMLButtonElement>('[data-action="retry"]')!
@@ -24,6 +25,7 @@ const installNowButton = document.querySelector<HTMLButtonElement>('[data-action
 const installQuitButton = document.querySelector<HTMLButtonElement>('[data-action="install-on-quit"]')!
 const releaseButton = document.querySelector<HTMLButtonElement>('[data-action="open-release"]')!
 const checkButton = document.querySelector<HTMLButtonElement>('[data-action="check"]')!
+let currentStatus: DesktopUpdateState['status'] = 'idle'
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null || !Number.isFinite(bytes)) return 'Unknown size'
@@ -59,9 +61,10 @@ function setButton(button: HTMLButtonElement, visible: boolean, enabled = visibl
 }
 
 function render(state: DesktopUpdateState): void {
+  currentStatus = state.status
   error.textContent = ''
   setVisible(error, false)
-  setVisible(errorIllustration, state.status === 'error')
+  setVisible(errorIllustration, state.status === 'error' && brandIcon.src !== '')
   setVisible(notes, state.status === 'available' || state.status === 'downloaded')
   setVisible(progressWrap, state.status === 'downloading')
   setButton(checkButton, state.status === 'idle' || state.status === 'not-available' || state.status === 'cancelled' || state.status === 'unsupported' || (state.status === 'error' && state.retryable !== true))
@@ -156,6 +159,11 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]
 }
 
 bridge.onState(render)
+void bridge.brandIconDataUrl().then(icon => {
+  if (icon === null) return
+  brandIcon.src = icon
+  setVisible(errorIllustration, currentStatus === 'error')
+}).catch(() => {})
 void bridge.getState().then(render).catch(cause => {
   error.textContent = cause instanceof Error ? cause.message : String(cause)
   setVisible(error, true)

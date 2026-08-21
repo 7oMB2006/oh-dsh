@@ -64,6 +64,7 @@ export type DesktopUpdateCommand =
   | { type: 'open-release' }
 
 export interface DesktopUpdateBridge {
+  brandIconDataUrl(): Promise<string | null>
   getState(): Promise<DesktopUpdateState>
   onState(listener: (state: DesktopUpdateState) => void): () => void
   command(command: DesktopUpdateCommand): Promise<DesktopUpdateState>
