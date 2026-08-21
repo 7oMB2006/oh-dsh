@@ -175,3 +175,28 @@ test('manager turns proxy authentication into a redacted actionable error', () =
     assert.doesNotMatch(state.message, /password|token/i)
   }
 })
+
+test('manager explains Chromium proxy connection failures and offers a manual fallback', async () => {
+  const updater = new FakeUpdater()
+  const opened: string[] = []
+  updater.checkForUpdates = async () => { throw new Error('net::ERR_PROXY_CONNECTION_FAILED') }
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    onOpenRelease: url => { opened.push(url) },
+  })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'error')
+  if (state.status === 'error') {
+    assert.equal(state.code, 'ERR_PROXY_CONNECTION_FAILED')
+    assert.equal(state.message, 'Could not connect to the configured proxy. Check your system proxy settings, then try again.')
+    assert.equal(state.retryable, true)
+    assert.equal(state.releaseUrl, 'https://github.com/hust-open-atom-club/oh-dsh/releases')
+  }
+
+  await manager.openRelease()
+  assert.deepEqual(opened, ['https://github.com/hust-open-atom-club/oh-dsh/releases'])
+})

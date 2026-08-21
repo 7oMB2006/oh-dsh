@@ -62,7 +62,7 @@ function render(state: DesktopUpdateState): void {
   setVisible(error, false)
   setVisible(notes, state.status === 'available' || state.status === 'downloaded')
   setVisible(progressWrap, state.status === 'downloading')
-  setButton(checkButton, state.status === 'idle' || state.status === 'not-available' || state.status === 'cancelled' || state.status === 'unsupported' || state.status === 'error')
+  setButton(checkButton, state.status === 'idle' || state.status === 'not-available' || state.status === 'cancelled' || state.status === 'unsupported' || (state.status === 'error' && state.retryable !== true))
   setButton(updateButton, state.status === 'available')
   setButton(cancelButton, state.status === 'downloading')
   setButton(retryButton, state.status === 'error' && state.retryable === true)
@@ -132,7 +132,7 @@ function render(state: DesktopUpdateState): void {
       title.textContent = 'Update could not be completed'
       status.textContent = state.message
       version.textContent = `Current version: ${state.currentVersion}`
-      error.textContent = `${state.stage} (${state.code})`
+      error.textContent = `Error code: ${state.code}`
       setVisible(error, true)
       break
   }
