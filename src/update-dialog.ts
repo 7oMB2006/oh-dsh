@@ -16,6 +16,7 @@ const progressWrap = document.querySelector<HTMLElement>('[data-field="progress-
 const progress = document.querySelector<HTMLElement>('[data-field="progress"]')!
 const progressText = document.querySelector<HTMLElement>('[data-field="progress-text"]')!
 const error = document.querySelector<HTMLElement>('[data-field="error"]')!
+const errorIllustration = document.querySelector<HTMLElement>('[data-field="error-illustration"]')!
 const updateButton = document.querySelector<HTMLButtonElement>('[data-action="download"]')!
 const cancelButton = document.querySelector<HTMLButtonElement>('[data-action="cancel"]')!
 const retryButton = document.querySelector<HTMLButtonElement>('[data-action="retry"]')!
@@ -60,6 +61,7 @@ function setButton(button: HTMLButtonElement, visible: boolean, enabled = visibl
 function render(state: DesktopUpdateState): void {
   error.textContent = ''
   setVisible(error, false)
+  setVisible(errorIllustration, state.status === 'error')
   setVisible(notes, state.status === 'available' || state.status === 'downloaded')
   setVisible(progressWrap, state.status === 'downloading')
   setButton(checkButton, state.status === 'idle' || state.status === 'not-available' || state.status === 'cancelled' || state.status === 'unsupported' || (state.status === 'error' && state.retryable !== true))
