@@ -35,7 +35,7 @@
     "client": {
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-ui-layout",
+        "@oh-dsh/desktop-frame",
         "@oh-dsh/panel-controls",
         "@oh-dsh/pinned-summary",
         "@oh-dsh/sidebar",
@@ -139,6 +139,10 @@
       {
         "from": "assets/icons/512x512.png",
         "to": "oh-dsh-desktop.png"
+      },
+      {
+        "from": "assets/dsh-whale.png",
+        "to": "dsh-whale.png"
       },
       {
         "from": "dist/ohdsh.js",

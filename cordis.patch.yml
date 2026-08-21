@@ -13,7 +13,13 @@
     surfaceContext: false
     trustedHosts: []
 
+- id: ui-layout
+  disabled: true
+
 - insert:
+    - id: oh-desktop-frame
+      name: '@oh-dsh/desktop-frame'
+
     - id: oh-desktop
       name: '@oh-dsh/desktop'
 

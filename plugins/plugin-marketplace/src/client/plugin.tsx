@@ -169,23 +169,36 @@ function persistOpen(open: boolean): void {
   try { localStorage.setItem(OPEN_KEY, String(open)) } catch { /* best effort */ }
 }
 
-function settingsButton(): HTMLButtonElement | null {
-  const visible = (button: HTMLButtonElement): boolean => {
+function settingsButton(measure = true): HTMLButtonElement | null {
+  const sidebar = document.querySelector<HTMLElement>('[data-slot="sidebar"]')
+  const candidates = sidebar === null
+    ? [...document.querySelectorAll<HTMLButtonElement>('button')]
+      .filter(button => button.closest('#oh-dsh-plugin-marketplace-root') === null)
+    : [...sidebar.querySelectorAll<HTMLButtonElement>('button')]
+  const rects = new WeakMap<HTMLButtonElement, DOMRect>()
+  const rectFor = (button: HTMLButtonElement): DOMRect => {
+    const cached = rects.get(button)
+    if (cached !== undefined) return cached
     const rect = button.getBoundingClientRect()
+    rects.set(button, rect)
+    return rect
+  }
+  const visible = (button: HTMLButtonElement): boolean => {
+    if (!measure) return true
+    const rect = rectFor(button)
     return rect.width > 0 && rect.height > 0
   }
   const byBottom = (left: HTMLButtonElement, right: HTMLButtonElement): number =>
-    right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom
+    measure ? rectFor(right).bottom - rectFor(left).bottom : 0
   // rc.5 wraps the trigger content in a stable slot marker; the rail trigger
   // is the one inside the sidebar (the open settings panel may render a copy).
-  const slotted = [...document.querySelectorAll<HTMLButtonElement>('button')]
+  const slotted = candidates
     .find(button => button.querySelector('[data-slot="settings.trigger"]') !== null
       && button.closest('[data-slot="sidebar"]') !== null
       && visible(button))
   if (slotted !== undefined) return slotted
-  const labeled = [...document.querySelectorAll<HTMLButtonElement>('button')]
+  const labeled = candidates
     .filter(button => {
-      if (button.closest('#oh-dsh-plugin-marketplace-root') !== null) return false
       if (!visible(button)) return false
       const label = [
         button.textContent,
@@ -197,8 +210,8 @@ function settingsButton(): HTMLButtonElement | null {
   if (labeled.length > 0) return labeled.sort(byBottom)[0] ?? null
   // rc.5's collapsed rail renders the settings trigger as an icon-only
   // dialog-opener at the rail foot, with no accessible settings label.
-  const railTriggers = [...document.querySelectorAll<HTMLButtonElement>('button[aria-haspopup="dialog"]')]
-    .filter(button => button.closest('[data-slot="sidebar"]') !== null && visible(button))
+  const railTriggers = candidates
+    .filter(button => button.getAttribute('aria-haspopup') === 'dialog' && visible(button))
   return railTriggers.sort(byBottom)[0] ?? null
 }
 
@@ -347,6 +360,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     this.#state = { ...this.#state, open }
     persistOpen(open)
     this.applyOpenState()
+    if (open) this.scheduleGeometry()
     for (const listener of this.#listeners) listener()
   }
 
@@ -376,6 +390,7 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     for (const listener of this.#listeners) listener()
 
     this.#observer = new MutationObserver(() => {
+      this.synchronizeFooterStack()
       if (this.#state.open && settingsDialogOpen()) this.setOpen(false)
       this.scheduleGeometry()
     })
@@ -422,22 +437,19 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
   }
 
   private scheduleGeometry(): void {
+    if (!this.#state.open) return
     if (this.#geometryFrame !== null) return
     this.#geometryFrame = requestAnimationFrame(() => {
       this.#geometryFrame = null
+      if (!this.#state.open) return
       this.synchronizeGeometry()
     })
   }
 
   private synchronizeGeometry(): void {
     const declared = document.querySelector<HTMLElement>('[data-slot="sidebar"]')
+    this.synchronizeFooterStack()
     const settings = settingsButton()
-    const footerStack = settings === null ? null : marketplaceFooter(settings)
-    if (footerStack !== this.#footerStack) {
-      this.#footerStack?.removeAttribute(FOOTER_STACK_ATTRIBUTE)
-      footerStack?.setAttribute(FOOTER_STACK_ATTRIBUTE, 'true')
-      this.#footerStack = footerStack
-    }
     const sidebar = declared ?? (settings === null ? null : sidebarFor(settings))
     if (sidebar === null) {
       document.documentElement.style.setProperty('--oh-marketplace-left', '0px')
@@ -449,6 +461,15 @@ class PluginMarketplaceViewService implements PluginMarketplaceView {
     const rect = box.getBoundingClientRect()
     const left = rect.right > 0 && rect.right < window.innerWidth * 0.55 ? rect.right : 0
     document.documentElement.style.setProperty('--oh-marketplace-left', `${String(Math.round(left))}px`)
+  }
+
+  private synchronizeFooterStack(): void {
+    const settings = settingsButton(false)
+    const footerStack = settings === null ? null : marketplaceFooter(settings)
+    if (footerStack === this.#footerStack) return
+    this.#footerStack?.removeAttribute(FOOTER_STACK_ATTRIBUTE)
+    footerStack?.setAttribute(FOOTER_STACK_ATTRIBUTE, 'true')
+    this.#footerStack = footerStack
   }
 }
 

@@ -8,10 +8,11 @@ import {
   nativeTheme,
   session,
   shell,
+  type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import { createWriteStream, existsSync, mkdirSync, statSync, type WriteStream } from 'node:fs'
+import { createWriteStream, existsSync, mkdirSync, readFileSync, statSync, type WriteStream } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,13 +31,14 @@ import {
 } from '../plugins/plugin-marketplace/src/host/platform.ts'
 import { parseMarketplaceCommand } from '../plugins/plugin-marketplace/src/protocol.ts'
 import {
-  DESKTOP_TITLEBAR_HEIGHT,
   type DesktopCommand,
   type DesktopInfo,
   type DesktopRuntimeSnapshot,
   type DesktopUpdateCommand,
+  type DesktopWindowState,
   type DesktopUpdateState,
 } from './contracts.ts'
+import type { OhDshLocale } from '../plugins/shared/i18n.ts'
 import {
   desktopElectronDataRoot,
   migrateLegacyDesktopState,
@@ -276,16 +278,12 @@ function windowIconPath(): string | undefined {
   return existsSync(development) ? development : undefined
 }
 
-function titleBarOverlayOptions(): { color: string; height: number; symbolColor: string } {
-  const dark = nativeTheme.shouldUseDarkColors
-  // The overlay declares its height in device-independent pixels, while the
-  // client strip measures CSS pixels under the default zoom factor; rounding
-  // up keeps the caption buttons inside the strip at any zoom.
-  return {
-    color: dark ? '#202020' : '#f7f7f5',
-    height: Math.ceil(DESKTOP_TITLEBAR_HEIGHT * DEFAULT_UI_ZOOM_FACTOR),
-    symbolColor: dark ? '#f0f0ee' : '#3d3d3b',
-  }
+function brandIconDataUrl(): string | null {
+  const packaged = join(process.resourcesPath, 'dsh-whale.png')
+  const development = join(currentDir, '..', 'assets', 'dsh-whale.png')
+  const path = existsSync(packaged) ? packaged : development
+  if (!existsSync(path)) return null
+  return `data:image/png;base64,${readFileSync(path).toString('base64')}`
 }
 
 function createWindow(options: { preview?: boolean; title?: string } = {}): BrowserWindow {
@@ -300,14 +298,7 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
     ...(process.platform === 'darwin'
       ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 16 } }
       : process.platform === 'win32'
-        ? {
-          // Merge the native menu-bar and title-bar rows into the in-page
-          // titlebar strip: the Window Controls Overlay keeps native caption
-          // buttons and snap layouts while the strip owns the single row.
-          autoHideMenuBar: true,
-          titleBarStyle: 'hidden' as const,
-          titleBarOverlay: titleBarOverlayOptions(),
-        }
+        ? { autoHideMenuBar: true, frame: false }
         : {}),
     ...(icon === undefined ? {} : { icon }),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#202020' : '#f7f7f5',
@@ -322,6 +313,11 @@ function createWindow(options: { preview?: boolean; title?: string } = {}): Brow
   })
   window.webContents.setZoomFactor(DEFAULT_UI_ZOOM_FACTOR)
   window.once('ready-to-show', () => { window.show() })
+  const sendWindowState = (): void => {
+    window.webContents.send('desktop:window-state', { maximized: window.isMaximized() } satisfies DesktopWindowState)
+  }
+  window.on('maximize', sendWindowState)
+  window.on('unmaximize', sendWindowState)
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = undefined
     if (previewWindow === window) {
@@ -711,49 +707,103 @@ function createPluginMarketplace(): PluginMarketplaceManager | undefined {
   })
 }
 
-function labels() {
-  const zh = app.getLocale().toLowerCase().startsWith('zh')
+function systemLocale(): OhDshLocale {
+  return app.getLocale().toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
+let menuLocale: OhDshLocale = 'en'
+
+function labels(locale: OhDshLocale) {
+  const zh = locale === 'zh'
   return zh ? {
+    about: '关于 Oh-DSH Desktop',
     checkUpdates: '检查更新…',
+    close: '关闭窗口',
+    copy: '复制',
+    copyDiagnostics: '复制诊断信息',
     dsh: 'DSH',
+    edit: '编辑',
+    file: '文件',
     focus: '聚焦输入框',
+    forceReload: '强制重新加载',
     installPlugin: '从文件夹安装插件…',
+    maximize: '最大化',
+    minimize: '最小化',
     newChat: '新建会话',
     openData: '打开 DSH 数据目录',
     openLogs: '打开日志目录',
     openPluginProfile: '打开插件配置目录',
     openWorkspace: '打开工作区…',
     restart: '重新启动 DSH Runtime',
+    redo: '重做',
+    reload: '重新加载',
+    resetZoom: '重置缩放',
     settings: '设置…',
+    selectAll: '全选',
     toggleBottomPanel: '切换底部面板',
+    toggleDevTools: '切换开发者工具',
+    toggleFullscreen: '切换全屏',
     togglePanelMaximized: '展开或还原工具侧栏',
     togglePinnedSummary: '切换置顶摘要',
     toggleSidePanel: '切换工具侧栏',
     toggleWorkspacePanel: '切换工作区面板',
     toggleSidebar: '切换侧栏',
+    undo: '撤销',
+    view: '视图',
+    window: '窗口',
+    zoomIn: '放大',
+    zoomOut: '缩小',
+    paste: '粘贴',
+    pasteAndMatchStyle: '粘贴并匹配样式',
+    cut: '剪切',
+    quit: '退出 Oh-DSH Desktop',
     browser: '浏览器',
     files: '文件',
     review: '审查',
     sideChat: '侧边会话',
     trajectory: '轨迹',
   } : {
+    about: 'About Oh-DSH Desktop',
     checkUpdates: 'Check for Updates...',
+    close: 'Close Window',
+    copy: 'Copy',
+    copyDiagnostics: 'Copy Diagnostics',
     dsh: 'DSH',
+    edit: 'Edit',
+    file: 'File',
     focus: 'Focus Composer',
+    forceReload: 'Force Reload',
     installPlugin: 'Install Plugin from Folder…',
+    maximize: 'Maximize',
+    minimize: 'Minimize',
     newChat: 'New Chat',
     openData: 'Open DSH Data Folder',
     openLogs: 'Open Logs Folder',
     openPluginProfile: 'Open Plugin Profile Folder',
     openWorkspace: 'Open Workspace…',
     restart: 'Restart DSH Runtime',
+    redo: 'Redo',
+    reload: 'Reload',
+    resetZoom: 'Reset Zoom',
     settings: 'Settings…',
+    selectAll: 'Select All',
     toggleBottomPanel: 'Toggle Bottom Panel',
+    toggleDevTools: 'Toggle Developer Tools',
+    toggleFullscreen: 'Toggle Full Screen',
     togglePanelMaximized: 'Expand or Restore Side Panel',
     togglePinnedSummary: 'Toggle Pinned Summary',
     toggleSidePanel: 'Toggle Side Panel',
     toggleWorkspacePanel: 'Toggle Workspace Panel',
     toggleSidebar: 'Toggle Sidebar',
+    undo: 'Undo',
+    view: 'View',
+    window: 'Window',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    paste: 'Paste',
+    pasteAndMatchStyle: 'Paste and Match Style',
+    cut: 'Cut',
+    quit: 'Quit Oh-DSH Desktop',
     browser: 'Browser',
     files: 'Files',
     review: 'Review',
@@ -762,8 +812,9 @@ function labels() {
   }
 }
 
-function buildMenu(): void {
-  const text = labels()
+function buildMenu(locale: OhDshLocale = menuLocale): void {
+  menuLocale = locale
+  const text = labels(locale)
   const info = desktopInfo()
   const profile = desktopReadOnly === false || !existsSync(join(info.dshHome, 'profiles', DESKTOP_PROFILE))
     ? ensureDesktopProfile(info.dshHome)
@@ -772,7 +823,7 @@ function buildMenu(): void {
     {
       label: PRODUCT_NAME,
       submenu: [
-        { role: 'about' },
+        { role: 'about', label: text.about },
         { type: 'separator' },
         { label: text.checkUpdates, click: () => { void openUpdateWindow() } },
         { type: 'separator' },
@@ -788,21 +839,34 @@ function buildMenu(): void {
           ]
           : []),
         { type: 'separator' },
-        { role: 'quit' },
+        { role: 'quit', label: text.quit },
       ],
     },
     {
-      label: 'File',
+      label: text.file,
       submenu: [
         { label: text.newChat, accelerator: 'CmdOrCtrl+N', click: () => { sendCommand({ type: 'new-session' }) } },
         { label: text.openWorkspace, accelerator: 'CmdOrCtrl+O', click: () => { void chooseWorkspace() } },
         { type: 'separator' },
-        { role: 'close' },
+        { role: 'close', label: text.close },
       ],
     },
-    { role: 'editMenu' },
     {
-      label: 'View',
+      label: text.edit,
+      submenu: [
+        { role: 'undo', label: text.undo },
+        { role: 'redo', label: text.redo },
+        { type: 'separator' },
+        { role: 'cut', label: text.cut },
+        { role: 'copy', label: text.copy },
+        { role: 'paste', label: text.paste },
+        { role: 'pasteAndMatchStyle', label: text.pasteAndMatchStyle },
+        { type: 'separator' },
+        { role: 'selectAll', label: text.selectAll },
+      ],
+    },
+    {
+      label: text.view,
       submenu: [
         { label: text.toggleSidebar, accelerator: 'CmdOrCtrl+B', click: () => { sendCommand({ type: 'toggle-sidebar' }) } },
         { label: text.togglePanelMaximized, click: () => { sendCommand({ type: 'toggle-panel-maximized' }) } },
@@ -819,15 +883,15 @@ function buildMenu(): void {
         { type: 'separator' },
         { label: text.focus, accelerator: 'CmdOrCtrl+L', click: () => { sendCommand({ type: 'focus-composer' }) } },
         { type: 'separator' },
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        { role: 'reload', label: text.reload },
+        { role: 'forceReload', label: text.forceReload },
+        { role: 'toggleDevTools', label: text.toggleDevTools },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        { role: 'resetZoom', label: text.resetZoom },
+        { role: 'zoomIn', label: text.zoomIn },
+        { role: 'zoomOut', label: text.zoomOut },
         { type: 'separator' },
-        { role: 'togglefullscreen' },
+        { role: 'togglefullscreen', label: text.toggleFullscreen },
       ],
     },
     {
@@ -842,7 +906,7 @@ function buildMenu(): void {
         { label: text.openLogs, click: () => { void shell.openPath(join(info.appDataPath, 'logs')) } },
         { type: 'separator' },
         {
-          label: 'Copy Diagnostics',
+          label: text.copyDiagnostics,
           click: () => {
             clipboard.writeText([
               `${PRODUCT_NAME} ${info.version}`,
@@ -856,7 +920,7 @@ function buildMenu(): void {
         },
       ],
     },
-    { role: 'windowMenu' },
+    { role: 'windowMenu', label: text.window },
   ]
   applicationMenu = Menu.buildFromTemplate(template)
   Menu.setApplicationMenu(applicationMenu)
@@ -865,10 +929,39 @@ function buildMenu(): void {
 /** The native application menu, popped up by the in-page Windows menu bar. */
 let applicationMenu: Menu | undefined
 
+function windowForSender(event: IpcMainInvokeEvent): BrowserWindow | undefined {
+  if (mainWindow?.webContents === event.sender) return mainWindow
+  if (previewWindow?.webContents === event.sender) return previewWindow
+  return undefined
+}
+
 function installIpc(): void {
   ipcMain.handle('desktop:choose-workspace', async () => await selectWorkspacePaths())
+  ipcMain.handle('desktop:brand-icon', () => brandIconDataUrl())
+  ipcMain.handle('desktop:window-close', event => {
+    windowForSender(event)?.close()
+  })
+  ipcMain.handle('desktop:window-minimize', event => {
+    windowForSender(event)?.minimize()
+  })
+  ipcMain.handle('desktop:window-is-maximized', event => {
+    return windowForSender(event)?.isMaximized() ?? false
+  })
+  ipcMain.handle('desktop:window-toggle-maximize', event => {
+    const window = windowForSender(event)
+    if (window === undefined) return false
+    if (window.isMaximized()) window.unmaximize()
+    else window.maximize()
+    return window.isMaximized()
+  })
   ipcMain.handle('desktop:menu-bar-labels', event => {
     if (event.sender !== mainWindow?.webContents) return []
+    return applicationMenu?.items.map(item => item.label) ?? []
+  })
+  ipcMain.handle('desktop:set-menu-locale', (event, raw: unknown) => {
+    if (event.sender !== mainWindow?.webContents) return []
+    if (raw !== 'en' && raw !== 'zh') throw new Error('desktop menu locale must be en or zh')
+    buildMenu(raw)
     return applicationMenu?.items.map(item => item.label) ?? []
   })
   ipcMain.handle('desktop:menu-bar-popup', (event, index: unknown, cssX: unknown, cssY: unknown) => {
@@ -985,17 +1078,6 @@ async function bootstrap(): Promise<void> {
     if (app.isReady()) flushQueuedPaths()
   })
   await app.whenReady()
-  nativeTheme.on('updated', () => {
-    if (process.platform !== 'win32') return
-    for (const window of [mainWindow, previewWindow]) {
-      if (window === undefined || window.isDestroyed()) continue
-      try {
-        window.setTitleBarOverlay(titleBarOverlayOptions())
-      } catch {
-        // Not a window-controls-overlay window (splash/update); nothing to recolor.
-      }
-    }
-  })
 
   const info = desktopInfo()
   const logsDir = join(info.appDataPath, 'logs')
@@ -1036,7 +1118,7 @@ async function bootstrap(): Promise<void> {
   const browserSession = session.fromPartition('persist:oh-dsh-browser')
   browserSession.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
   browserSession.setPermissionCheckHandler(() => false)
-  buildMenu()
+  buildMenu(systemLocale())
   mainWindow = createWindow()
   await showSplash()
   const initialArguments = process.argv.slice(app.isPackaged ? 1 : 2)

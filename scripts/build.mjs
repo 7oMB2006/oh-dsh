@@ -27,6 +27,7 @@ const pluginPackages = [
   },
   { directory: 'tui', hostOnly: true },
   { directory: 'tui-marketplace', hostOnly: true },
+  { directory: 'desktop-frame', id: '@oh-dsh/desktop-frame' },
   { directory: 'skins', id: '@oh-dsh/skins' },
   { directory: 'sidebar', id: '@oh-dsh/sidebar' },
   { directory: 'panel-controls', id: '@oh-dsh/panel-controls' },
@@ -172,7 +173,7 @@ for (const plugin of pluginPackages) {
         'react',
         'react-dom/client',
         'react/jsx-runtime',
-        ...(['skins', 'sidebar'].includes(plugin.directory)
+        ...(['skins', 'sidebar', 'desktop-frame'].includes(plugin.directory)
           ? ['@deepseek-ai/dsh-client-runtime/client']
           : []),
       ],

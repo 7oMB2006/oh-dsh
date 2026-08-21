@@ -911,6 +911,7 @@ function installDesktopPackages() {
       ],
     },
     ...[
+      'desktop-frame',
       'skins',
       'sidebar',
       'panel-controls',
@@ -1091,6 +1092,9 @@ for (const required of [
   'web/client.js.map',
   'web/cordis.patch.yml',
   'plugins/better-sidebar-runtime/index.js',
+  'plugins/desktop-frame/index.js',
+  'plugins/desktop-frame/client.js',
+  'plugins/desktop-frame/client.js.map',
   'plugins/vision/index.js',
   'plugins/vision/client.js',
   'plugins/vision/client.js.map',
