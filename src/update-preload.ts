@@ -20,6 +20,7 @@ function isCommand(value: unknown): value is DesktopUpdateCommand {
 }
 
 const bridge: DesktopUpdateBridge = Object.freeze({
+  brandIconDataUrl: async (): Promise<string | null> => await ipcRenderer.invoke('desktop:brand-icon') as string | null,
   getState: async (): Promise<DesktopUpdateState> => await ipcRenderer.invoke('desktop:update:get-state') as DesktopUpdateState,
   command: async (command: DesktopUpdateCommand): Promise<DesktopUpdateState> => {
     if (!isCommand(command)) throw new Error('unsupported update command')

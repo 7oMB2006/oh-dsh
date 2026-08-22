@@ -8,6 +8,7 @@ import type {
 } from './contracts.ts'
 
 const OFFICIAL_REPOSITORY = 'hust-open-atom-club/oh-dsh'
+const OFFICIAL_RELEASES_URL = `https://github.com/${OFFICIAL_REPOSITORY}/releases`
 const OFFICIAL_RELEASE_BASE = `https://github.com/${OFFICIAL_REPOSITORY}/releases/tag/`
 
 export interface UpdateEventSource {
@@ -109,7 +110,9 @@ export function selectUpdateFile(
 }
 
 function errorCode(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string') return error.code
+  if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string' && error.code.trim() !== '') return error.code
+  const networkCode = errorMessage(error).match(/\b(?:net::)?(ERR_[A-Z0-9_]+)\b/i)?.[1]
+  if (networkCode !== undefined) return networkCode.toUpperCase()
   return 'UPDATE_FAILED'
 }
 
@@ -119,6 +122,28 @@ function errorMessage(error: unknown): string {
     .replace(/authorization:\s*[^\s]+/gi, 'authorization: <redacted>')
     .replace(/([?&](?:token|access_token|password|passwd|secret))=[^&\s]*/gi, '$1=<redacted>')
     .slice(0, 1_000)
+}
+
+function userFacingErrorMessage(error: unknown, code: string): string {
+  switch (code) {
+    case 'ERR_PROXY_CONNECTION_FAILED':
+      return 'Could not connect to the configured proxy. Check your system proxy settings, then try again.'
+    case 'PROXY_AUTH_REQUIRED':
+      return 'The configured network proxy requires authentication. Sign in to the proxy, then try again.'
+    case 'ERR_INTERNET_DISCONNECTED':
+      return 'No internet connection is available. Reconnect to the internet, then try again.'
+    case 'ERR_NAME_NOT_RESOLVED':
+      return 'Could not find the update server. Check your internet and DNS settings, then try again.'
+    case 'ERR_CONNECTION_TIMED_OUT':
+    case 'ETIMEDOUT':
+      return 'The update server took too long to respond. Check your network connection, then try again.'
+    case 'ERR_CONNECTION_REFUSED':
+      return 'The update server refused the connection. Check your network or proxy settings, then try again.'
+    case 'ENOSPC':
+      return 'Not enough disk space to download the update.'
+    default:
+      return errorMessage(error)
+  }
 }
 
 function isVerificationFailure(error: unknown): boolean {
@@ -346,8 +371,9 @@ export class DesktopUpdateManager {
   }
 
   async openRelease(): Promise<DesktopUpdateState> {
-    const url = this.metadata?.releaseUrl
-    if (url !== undefined) await this.onOpenRelease?.(url)
+    const stateReleaseUrl = 'releaseUrl' in this.state ? this.state.releaseUrl : null
+    const url = this.metadata?.releaseUrl ?? stateReleaseUrl
+    if (url !== null) await this.onOpenRelease?.(url)
     return this.state
   }
 
@@ -428,15 +454,15 @@ export class DesktopUpdateManager {
 
   private fail(error: unknown, stage: Operation): DesktopUpdateState {
     const code = errorCode(error)
-    const message = errorMessage(error)
-    this.onLog?.(`update ${stage} failed (${code}): ${message}`)
+    const diagnosticMessage = errorMessage(error)
+    this.onLog?.(`update ${stage} failed (${code}): ${diagnosticMessage}`)
     return this.publish({
       status: 'error',
       currentVersion: this.currentVersion,
       stage,
       code,
-      message: code === 'ENOSPC' ? 'Not enough disk space to download the update.' : message,
-      releaseUrl: this.metadata?.releaseUrl ?? null,
+      message: userFacingErrorMessage(error, code),
+      releaseUrl: this.metadata?.releaseUrl ?? OFFICIAL_RELEASES_URL,
       retryable: isRetryable(error, stage),
     })
   }
