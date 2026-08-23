@@ -155,7 +155,12 @@ jobs:
             > .stage/oh-dsh-runtime-manifest.json
           tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
           rm .stage/oh-dsh-runtime-manifest.json
-          shasum -a 256 "${BUNDLE}" | sed "s#  release/#  #" > "${BUNDLE}.sha256"
+          # Git Bash on Windows ships sha256sum but not shasum.
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "${BUNDLE}" | sed "s#  release/#  #" > "${BUNDLE}.sha256"
+          else
+            sha256sum "${BUNDLE}" | sed "s#  release/#  #" > "${BUNDLE}.sha256"
+          fi
 
       - name: Verify updater metadata
         shell: bash
