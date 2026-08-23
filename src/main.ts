@@ -675,8 +675,16 @@ async function startLiveForMarketplace(): Promise<void> {
   }
 }
 
+let queuedRuntimeRestart = false
+
 async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'): Promise<void> {
-  if (transitioning) return
+  if (transitioning) {
+    // A runtime update may land while a marketplace apply or another
+    // restart owns the transition; queue this one instead of dropping
+    // it — the pointer already switched the active runtime.
+    queuedRuntimeRestart = true
+    return
+  }
   transitioning = true
   try {
     await showSplash({ message })
@@ -694,6 +702,10 @@ async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'
     })
   } finally {
     transitioning = false
+    if (queuedRuntimeRestart) {
+      queuedRuntimeRestart = false
+      void restartRuntime(message)
+    }
   }
 }
 
