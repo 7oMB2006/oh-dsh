@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DesktopUpdateBridge, DesktopUpdateCommand, DesktopUpdateState } from './contracts.ts'
+import type {
+  DesktopUpdateBridge,
+  DesktopUpdateCommand,
+  DesktopUpdateState,
+  RuntimeUpdateBridge,
+  RuntimeUpdateCommand,
+  RuntimeUpdateState,
+} from './contracts.ts'
 
 const commandTypes = new Set<DesktopUpdateCommand['type']>([
   'check',
@@ -33,3 +40,28 @@ const bridge: DesktopUpdateBridge = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('dshDesktopUpdate', bridge)
+
+const runtimeCommandTypes = new Set<RuntimeUpdateCommand['type']>(['check', 'install', 'rollback'])
+
+function isRuntimeCommand(value: unknown): value is RuntimeUpdateCommand {
+  return typeof value === 'object'
+    && value !== null
+    && 'type' in value
+    && typeof value.type === 'string'
+    && runtimeCommandTypes.has(value.type as RuntimeUpdateCommand['type'])
+}
+
+const runtimeBridge: RuntimeUpdateBridge = Object.freeze({
+  getState: async (): Promise<RuntimeUpdateState> => await ipcRenderer.invoke('desktop:runtime-update:get-state') as RuntimeUpdateState,
+  command: async (command: RuntimeUpdateCommand): Promise<RuntimeUpdateState> => {
+    if (!isRuntimeCommand(command)) throw new Error('unsupported runtime update command')
+    return await ipcRenderer.invoke('desktop:runtime-update:command', command) as RuntimeUpdateState
+  },
+  onState: (listener: (state: RuntimeUpdateState) => void): (() => void) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: RuntimeUpdateState): void => { listener(state) }
+    ipcRenderer.on('desktop:runtime-update:state', wrapped)
+    return () => { ipcRenderer.removeListener('desktop:runtime-update:state', wrapped) }
+  },
+})
+
+contextBridge.exposeInMainWorld('dshDesktopRuntimeUpdate', runtimeBridge)

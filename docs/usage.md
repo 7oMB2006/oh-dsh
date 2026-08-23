@@ -85,6 +85,23 @@ before the first updater-enabled Release need one manual install; local
 development builds and Releases without a matching platform package fall back
 to the official Release page.
 
+### DSH runtime updates (decoupled from the application)
+
+The same update window also lists the DSH runtime version. Runtime updates
+ship as independent `oh-dsh-runtime-<dshVersion>-<platform>-<arch>.tar.gz`
+Release assets, so a new DSH release can be applied without reinstalling
+Oh-DSH Desktop.
+
+- **Check Runtime** looks for the newest runtime bundle published for this
+  platform. **Update Runtime** downloads it, verifies the published SHA-256
+  checksum, stages it under `~/.ohdsh/runtimes/<version>/`, and smoke-checks
+  `dsh --version` before activating anything.
+- Activation writes the pointer `~/.ohdsh/runtimes/current.json` and restarts
+  only the Harness process; the application keeps running.
+- **Use Bundled Runtime** removes the pointer and restarts the Harness on the
+  runtime bundled with the application build. A failed verification never
+  changes the active runtime.
+
 ## Install Web-only
 
 ```sh

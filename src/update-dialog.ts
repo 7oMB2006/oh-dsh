@@ -1,12 +1,20 @@
-import type { DesktopUpdateBridge, DesktopUpdateState } from './contracts.ts'
+import type {
+  DesktopUpdateBridge,
+  DesktopUpdateState,
+  RuntimeUpdateBridge,
+  RuntimeUpdateCommand,
+  RuntimeUpdateState,
+} from './contracts.ts'
 
 declare global {
   interface Window {
     dshDesktopUpdate: DesktopUpdateBridge
+    dshDesktopRuntimeUpdate: RuntimeUpdateBridge
   }
 }
 
 const bridge = window.dshDesktopUpdate
+const runtimeBridge = window.dshDesktopRuntimeUpdate
 const title = document.querySelector<HTMLElement>('[data-field="title"]')!
 const status = document.querySelector<HTMLElement>('[data-field="status"]')!
 const version = document.querySelector<HTMLElement>('[data-field="version"]')!
@@ -150,8 +158,79 @@ async function run(type: Parameters<DesktopUpdateBridge['command']>[0]['type']):
 for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
   const action = button.dataset.action
   if (action === undefined || action === 'close') continue
+  if (action.startsWith('runtime-')) {
+    button.addEventListener('click', () => { void runRuntime(action.slice('runtime-'.length) as RuntimeUpdateCommand['type']) })
+    continue
+  }
   button.addEventListener('click', () => { void run(action as Parameters<DesktopUpdateBridge['command']>[0]['type']) })
 }
+
+const runtimeStatus = document.querySelector<HTMLElement>('[data-field="runtime-status"]')!
+const runtimeCurrent = document.querySelector<HTMLElement>('[data-field="runtime-current"]')!
+const runtimeSize = document.querySelector<HTMLElement>('[data-field="runtime-size"]')!
+const runtimeError = document.querySelector<HTMLElement>('[data-field="runtime-error"]')!
+const runtimeCheckButton = document.querySelector<HTMLButtonElement>('[data-action="runtime-check"]')!
+const runtimeInstallButton = document.querySelector<HTMLButtonElement>('[data-action="runtime-install"]')!
+const runtimeRollbackButton = document.querySelector<HTMLButtonElement>('[data-action="runtime-rollback"]')!
+
+function renderRuntime(state: RuntimeUpdateState): void {
+  runtimeError.textContent = ''
+  setVisible(runtimeError, false)
+  runtimeCurrent.textContent = `Active ${state.currentVersion} · bundled with app ${state.bundledVersion}`
+  const canRollBack = state.currentVersion !== state.bundledVersion
+  setButton(runtimeCheckButton, state.status === 'idle' || state.status === 'not-available' || state.status === 'available' || state.status === 'installed' || state.status === 'rolled-back' || state.status === 'error')
+  setButton(runtimeInstallButton, state.status === 'available')
+  setButton(runtimeRollbackButton, canRollBack && state.status !== 'downloading' && state.status !== 'staging')
+  runtimeSize.textContent = ''
+  switch (state.status) {
+    case 'idle':
+      runtimeStatus.textContent = 'The DSH runtime updates independently of this application.'
+      break
+    case 'checking':
+      runtimeStatus.textContent = 'Checking published runtime bundles...'
+      break
+    case 'not-available':
+      runtimeStatus.textContent = 'DSH runtime is up to date.'
+      break
+    case 'available':
+      runtimeStatus.textContent = `DSH ${state.candidate.dshVersion} is available.`
+      runtimeSize.textContent = `Download size: ${formatBytes(state.candidate.size)}`
+      break
+    case 'downloading':
+      runtimeStatus.textContent = 'Downloading runtime bundle...'
+      runtimeSize.textContent = `${formatBytes(state.transferred)} of ${formatBytes(state.total)}`
+      break
+    case 'staging':
+      runtimeStatus.textContent = `Preparing DSH ${state.candidate.dshVersion} (${state.stage})...`
+      break
+    case 'installed':
+      runtimeStatus.textContent = `DSH runtime ${state.currentVersion} activated (was ${state.previousVersion}). The Harness is restarting.`
+      break
+    case 'rolled-back':
+      runtimeStatus.textContent = `Using the bundled DSH runtime ${state.bundledVersion}. The Harness is restarting.`
+      break
+    case 'error':
+      runtimeStatus.textContent = 'Runtime update failed.'
+      runtimeError.textContent = `${state.stage}: ${state.message}`
+      setVisible(runtimeError, true)
+      break
+  }
+}
+
+async function runRuntime(type: RuntimeUpdateCommand['type']): Promise<void> {
+  try {
+    renderRuntime(await runtimeBridge.command({ type }))
+  } catch (cause) {
+    runtimeError.textContent = cause instanceof Error ? cause.message : String(cause)
+    setVisible(runtimeError, true)
+  }
+}
+
+runtimeBridge.onState(renderRuntime)
+void runtimeBridge.getState().then(renderRuntime).catch(cause => {
+  runtimeError.textContent = cause instanceof Error ? cause.message : String(cause)
+  setVisible(runtimeError, true)
+})
 
 bridge.onState(render)
 void bridge.getState().then(render).catch(cause => {
