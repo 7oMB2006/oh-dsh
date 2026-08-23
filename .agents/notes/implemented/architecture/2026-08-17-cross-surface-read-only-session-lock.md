@@ -22,8 +22,13 @@ surfaces are allowed to start as read-only viewers instead of being rejected:
 - Viewer runtimes receive `OH_DSH_READ_ONLY=1`.
 - A host-side guard blocks `sessionPersistence.create()` and `append()` in
   viewer mode.
-- Marketplace mounting and profile setup are skipped or minimized in viewer
-  mode to avoid mutating state owned by the active surface.
+- Marketplace profile setup is skipped in viewer mode to avoid mutating
+  state owned by the active surface. The marketplace service itself stays
+  mounted as a degraded read-only bridge (updated 2026-08-22): the
+  transaction manager constructs without preview/rollback directories,
+  refuses every dispatch except catalog `refresh`, and passes no working
+  directory to spawned catalog commands. Viewers keep the full plugin tree
+  (a missing `pluginMarketplace` service used to crash the TUI, #115).
 - Lock files record launcher PID, runtime child PIDs, and process-start
   markers so stale-lock recovery does not bypass an orphaned runtime or a
   reused PID.

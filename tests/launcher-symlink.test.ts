@@ -42,3 +42,31 @@ test('bin/ohdsh resolves symlinks to the installed runtime', { skip: process.pla
     rmSync(linkDir, { recursive: true, force: true })
   }
 })
+
+test('bin/ohdsh resolves relative and chained symlinks', { skip: process.platform === 'win32' }, () => {
+  const installRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-launcher-chain-'))
+  const linkDir = mkdtempSync(join(tmpdir(), 'oh-dsh-launcher-chain-link-'))
+  try {
+    const nodeBin = join(installRoot, 'node-runtime', 'bin')
+    mkdirSync(nodeBin, { recursive: true })
+    writeFileSync(join(nodeBin, 'node'), '#!/bin/sh\necho "fake-node $@"\n')
+    chmodSync(join(nodeBin, 'node'), 0o755)
+    const cliDir = join(installRoot, 'lib', 'oh-dsh')
+    mkdirSync(cliDir, { recursive: true })
+    writeFileSync(join(cliDir, 'cli.js'), '')
+
+    const appBin = join(installRoot, 'bin')
+    mkdirSync(appBin, { recursive: true })
+    copyFileSync(launcher, join(appBin, 'ohdsh'))
+    chmodSync(join(appBin, 'ohdsh'), 0o755)
+    // First link uses a relative target, the second chains through it.
+    symlinkSync('../bin/ohdsh', join(installRoot, 'bin', 'ohdsh-rel'))
+    symlinkSync(join(installRoot, 'bin', 'ohdsh-rel'), join(linkDir, 'ohdsh'))
+
+    const output = execFileSync('sh', [join(linkDir, 'ohdsh'), 'web'], { encoding: 'utf8' })
+    assert.match(output, /fake-node .*lib\/oh-dsh\/cli\.js/)
+  } finally {
+    rmSync(installRoot, { recursive: true, force: true })
+    rmSync(linkDir, { recursive: true, force: true })
+  }
+})

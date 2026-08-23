@@ -30,8 +30,8 @@ separate Web Terminal or shell plugin is required.
 ## DSH-better-sidebar
 
 - Project: <https://github.com/omdsh-dev/DSH-better-sidebar>
-- Pinned release: `v0.13.0`
-- Pinned revision: `9ad0a49b8a7506109b704896ffea3d7349c21e63`
+- Pinned release: `v0.15.0`
+- Pinned revision: `f0965e1d6157a3e06ed2f5c7775a64428d5d3c29`
 - Declared license: MIT
 - Oh-DSH components: `@oh-dsh/better-sidebar-runtime` and
   `@oh-dsh/sidebar`
@@ -79,12 +79,12 @@ packaged plugin.
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>
-- Upstream package: `@deepseek-harness-tui/dsh-tui@0.8.1`
-- Pinned revision: `180117716ed50a789edb56539e832b1d1f7839cf`
+- Upstream package: `@deepseek-harness-tui/dsh-tui@0.8.8`
+- Pinned revision: `bdff0afb028d50c304e4474fd40f83b0721d50fd`
 - Ecosystem specification: <https://github.com/T-Auto/dsh-ecosystem-spec>
-- Pinned ecosystem revision: `7e49be23ecd42ee1b19a74b92bb2791c3406d7fc`
+- Pinned ecosystem revision: `e1b902b0f95f4280a8e68d414ec7a4d25d6ce106`
 - Protocol packages: <https://github.com/Yan-Zero/dsh-std>
-- Pinned protocol revision: `a2faa86243a5693ee4970e3d8b3aaf361edea298`
+- Pinned protocol revision: `614dfa1ac168db79fcf4577cf0ebb34e2e3b944b`
 - Declared license: MIT
 - Oh-DSH component: `@oh-dsh/tui`
 
