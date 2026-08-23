@@ -29,6 +29,13 @@ export const RUNTIME_BUNDLE_MANIFEST = 'oh-dsh-runtime-manifest.json'
 export interface RuntimeBundleManifest {
   bundledByAppVersion: string
   dshVersion: string
+  /**
+   * Explicit runtime-boundary contract revision of the producing tree.
+   * The bundle embeds this project's surface plugins and adapters, so a
+   * running application may only install bundles whose contract revision
+   * matches its own; application package versions do not encode this.
+   */
+  runtimeContract: number
 }
 
 export interface RuntimeBundleCandidate {
@@ -57,7 +64,7 @@ export type RuntimeUpdateState =
   | { status: 'staging'; currentVersion: string; bundledVersion: string; candidate: RuntimeBundleCandidate; stage: 'extract' | 'verify' | 'activate' }
   | { status: 'installed'; currentVersion: string; bundledVersion: string; previousVersion: string }
   | { status: 'rolled-back'; currentVersion: string; bundledVersion: string }
-  | { status: 'error'; currentVersion: string; bundledVersion: string; stage: 'check' | 'download' | 'verify' | 'activate'; message: string; retryable: boolean }
+  | { status: 'error'; currentVersion: string; bundledVersion: string; stage: 'check' | 'download' | 'verify' | 'extract' | 'activate'; message: string; retryable: boolean }
 
 export type RuntimeUpdateCommand = { type: 'check' } | { type: 'install' } | { type: 'rollback' }
 
@@ -130,12 +137,10 @@ export interface RuntimeUpdateManagerOptions {
   /** Bundled Node binary used to smoke-verify a staged runtime. */
   nodeBinary: string
   /**
-   * Version of this application build. A bundle is only installable when it
-   * was produced by an application no newer than the running one: the bundle
-   * embeds this project's surface plugins and adapters, whose cross-boundary
-   * contracts only stay compatible within that constraint.
+   * Runtime-boundary contract revision this application declares. A bundle
+   * is installable only when its manifest declares the same revision.
    */
-  appVersion: string
+  runtimeContract: number
   platform?: NodeJS.Platform
   arch?: string
   /** GitHub releases API base; overridable for tests. */
@@ -183,7 +188,7 @@ export class RuntimeUpdateManager {
     this.#options.onState?.(state)
   }
 
-  #fail(stage: 'check' | 'download' | 'verify' | 'activate', message: string, retryable: boolean): void {
+  #fail(stage: 'check' | 'download' | 'verify' | 'extract' | 'activate', message: string, retryable: boolean): void {
     this.#busy = false
     this.#setState({
       status: 'error',
@@ -254,6 +259,10 @@ export class RuntimeUpdateManager {
     const candidate = this.#candidate
     this.#busy = true
     const previousVersion = this.#options.currentVersion
+    // The shared catch reports where the transaction actually failed and
+    // whether trying again can plausibly help.
+    let stage: 'download' | 'verify' | 'extract' | 'activate' = 'download'
+    let retryable = true
     try {
       const updateRoot = join(this.#options.dataRoot, RUNTIMES_DIRECTORY)
       const downloadsRoot = join(updateRoot, 'downloads')
@@ -273,6 +282,7 @@ export class RuntimeUpdateManager {
       })
       await pipeline(body, createWriteStream(archivePath))
 
+      stage = 'verify'
       this.#setState({ status: 'staging', bundledVersion: this.#options.bundledVersion, candidate, currentVersion: this.#options.currentVersion, stage: 'verify' })
       const expectedHash = await this.#downloadSha256(candidate)
       const actualHash = await sha256File(archivePath)
@@ -280,6 +290,7 @@ export class RuntimeUpdateManager {
         throw new Error(`runtime bundle integrity mismatch: expected ${expectedHash}, received ${actualHash}`)
       }
 
+      stage = 'extract'
       this.#setState({ status: 'staging', bundledVersion: this.#options.bundledVersion, candidate, currentVersion: this.#options.currentVersion, stage: 'extract' })
       const stageRoot = join(updateRoot, candidate.dshVersion)
       rmSync(stageRoot, { recursive: true, force: true })
@@ -295,15 +306,18 @@ export class RuntimeUpdateManager {
       try {
         bundleManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as RuntimeBundleManifest
       } catch (error) {
+        retryable = false
         throw new Error(`runtime bundle manifest is unreadable: ${error instanceof Error ? error.message : String(error)}`)
       }
       if (bundleManifest.dshVersion !== candidate.dshVersion) {
+        retryable = false
         throw new Error(`runtime bundle manifest declares DSH ${String(bundleManifest.dshVersion)}, expected ${candidate.dshVersion}`)
       }
-      if (compareDshVersions(bundleManifest.bundledByAppVersion, this.#options.appVersion) > 0) {
+      if (bundleManifest.runtimeContract !== this.#options.runtimeContract) {
+        retryable = false
         throw new Error(
-          `runtime bundle was produced by Oh-DSH ${bundleManifest.bundledByAppVersion}, newer than this application `
-          + `${this.#options.appVersion}; update Oh-DSH Desktop first`,
+          `runtime bundle targets contract revision ${String(bundleManifest.runtimeContract)}, `
+          + `this application requires ${String(this.#options.runtimeContract)}; update Oh-DSH Desktop first`,
         )
       }
       const stagedRuntime = join(stageRoot, 'dsh-runtime')
@@ -320,6 +334,7 @@ export class RuntimeUpdateManager {
         throw new Error(`staged runtime smoke check returned ${smokeVersion}, expected ${candidate.dshVersion}`)
       }
 
+      stage = 'activate'
       this.#setState({ status: 'staging', bundledVersion: this.#options.bundledVersion, candidate, currentVersion: this.#options.currentVersion, stage: 'activate' })
       writePointer(updateRoot, { dshRuntimeRoot: stagedRuntime, version: candidate.dshVersion })
       rmSync(downloadsRoot, { recursive: true, force: true })
@@ -331,7 +346,7 @@ export class RuntimeUpdateManager {
       await this.#options.onRuntimeChanged?.()
       return this.#state
     } catch (error) {
-      this.#fail('download', error instanceof Error ? error.message : String(error), true)
+      this.#fail(stage, error instanceof Error ? error.message : String(error), retryable)
       return this.#state
     }
   }

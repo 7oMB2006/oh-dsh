@@ -449,7 +449,7 @@ function getRuntimeUpdateManager(): RuntimeUpdateManager {
   const paths = bundledRuntimePaths(resourcesRoot())
   const dataRoot = resolveOhDshHome(process.env)
   const manager = new RuntimeUpdateManager({
-    appVersion: app.getVersion(),
+    runtimeContract: JSON.parse(readFileSync(join(currentDir, '..', 'package.json'), 'utf8')).ohDshRuntimeContract,
     bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
     currentVersion: dshRuntimeVersionOf(resolveStagedRuntimeRoot(dataRoot) ?? paths.runtimeRoot),
     dataRoot,

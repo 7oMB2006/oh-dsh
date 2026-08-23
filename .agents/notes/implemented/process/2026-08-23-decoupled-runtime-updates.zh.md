@@ -33,12 +33,16 @@ Desktop 才能到达用户。
 ## Consequences
 
 - 每个 bundle 携带 `oh-dsh-runtime-manifest.json`（`dshVersion`、
-  `bundledByAppVersion`）。更新器拒绝由比当前应用更新的应用产出的
-  bundle——bundle 内嵌本项目的表面插件，其跨边界契约只在该约束内
-  有保证——也拒绝缺失 manifest 的 bundle。`workflow_dispatch` 的
-  "Runtime release" 工作流可单独发布 bundle，DSH 升级不再需要应用
-  发版。Desktop 处于查看端（运行时锁被其他表面持有）时，IPC 边界
-  拒绝 `install`/`rollback`。
+  `bundledByAppVersion`、`runtimeContract`）。兼容性由 `package.json`
+  中显式声明的 `runtimeContract` 契约版本（`ohDshRuntimeContract`）
+  判定，而非应用包版本：bundle 内嵌本项目的表面插件，只有契约版本
+  一致才能保证其边界。缺失 manifest 或契约不匹配的 bundle 以不可
+  重试错误拒绝；安装错误会报告实际失败的阶段
+  （download/verify/extract/activate）。`workflow_dispatch` 的
+  "Runtime release" 工作流可单独发布 bundle（tag 通过 `--target`
+  固定到派发的提交），DSH 升级不再需要应用发版。Desktop 处于查看端
+  （运行时锁被其他表面持有）时，IPC 边界拒绝
+  `install`/`rollback`。
 - 下载、校验和冒烟检查任何一步失败都不会改变当前生效的运行时；
   回滚只需删除一个指针文件。
 - 运行时更新要求 Release 实际携带本平台的运行时 bundle；更早的

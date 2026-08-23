@@ -91,7 +91,8 @@ jobs:
           DSH_VERSION="$(node -p "require('./dsh-source.json').version")"
           APP_VERSION="$(node -p "require('./package.json').version")"
           BUNDLE="oh-dsh-runtime-${DSH_VERSION}-${{ matrix.runtime_platform }}-${{ matrix.node_arch }}.tar.gz"
-          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\"}" \
+          CONTRACT="$(node -p "require('./package.json').ohDshRuntimeContract")"
+          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\",\"runtimeContract\":${CONTRACT}}" \
             > .stage/oh-dsh-runtime-manifest.json
           tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
           shasum -a 256 "${BUNDLE}" > "${BUNDLE}.sha256"
@@ -122,6 +123,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
             --title "${{ inputs.release-name }}" \
             --notes "Decoupled DSH runtime bundles built from $GITHUB_SHA." \
             bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 \

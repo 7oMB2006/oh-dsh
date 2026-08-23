@@ -150,7 +150,8 @@ jobs:
           APP_VERSION="$(node -p "require('./package.json').version")"
           BUNDLE="release/oh-dsh-runtime-${DSH_VERSION}-${{ matrix.runtime_platform }}-${{ matrix.node_arch }}.tar.gz"
           mkdir -p release
-          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\"}" \
+          CONTRACT="$(node -p "require('./package.json').ohDshRuntimeContract")"
+          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\",\"runtimeContract\":${CONTRACT}}" \
             > .stage/oh-dsh-runtime-manifest.json
           tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
           rm .stage/oh-dsh-runtime-manifest.json

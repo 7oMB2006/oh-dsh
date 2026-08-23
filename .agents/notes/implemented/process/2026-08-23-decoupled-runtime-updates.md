@@ -38,15 +38,19 @@ model — required a full Oh-DSH Desktop release before users could get it.
 
 ## Consequences
 
-- Every bundle ships `oh-dsh-runtime-manifest.json`
-  (`dshVersion`, `bundledByAppVersion`). The updater refuses a bundle
-  produced by an application newer than the running one — the bundle
-  embeds this project's surface plugins, whose cross-boundary contracts
-  are only guaranteed within that constraint — and refuses bundles
-  without a manifest. A `workflow_dispatch` "Runtime release" workflow
-  publishes bundles alone, so a DSH bump does not need an application
-  release. Viewer Desktops (runtime lock held by another surface)
-  reject `install`/`rollback` at the IPC boundary.
+- Every bundle ships `oh-dsh-runtime-manifest.json` (`dshVersion`,
+  `bundledByAppVersion`, `runtimeContract`). Compatibility is judged by
+  the explicit `runtimeContract` revision declared in `package.json`
+  (`ohDshRuntimeContract`), not the application package version: the
+  bundle embeds this project's surface plugins, and only a matching
+  contract revision guarantees their boundaries. Manifest-less or
+  mismatched bundles are refused as non-retryable, and install errors
+  report the failing stage (download/verify/extract/activate). A
+  `workflow_dispatch` "Runtime release" workflow publishes bundles
+  alone (tag pinned to the dispatched commit via `--target`), so a DSH
+  bump does not need an application release. Viewer Desktops (runtime
+  lock held by another surface) reject `install`/`rollback` at the IPC
+  boundary.
 - A failed download, checksum, or smoke check never changes the active
   runtime; rollback is one pointer removal away.
 - Runtime updates require a Release that actually carries a runtime

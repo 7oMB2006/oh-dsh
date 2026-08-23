@@ -31,10 +31,11 @@ test('runtime bundle asset names parse per platform and arch', () => {
   assert.equal(parseRuntimeBundleAsset('oh-dsh-tui-0.1.7-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
 })
 
-function stagedLayout(root: string, version: string, appVersion = '0.1.7'): string {
+function stagedLayout(root: string, version: string, runtimeContract: number = 1): string {
   writeFileSync(join(root, RUNTIME_BUNDLE_MANIFEST), JSON.stringify({
-    bundledByAppVersion: appVersion,
+    bundledByAppVersion: '0.1.7',
     dshVersion: version,
+    runtimeContract,
   }))
   const runtimeRoot = join(root, 'runtimes', version, 'dsh-runtime')
   mkdirSync(join(runtimeRoot, 'lib'), { recursive: true })
@@ -85,7 +86,7 @@ test('runtime update manager selects the newest matching bundle', async () => {
   const states: string[] = []
   try {
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -118,7 +119,7 @@ test('runtime update manager stages, verifies, and activates a bundle', async ()
     const fixtureRuntime = stagedLayout(fixtureRoot, '0.1.1-rc.2')
     let applied = false
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -171,7 +172,7 @@ test('runtime update manager reports up to date without a newer bundle', async (
   const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-uptodate-'))
   try {
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.1-rc.2',
       currentVersion: '0.1.1-rc.2',
@@ -196,7 +197,7 @@ test('runtime update manager refuses to activate a failed smoke check', async ()
   try {
     stagedLayout(fixtureRoot, '0.1.1-rc.2')
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -237,7 +238,7 @@ test('runtime update manager surfaces check failures without changing state', as
   const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-checkfail-'))
   try {
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -258,10 +259,10 @@ test('runtime update manager refuses bundles from a newer application', async ()
   const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-newerapp-'))
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-fixture3-'))
   try {
-    // Bundle produced by a newer Oh-DSH Desktop than the running one.
-    stagedLayout(fixtureRoot, '0.1.1-rc.2', '0.2.0')
+    // Bundle produced from a tree with a different runtime contract revision.
+    stagedLayout(fixtureRoot, '0.1.1-rc.2', 2)
     const manager = new RuntimeUpdateManager({
-      appVersion: '0.1.7',
+      runtimeContract: 1,
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -290,6 +291,7 @@ test('runtime update manager refuses bundles from a newer application', async ()
     const refused = await manager.command({ type: 'install' })
     assert.equal(refused.status, 'error')
     if (refused.status === 'error') assert.match(refused.message, /update Oh-DSH Desktop first/)
+    assert.equal(refused.retryable, false)
     assert.equal(readRuntimePointer(dataRoot), null)
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
