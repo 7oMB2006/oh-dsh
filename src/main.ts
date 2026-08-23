@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  net,
   session,
   shell,
   type IpcMainInvokeEvent,
@@ -453,6 +454,9 @@ function getRuntimeUpdateManager(): RuntimeUpdateManager {
   const paths = bundledRuntimePaths(resourcesRoot())
   const dataRoot = resolveOhDshHome(process.env)
   const manager = new RuntimeUpdateManager({
+    // Chromium's network stack honors the OS-configured proxy, matching
+    // the application updater's proxy behavior.
+    fetchImpl: (input, init) => net.fetch(input, init),
     runtimeContract: ohDshRuntimeContract,
     bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
     currentVersion: dshRuntimeVersionOf(
