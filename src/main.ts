@@ -456,7 +456,7 @@ function getRuntimeUpdateManager(): RuntimeUpdateManager {
   const manager = new RuntimeUpdateManager({
     // Chromium's network stack honors the OS-configured proxy, matching
     // the application updater's proxy behavior.
-    fetchImpl: (input, init) => net.fetch(input, init),
+    fetchImpl: (input, init) => net.fetch(String(input), init),
     runtimeContract: ohDshRuntimeContract,
     bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
     currentVersion: dshRuntimeVersionOf(
