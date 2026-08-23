@@ -30,9 +30,10 @@ export function resolveRuntimeResourcesRoot(
 export function bundledRuntimePaths(
   resourcesRoot: string,
   platform: NodeJS.Platform = process.platform,
+  dshRuntimeRootOverride?: string,
 ): BundledRuntimePaths {
   const paths = pathApi(platform)
-  const runtimeRoot = paths.join(resourcesRoot, 'dsh-runtime')
+  const runtimeRoot = dshRuntimeRootOverride ?? paths.join(resourcesRoot, 'dsh-runtime')
   const nodeRoot = paths.join(resourcesRoot, 'node-runtime')
   const nodeBinDirectory = platform === 'win32'
     ? nodeRoot

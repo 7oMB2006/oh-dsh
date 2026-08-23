@@ -1765,3 +1765,82 @@ test('discover updates remove an old bundle before switching to a repository plu
     setup.cleanup()
   }
 })
+
+test('read-only viewer manager browses without writing or transacting', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-readonly-'))
+  const dshHome = join(appDataPath, 'dsh')
+  const profileDir = join(dshHome, 'profiles', 'desktop')
+  mkdirSync(profileDir, { recursive: true })
+  writeFileSync(join(profileDir, 'package.json'), JSON.stringify({
+    name: 'desktop',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: ['@oh-dsh/desktop'] } },
+  }, undefined, 2) + '\n')
+  const platform = new FakePlatform()
+  const runtime = new FakeRuntime()
+  const manager = new PluginMarketplaceManager({
+    appDataPath,
+    dshHome,
+    platform,
+    profile: 'desktop',
+    readOnly: true,
+    runtime,
+  })
+  try {
+    // Viewer mode shares a data root with the lock holder: no preview or
+    // rollback directories may be created on construction.
+    assert.equal(existsSync(join(appDataPath, 'plugin-marketplace', 'previews')), false)
+    assert.equal(existsSync(join(appDataPath, 'plugin-marketplace', 'rollbacks')), false)
+
+    const snapshot = await manager.dispatch({ type: 'refresh' })
+    assert.equal(snapshot.error, null)
+    assert.ok(snapshot.catalog.length > 0)
+
+    const refused = await manager.dispatch({
+      type: 'inspect',
+      action: 'install',
+      pluginId: 'bundle-demo',
+    })
+    assert.match(refused.error ?? '', /read-only/)
+    assert.equal(platform.builds.length, 0)
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})
+
+test('read-only viewers load the catalog without writing the shared cache', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-cache-readonly-'))
+  try {
+    const createPlatform = (cacheReadOnly: boolean): ProductionMarketplacePlatform =>
+      new ProductionMarketplacePlatform({
+        appDataPath,
+        cacheReadOnly,
+        cliEntry: '/unused/dsh.mjs',
+        env: {
+          OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+          PATH: '',
+        },
+        fetch: async (): Promise<Response> =>
+          new Response(JSON.stringify(catalogDocument()), { status: 200 }),
+        nodeBinary: process.execPath,
+        pnpmEntry: '/unused/pnpm.mjs',
+      })
+
+    assert.deepEqual(await createPlatform(true).loadCatalog(), catalogDocument())
+    assert.equal(
+      existsSync(join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')),
+      false,
+      'viewer mode must not create the shared catalog cache',
+    )
+
+    assert.deepEqual(await createPlatform(false).loadCatalog(), catalogDocument())
+    assert.equal(
+      existsSync(join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')),
+      true,
+      'writer mode still refreshes the shared catalog cache',
+    )
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})

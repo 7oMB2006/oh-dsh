@@ -6,6 +6,7 @@
   "author": "dsh-external",
   "desktopName": "oh-dsh-desktop.desktop",
   "private": true,
+  "ohDshRuntimeContract": 1,
   "type": "module",
   "main": "dist/main.js",
   "bin": {

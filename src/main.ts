@@ -6,6 +6,7 @@ import {
   ipcMain,
   Menu,
   nativeTheme,
+  net,
   session,
   shell,
   type IpcMainInvokeEvent,
@@ -56,6 +57,12 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
+import {
+  RuntimeUpdateManager,
+  resolveStagedRuntimeRoot,
+  type RuntimeUpdateCommand,
+  type RuntimeUpdateState,
+} from './runtime-update.ts'
 import { DesktopUpdateManager, detectPackageType } from './update-manager.ts'
 import { scheduleImmediateUpdateInstall, singleFlight } from './update-lifecycle.ts'
 
@@ -84,6 +91,7 @@ let marketplaceAgentGateway: MarketplaceAgentGateway | undefined
 let logStream: WriteStream | undefined
 let updateWindow: BrowserWindow | undefined
 let updateManager: DesktopUpdateManager | undefined
+let runtimeUpdateManager: RuntimeUpdateManager | undefined
 let quittingForUpdate = false
 let quitting = false
 let transitioning = false
@@ -136,8 +144,28 @@ async function retireDuplicateMacBundles(): Promise<void> {
   }
 }
 
+const ohDshRuntimeContract: number = JSON.parse(
+  readFileSync(join(currentDir, '..', 'package.json'), 'utf8'),
+).ohDshRuntimeContract
+
 function runtimePaths(): BundledRuntimePaths {
-  return bundledRuntimePaths(resourcesRoot())
+  // An explicitly overridden resources root wins; otherwise a validated
+  // staged runtime from an in-app DSH update takes precedence over the
+  // runtime bundled with this application build.
+  const explicitRoot = process.env.OH_DSH_RESOURCES_ROOT ?? process.env.DSH_OH_WEB_ROOT
+  const staged = explicitRoot === undefined || explicitRoot === ''
+    ? resolveStagedRuntimeRoot(resolveOhDshHome(process.env), { runtimeContract: ohDshRuntimeContract })
+    : null
+  return bundledRuntimePaths(resourcesRoot(), process.platform, staged ?? undefined)
+}
+
+function dshRuntimeVersionOf(runtimeRoot: string): string {
+  try {
+    const manifest = JSON.parse(readFileSync(join(runtimeRoot, 'package.json'), 'utf8')) as { version?: unknown }
+    return typeof manifest.version === 'string' ? manifest.version : '0.0.0'
+  } catch {
+    return '0.0.0'
+  }
 }
 
 function desktopInfo(preview: DesktopInfo['preview'] = null): DesktopInfo {
@@ -416,6 +444,48 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
   return manager
 }
 
+function sendRuntimeUpdateState(state: RuntimeUpdateState): void {
+  if (updateWindow === undefined || updateWindow.isDestroyed()) return
+  updateWindow.webContents.send('desktop:runtime-update:state', state)
+}
+
+function getRuntimeUpdateManager(): RuntimeUpdateManager {
+  if (runtimeUpdateManager !== undefined) return runtimeUpdateManager
+  const paths = bundledRuntimePaths(resourcesRoot())
+  const dataRoot = resolveOhDshHome(process.env)
+  const manager = new RuntimeUpdateManager({
+    // Chromium's network stack honors the OS-configured proxy, matching
+    // the application updater's proxy behavior.
+    fetchImpl: (input, init) => net.fetch(String(input), init),
+    runtimeContract: ohDshRuntimeContract,
+    bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
+    currentVersion: dshRuntimeVersionOf(
+      resolveStagedRuntimeRoot(dataRoot, { runtimeContract: ohDshRuntimeContract }) ?? paths.runtimeRoot,
+    ),
+    dataRoot,
+    nodeBinary: paths.nodeBinary,
+    onLog: message => { appendLog('desktop', `[runtime-update] ${message}`) },
+    onState: sendRuntimeUpdateState,
+    onRuntimeChanged: () => { void restartRuntime('正在切换 DSH 运行时…') },
+  })
+  runtimeUpdateManager = manager
+  manager.command({ type: 'check' }).catch((error: unknown) => {
+    appendLog('desktop', `[runtime-update] initial check failed: ${error instanceof Error ? error.message : String(error)}`)
+  })
+  return manager
+}
+
+function parseRuntimeUpdateCommand(raw: unknown): RuntimeUpdateCommand {
+  if (typeof raw !== 'object' || raw === null || !('type' in raw) || typeof raw.type !== 'string') {
+    throw new Error('invalid runtime update command')
+  }
+  const type = raw.type
+  if (type !== 'check' && type !== 'install' && type !== 'rollback') {
+    throw new Error(`unsupported runtime update command: ${type}`)
+  }
+  return { type } as RuntimeUpdateCommand
+}
+
 function assertUpdateWindowSender(event: { sender: Electron.WebContents }): void {
   if (updateWindow === undefined || updateWindow.isDestroyed() || event.sender !== updateWindow.webContents) {
     throw new Error('update IPC is only available to the local update window')
@@ -470,6 +540,7 @@ async function openUpdateWindow(): Promise<void> {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   await window.loadFile(updateHtmlPath)
   void manager.check()
+  sendRuntimeUpdateState(getRuntimeUpdateManager().getState())
 }
 
 const stopForApplicationQuit = singleFlight(async (): Promise<void> => {
@@ -608,8 +679,16 @@ async function startLiveForMarketplace(): Promise<void> {
   }
 }
 
+let queuedRuntimeRestart = false
+
 async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'): Promise<void> {
-  if (transitioning) return
+  if (transitioning) {
+    // A runtime update may land while a marketplace apply or another
+    // restart owns the transition; queue this one instead of dropping
+    // it — the pointer already switched the active runtime.
+    queuedRuntimeRestart = true
+    return
+  }
   transitioning = true
   try {
     await showSplash({ message })
@@ -627,6 +706,10 @@ async function restartRuntime(message = '正在重新启动 DeepSeek Harness…'
     })
   } finally {
     transitioning = false
+    if (queuedRuntimeRestart) {
+      queuedRuntimeRestart = false
+      void restartRuntime(message)
+    }
   }
 }
 
@@ -1004,6 +1087,20 @@ function installIpc(): void {
       })
     }
     return await manager.command(command)
+  })
+  ipcMain.handle('desktop:runtime-update:get-state', event => {
+    assertUpdateWindowSender(event)
+    return getRuntimeUpdateManager().getState()
+  })
+  ipcMain.handle('desktop:runtime-update:command', async (event, raw: unknown) => {
+    assertUpdateWindowSender(event)
+    const command = parseRuntimeUpdateCommand(raw)
+    // While another surface owns the runtime lock this Desktop is a
+    // read-only viewer: only checks are allowed, never pointer mutations.
+    if (desktopReadOnly && command.type !== 'check') {
+      throw new Error('runtime updates are unavailable while another surface owns the runtime lock')
+    }
+    return await getRuntimeUpdateManager().command(command)
   })
   ipcMain.handle('desktop:get-info', event => {
     const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null

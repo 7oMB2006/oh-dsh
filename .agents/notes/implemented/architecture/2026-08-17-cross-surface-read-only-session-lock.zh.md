@@ -21,8 +21,12 @@ DSH JSONL 会话持久化只允许每个会话有一个活动写入者，并且�
 - 只读 runtime 接收 `OH_DSH_READ_ONLY=1`。
 - Host 侧 guard 在只读模式下阻止 `sessionPersistence.create()` 和
   `append()`。
-- 只读模式会跳过或最小化 marketplace 挂载与 profile 初始化，避免修改活动
-  表面持有的状态。
+- 只读模式会跳过 marketplace 的 profile 初始化，避免修改活动表面持有
+  的状态。marketplace 服务本身以降级的只读桥接形式保留挂载
+  （2026-08-22 更新）：事务管理器构造时不创建 previews/rollbacks 目录，
+  拒绝除目录 `refresh` 外的所有 dispatch，且不为目录命令传递工作目录。
+  查看端因此能保住完整插件树（缺失 `pluginMarketplace` 服务曾让 TUI
+  直接崩溃，#115）。
 - 锁文件记录 launcher PID、runtime child PID 和进程启动标识，使 stale 锁
   回收不会绕过孤儿 runtime 或误判被复用的 PID。
 

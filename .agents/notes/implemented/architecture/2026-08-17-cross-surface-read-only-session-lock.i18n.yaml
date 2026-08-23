@@ -1,3 +1,6 @@
-# Bilingual-pair consistency record (docs/i18n/README.md).
-2026-08-17-cross-surface-read-only-session-lock.md: 50966d73ca60946c9a713c25fc80738250bf9ede
-2026-08-17-cross-surface-read-only-session-lock.zh.md: c18ce9738022b128fe576c998998c4b93b694860
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-17-cross-surface-read-only-session-lock.md
+2026-08-17-cross-surface-read-only-session-lock.md: a47de657f11699aa48405f84ef83a55545c957aa
+2026-08-17-cross-surface-read-only-session-lock.zh.md: ed3a830e6e22b70e416e2a9e20c52df8630f0c77

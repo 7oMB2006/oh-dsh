@@ -76,6 +76,20 @@ token。
 手动安装一次；本地开发构建和缺少当前平台安装包的 Release 会提供官方 Release
 页面作为回退。
 
+### DSH 运行时更新（与应用更新解耦）
+
+同一个更新窗口还会列出 DSH 运行时版本。运行时更新以独立的
+`oh-dsh-runtime-<dshVersion>-<platform>-<arch>.tar.gz` Release 资产发布，
+因此新的 DSH 版本无需重装 Oh-DSH Desktop 即可应用。
+
+- **Check Runtime** 查找为本平台发布的最新运行时包；**Update Runtime**
+  下载后先校验发布的 SHA-256，暂存到 `~/.ohdsh/runtimes/<version>/`，
+  并在激活前用 `dsh --version` 做冒烟检查。
+- 激活会写入指针 `~/.ohdsh/runtimes/current.json` 并只重启 Harness 进程，
+  应用本身保持运行。
+- **Use Bundled Runtime** 删除指针并让 Harness 回到随应用内置的运行时。
+  任何校验失败都不会改变当前生效的运行时。
+
 ## 安装 Web-only
 
 ```sh

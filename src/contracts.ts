@@ -100,3 +100,16 @@ export interface DesktopBridge {
   toggleMaximizeWindow(): Promise<boolean>
   isWindowMaximized(): Promise<boolean>
 }
+
+export type {
+  RuntimeBundleCandidate,
+  RuntimeUpdateCommand,
+  RuntimeUpdateState,
+} from './runtime-update.ts'
+import type { RuntimeUpdateCommand, RuntimeUpdateState } from './runtime-update.ts'
+
+export interface RuntimeUpdateBridge {
+  getState(): Promise<RuntimeUpdateState>
+  onState(listener: (state: RuntimeUpdateState) => void): () => void
+  command(command: RuntimeUpdateCommand): Promise<RuntimeUpdateState>
+}

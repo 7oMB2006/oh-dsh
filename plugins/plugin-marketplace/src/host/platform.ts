@@ -69,8 +69,11 @@ export interface LoadCatalogOptions {
 export interface ProductionMarketplacePlatformOptions {
   /** Surface-owned app-data root for cache and credential helpers. */
   appDataPath?: string
+  /** Read-only viewers read the catalog cache but never write it. */
+  cacheReadOnly?: boolean
   cliEntry: string
-  cwd: string
+  /** Working directory for spawned commands; omitted in read-only viewers. */
+  cwd?: string
   env: NodeJS.ProcessEnv
   fetch?: typeof globalThis.fetch
   nodeBinary: string
@@ -473,6 +476,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       return cached.document
     }
     const save = (document: unknown, etag: string | null): void => {
+      if (this.#options.cacheReadOnly === true) return
       try {
         writeCatalogCache(cachePath, {
           document,
@@ -522,7 +526,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
           contentPath,
           '-H',
           'Accept: application/vnd.github.raw+json',
-        ], { cwd: this.#options.cwd, env: this.#options.env, timeoutMs: 30_000 })
+        ], { ...(this.#options.cwd === undefined ? {} : { cwd: this.#options.cwd }), env: this.#options.env, timeoutMs: 30_000 })
         const document = JSON.parse(result.stdout) as unknown
         parseMarketplaceCatalog(document)
         save(document, null)
@@ -614,7 +618,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       : nodeArguments
     this.#options.onLog?.(`marketplace command: dsh ${input.args.join(' ')}`)
     const result = await runCommand(command, args, {
-      cwd: this.#options.cwd,
+      ...(this.#options.cwd === undefined ? {} : { cwd: this.#options.cwd }),
       env,
       timeoutMs: 180_000,
     })

@@ -24,6 +24,7 @@ jobs:
             dist_script: dist:mac
             node_platform: darwin
             node_arch: arm64
+            runtime_platform: darwin
             update_platform: mac-arm64
           - name: macOS x64
             id: macos-x64
@@ -31,6 +32,7 @@ jobs:
             dist_script: dist:mac:x64
             node_platform: darwin
             node_arch: x64
+            runtime_platform: darwin
             update_platform: mac-x64
           - name: Linux x64
             id: linux-x64
@@ -38,6 +40,7 @@ jobs:
             dist_script: dist:linux
             node_platform: linux
             node_arch: x64
+            runtime_platform: linux
             update_platform: linux-x64
           - name: Windows x64
             id: windows-x64
@@ -45,6 +48,7 @@ jobs:
             dist_script: dist:win
             node_platform: win
             node_arch: x64
+            runtime_platform: win32
             update_platform: win-x64
     env:
       DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
@@ -139,6 +143,20 @@ jobs:
       - name: Package Oh-DSH TUI distribution
         run: node scripts/build-tui.mjs
 
+      - name: Package decoupled DSH runtime bundle
+        shell: bash
+        run: |
+          DSH_VERSION="$(node -p "require('./dsh-source.json').version")"
+          APP_VERSION="$(node -p "require('./package.json').version")"
+          BUNDLE="release/oh-dsh-runtime-${DSH_VERSION}-${{ matrix.runtime_platform }}-${{ matrix.node_arch }}.tar.gz"
+          mkdir -p release
+          CONTRACT="$(node -p "require('./package.json').ohDshRuntimeContract")"
+          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\",\"runtimeContract\":${CONTRACT}}" \
+            > .stage/oh-dsh-runtime-manifest.json
+          tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
+          rm .stage/oh-dsh-runtime-manifest.json
+          shasum -a 256 "${BUNDLE}" | sed "s#  release/#  #" > "${BUNDLE}.sha256"
+
       - name: Verify updater metadata
         shell: bash
         run: node scripts/verify-update-metadata.mjs --dir release --version "$(node -p "require('./package.json').version")" --platform "${{ matrix.update_platform }}"
@@ -157,6 +175,8 @@ jobs:
             release/oh-dsh-web-*.zip
             release/oh-dsh-tui-*.tar.gz
             release/oh-dsh-tui-*.zip
+            release/oh-dsh-runtime-*.tar.gz
+            release/oh-dsh-runtime-*.tar.gz.sha256
             release/updater-metadata/**
           if-no-files-found: error
 

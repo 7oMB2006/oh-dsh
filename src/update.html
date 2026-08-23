@@ -72,6 +72,19 @@
       <button type="button" data-action="install-on-quit">Install on Quit</button>
       <button type="button" data-action="open-release">Open Release Page</button>
     </div>
+    <section data-field="runtime-section" style="margin-top: 36px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);">
+      <p class="eyebrow">DSH 运行时 · decoupled runtime</p>
+      <h2 style="margin: 4px 0 8px; font-size: 18px;">DSH Runtime</h2>
+      <p class="status" data-field="runtime-status">Checking...</p>
+      <p class="version" data-field="runtime-current"></p>
+      <p class="size" data-field="runtime-size"></p>
+      <p class="error" data-field="runtime-error" hidden></p>
+      <div class="actions" style="margin-top: 16px;">
+        <button type="button" data-action="runtime-check">Check Runtime</button>
+        <button type="button" class="primary" data-action="runtime-install">Update Runtime</button>
+        <button type="button" data-action="runtime-rollback">Use Bundled Runtime</button>
+      </div>
+    </section>
   </main>
   <script src="update-dialog.js"></script>
 </body>

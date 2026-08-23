@@ -64,30 +64,30 @@ let
   betterSidebarSrc = pkgs.fetchFromGitHub {
     owner = "omdsh-dev";
     repo = "DSH-better-sidebar";
-    rev = "9ad0a49b8a7506109b704896ffea3d7349c21e63";
-    hash = "sha256-8ppL9KD9wKEWIxqV7xo5o0pCEX1SxnMrZc0w9JFRi4w=";
+    rev = "f0965e1d6157a3e06ed2f5c7775a64428d5d3c29";
+    hash = "sha256-4uu1StNBZTuM6BJV1498FReUWIKoTFla1OjBgIEJsnM=";
   };
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "180117716ed50a789edb56539e832b1d1f7839cf";
-    hash = "sha256-bz2S2Nf8vfRCC+3XnzreWLoX7v1RwuIlbKIEU8hlvH0=";
+    rev = "bdff0afb028d50c304e4474fd40f83b0721d50fd";
+    hash = "sha256-N5jjAoHeABAM+rQMGuPtQasLEk9wmU/bSw2X2ilGg0U=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.8.1.tgz";
-    hash = "sha512-SwVgjKriOr/lyyFP8BGwzsJxdJWMIInD8X52hUhbCalRUCp9FO3aXj4gDWOf5Bxc2C3O9nh3guKBEt6QdJk9rQ==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.8.8.tgz";
+    hash = "sha512-clebbC1YnN7kU8nqRPr7U6KBopJLmQovGEO0Qu+7rHX4fN44UGPaBbVW8gLqpZrM73c8+R7kUQm0Aq4oWtmq0g==";
   };
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";
     repo = "dsh-ecosystem-spec";
-    rev = "7e49be23ecd42ee1b19a74b92bb2791c3406d7fc";
-    hash = "sha256-xEQyrFxdjyaHDzH2WhLd+ZuG42I4NvSeTa1f+tXp1AI=";
+    rev = "e1b902b0f95f4280a8e68d414ec7a4d25d6ce106";
+    hash = "sha256-LVc7bMUJMI4GYW3IyBWYwFzkibayu6BgZxlO67FPtGk=";
   };
   tuiStdSrc = pkgs.fetchFromGitHub {
     owner = "Yan-Zero";
     repo = "dsh-std";
-    rev = "a2faa86243a5693ee4970e3d8b3aaf361edea298";
-    hash = "sha256-J9DhM2kV8gLIBEpRxQxHp4x+Lw3B0DfxTE0/q/ghVMc=";
+    rev = "614dfa1ac168db79fcf4577cf0ebb34e2e3b944b";
+    hash = "sha256-aJEykWAXEKTUsNte51+ZEhFAgLT6QNNplNZTNPhgb00=";
   };
 
   # fetchPnpmDeps and the real build MUST see the same workspace graph.
@@ -119,7 +119,7 @@ let
     pnpmDeps = pkgs.fetchPnpmDeps {
       inherit pname version src;
       fetcherVersion = 4;
-      hash = "sha256-+L7DV/45inPxTwVrzfb5Z3Kx89tQxvoJhEPWsfyvUj0=";
+      hash = "sha256-dlysGu1HP7WSjURqeDFttqyeDk0igfu8Qr3b0IVE0Rs=";
     };
 
     nativeBuildInputs = [
@@ -163,7 +163,7 @@ let
       mkdir -p $out/lib/oh-dsh/tui-renderer
       cp -r upstream/dsh-TUI-release/lib \
         upstream/dsh-TUI-release/skills \
-        upstream/dsh-TUI-release/ecosystem-spec \
+        upstream/dsh-TUI-release/dsh-ecosystem-spec \
         upstream/dsh-TUI-release/presets \
         upstream/dsh-TUI-release/cordis.patch.yml \
         upstream/dsh-TUI-release/cordis.yml \
