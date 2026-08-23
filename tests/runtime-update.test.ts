@@ -29,6 +29,10 @@ test('runtime bundle asset names parse per platform and arch', () => {
   assert.equal(parseRuntimeBundleAsset('oh-dsh-runtime-0.1.1-rc.2-win32-x64.tar.gz', 'win32', 'x64'), '0.1.1-rc.2')
   assert.equal(parseRuntimeBundleAsset('oh-dsh-runtime-0.1.1-rc.2-linux-x64.tar.gz', 'darwin', 'arm64'), null)
   assert.equal(parseRuntimeBundleAsset('oh-dsh-tui-0.1.7-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
+  // A hostile asset must never smuggle a traversal segment into a path.
+  assert.equal(parseRuntimeBundleAsset('oh-dsh-runtime-..-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
+  assert.equal(parseRuntimeBundleAsset('oh-dsh-runtime-0.1.1-rc.2..-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
+  assert.equal(parseRuntimeBundleAsset('oh-dsh-runtime-0.1/1-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
 })
 
 function stagedLayout(root: string, version: string, runtimeContract: number = 1): string {

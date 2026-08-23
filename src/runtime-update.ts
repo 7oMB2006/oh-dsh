@@ -11,7 +11,7 @@
  */
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
@@ -100,6 +100,9 @@ export function compareDshVersions(left: string, right: string): number {
   return 0
 }
 
+/** Strict DSH release version: the captured value becomes a path segment. */
+const DSH_VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+
 /** Match one release asset against the runtime-bundle naming contract. */
 export function parseRuntimeBundleAsset(
   fileName: string,
@@ -109,7 +112,8 @@ export function parseRuntimeBundleAsset(
   const escaped = `${RUNTIME_BUNDLE_PREFIX}(.+)-${platform}-${arch}.tar.gz`
   const match = new RegExp(`^${escaped}$`).exec(fileName)
   const dshVersion = match?.[1]
-  return dshVersion === undefined || dshVersion === '' ? null : dshVersion
+  if (dshVersion === undefined || DSH_VERSION_PATTERN.test(dshVersion) !== true) return null
+  return dshVersion
 }
 
 interface ReleaseAsset {
@@ -443,9 +447,12 @@ export function resolveStagedRuntimeRoot(
   return pointer.dshRuntimeRoot
 }
 
-/** Persist the pointer atomically enough for a single-writer desktop. */
+/** Persist the pointer with an atomic replace so failures keep the old one. */
 export function writePointer(updateRoot: string, pointer: RuntimePointer): void {
-  writeFileSync(join(updateRoot, RUNTIME_POINTER_FILE), `${JSON.stringify(pointer, undefined, 2)}\n`)
+  const target = join(updateRoot, RUNTIME_POINTER_FILE)
+  const temporary = `${target}.tmp-${String(process.pid)}`
+  writeFileSync(temporary, `${JSON.stringify(pointer, undefined, 2)}\n`)
+  renameSync(temporary, target)
 }
 
 async function defaultRunCommand(file: string, args: string[], options: { cwd?: string }): Promise<{ stdout: string; stderr: string }> {
