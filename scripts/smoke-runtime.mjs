@@ -145,6 +145,12 @@ const timeout = new Promise((_, reject) => {
 
 try {
   const base = await Promise.race([ready, timeout])
+  assert.ok(existsSync(join(
+    dshHome,
+    '.agent-presets',
+    'liangshen',
+    'agent.cordis.yml',
+  )), 'Desktop Liangshen plugin did not install its preset')
   const indexResponse = await fetch(base)
   const index = await indexResponse.text()
   assert.equal(indexResponse.status, 200)

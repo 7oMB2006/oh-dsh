@@ -149,6 +149,24 @@ ohdsh web
 ohdsh tui
 ```
 
+本地开发时，也可以用仓库根目录的 Makefile 快速启动指定交互端：
+
+```sh
+make build
+make tui ARGS="--lang zh"       # 只暂存并启动 TUI
+make web ARGS="--port 3080"     # 只暂存并启动 Web
+make desktop                     # 只暂存并启动 Desktop
+```
+
+`make tui` 默认使用 inline 模式，从当前终端光标位置继续渲染；需要
+alternate screen 时传入 `ARGS="--fullscreen"`。每个 Make 目标只会暂存
+对应交互端的 Oh-DSH package，不会把其它交互端一起带入开发 runtime。Make
+默认使用 `~/.ohdsh`，也可以覆盖：`OH_DSH_HOME=/tmp/ohdsh make tui`。
+
+Desktop、Web 和 TUI 共享同一组 Agent preset；其中 `liangshen`（梁神模式）会在
+首轮保持 Minimal 双工具，首次工具调用后开放完整工具目录，压缩后重新锚定。
+Web/Desktop 可在设置页的 Agent preset 中选择，TUI 可输入 `/preset liangshen`。
+
 打包完整版使用对应平台的 `dist:mac`、`dist:linux` 或 `dist:win`；只打包
 Web 使用 `pnpm run dist:web`；只打包 TUI 使用 `pnpm run dist:tui`。
 

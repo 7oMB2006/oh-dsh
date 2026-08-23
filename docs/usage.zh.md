@@ -129,8 +129,9 @@ cd oh-dsh-tui-*/
 ./bin/ohdsh tui
 ```
 
-Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认使用 alternate
-screen，全屏选择、滚动和复制由上游 `dsh-TUI` 处理。
+Windows 使用 `bin\ohdsh.cmd tui`。TUI 需要真实交互终端；默认从当前终端位置
+inline 启动，与 Codex 风格一致；需要 alternate screen 时显式传入
+`--fullscreen`。
 
 ## 统一启动命令
 
@@ -155,7 +156,21 @@ TUI 常用选项：
 | `--resume` | 新会话 | 恢复指定 Session id |
 | `--lang` | 上游设置 | `zh` 或 `en` |
 | `--preset` | `standard` | 初始 Agent preset |
-| `--inline` | 关闭 | 保留终端 scrollback，不使用 alternate screen |
+| `--inline` | 开启 | 保留终端 scrollback，不使用 alternate screen |
+
+### Agent preset
+
+Desktop、Web 和 TUI 使用同一份 Agent preset 名册。随发行版提供的
+`liangshen`（梁神模式）会让主 Agent 与子 Agent 首轮都保持 Minimal 双工具，
+首次工具调用后开放完整工具目录，压缩后重新锚定。Web/Desktop 在设置页的
+Agent preset 中选择；TUI 可以在空白会话中输入：
+
+```text
+/preset liangshen
+```
+
+也可以在启动时指定 TUI preset：`ohdsh tui --preset liangshen`。已经产生对话的
+会话遵循 blank-only 规则，选择会保存为下一次新会话的默认值。
 
 ## 图片识别
 
@@ -301,6 +316,21 @@ ohdsh desktop
 ohdsh web --port 3080
 ohdsh tui
 ```
+
+开发阶段也可以使用仓库根目录的 Makefile；它只会为当前界面暂存所需的包，
+因此比完整 staging 更快：
+
+```sh
+make build
+make tui ARGS="--inline --lang en"
+make web ARGS="--port 3080"
+make desktop
+```
+
+`make tui` 和 `make web` 不会暂存 Desktop 或其它交互形态的包；Oh-DSH 也会禁用
+上游 TUI 的后台自动更新检查，pinned runtime 由 Oh-DSH 发布流程统一更新；面向
+完整共享 runtime 的发布流程仍使用 `pnpm run stage:dsh`。Make 默认使用
+`~/.ohdsh`，也可以通过 `OH_DSH_HOME` 覆盖以运行隔离实例。
 
 打包命令：
 

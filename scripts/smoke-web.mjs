@@ -119,6 +119,7 @@ const dump = spawnSync(nodeBinary, [cliEntry, '--profile', WEB_PROFILE, '--dump-
 assert.equal(dump.status, 0, dump.stderr || dump.stdout)
 for (const row of [
   'oh-web',
+  'oh-liangshen',
   'oh-better-sidebar-runtime',
   'oh-vision',
   'oh-skins',
@@ -182,6 +183,12 @@ const timeout = new Promise((_, reject) => {
 
 try {
   const base = await Promise.race([ready, timeout])
+  assert.ok(existsSync(join(
+    dshHome,
+    '.agent-presets',
+    'liangshen',
+    'agent.cordis.yml',
+  )), 'Web Liangshen plugin did not install its preset')
   const indexResponse = await fetch(base)
   const index = await indexResponse.text()
   assert.equal(indexResponse.status, 200)

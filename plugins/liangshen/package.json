@@ -1,0 +1,23 @@
+{
+  "name": "@oh-dsh/liangshen",
+  "version": "0.1.0",
+  "description": "Built-in Liangshen Agent preset bridge for Oh-DSH Web and Desktop",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/index.js",
+    "presets/liangshen"
+  ],
+  "ohDsh": {
+    "upstream": {
+      "name": "dsh-TUI Liangshen preset",
+      "package": "@deepseek-harness-tui/dsh-tui",
+      "repository": "https://github.com/ccch1mneyyy/dsh-TUI"
+    }
+  }
+}

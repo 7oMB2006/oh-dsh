@@ -19,6 +19,9 @@
     - id: oh-web
       name: '@oh-dsh/web'
 
+    - id: oh-liangshen
+      name: '@oh-dsh/liangshen'
+
     - id: oh-better-sidebar-runtime
       name: '@oh-dsh/better-sidebar-runtime'
 

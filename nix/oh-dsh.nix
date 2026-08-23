@@ -70,12 +70,12 @@ let
   tuiSrc = pkgs.fetchFromGitHub {
     owner = "ccch1mneyyy";
     repo = "dsh-TUI";
-    rev = "bdff0afb028d50c304e4474fd40f83b0721d50fd";
-    hash = "sha256-N5jjAoHeABAM+rQMGuPtQasLEk9wmU/bSw2X2ilGg0U=";
+    rev = "aca03b83850d4dc52728d068b2b1b05078ecb90b";
+    hash = "sha256-wMmIu6m5c1+DW5Fl0AK/25Z6wiNVBdOAWXg9GXR3zBU=";
   };
   tuiRelease = pkgs.fetchurl {
-    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.8.8.tgz";
-    hash = "sha512-clebbC1YnN7kU8nqRPr7U6KBopJLmQovGEO0Qu+7rHX4fN44UGPaBbVW8gLqpZrM73c8+R7kUQm0Aq4oWtmq0g==";
+    url = "https://registry.npmjs.org/@deepseek-harness-tui/dsh-tui/-/dsh-tui-0.9.0.tgz";
+    hash = "sha512-Z+q2qfPCAoXOfQqpdazMssRl0WxJQ4C3OZITETvZBXzUG63EmPqPhTGsStM0U8AgoKymxgNX0Zkfu6XH37AebQ==";
   };
   tuiEcosystemSpecSrc = pkgs.fetchFromGitHub {
     owner = "T-Auto";

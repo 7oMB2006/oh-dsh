@@ -79,8 +79,8 @@ packaged plugin.
 ## dsh-TUI
 
 - Project: <https://github.com/ccch1mneyyy/dsh-TUI>
-- Upstream package: `@deepseek-harness-tui/dsh-tui@0.8.8`
-- Pinned revision: `bdff0afb028d50c304e4474fd40f83b0721d50fd`
+- Upstream package: `@deepseek-harness-tui/dsh-tui@0.9.0`
+- Pinned revision: `aca03b83850d4dc52728d068b2b1b05078ecb90b`
 - Ecosystem specification: <https://github.com/T-Auto/dsh-ecosystem-spec>
 - Pinned ecosystem revision: `e1b902b0f95f4280a8e68d414ec7a4d25d6ce106`
 - Protocol packages: <https://github.com/Yan-Zero/dsh-std>

@@ -60,6 +60,30 @@ const nodeArchiveName = `${nodeFolder}.${isWindowsNode ? 'zip' : 'tar.gz'}`
 const nodeArchive = join(cache, nodeArchiveName)
 const nodeCache = join(cache, nodeFolder)
 const nodeExecutable = join(nodeCache, isWindowsNode ? 'node.exe' : join('bin', 'node'))
+const STAGE_SURFACES = new Set(['all', 'desktop', 'web', 'tui'])
+
+function parseStageSurface(argv = process.argv.slice(2), env = process.env) {
+  let value = env.DSH_STAGE_SURFACE ?? 'all'
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index]
+    if (argument === '--') {
+      continue
+    } else if (argument === '--surface') {
+      value = argv[index + 1]
+      index += 1
+    } else if (argument.startsWith('--surface=')) {
+      value = argument.slice('--surface='.length)
+    } else {
+      throw new Error(`unknown stage option: ${argument}`)
+    }
+  }
+  if (!STAGE_SURFACES.has(value)) {
+    throw new Error(`invalid stage surface: ${String(value)} (expected all, desktop, web, or tui)`)
+  }
+  return value
+}
+
+const stageSurface = parseStageSurface()
 
 if (!npmRelease
   && (!existsSync(join(dshSource, 'apps', 'web', 'dist', 'index.html'))
@@ -699,6 +723,41 @@ function packageMatches(directory, expected) {
   return actual.name === expected.name && actual.version === expected.version
 }
 
+/**
+ * Better Sidebar and DSH both consume node-pty, but the pinned runtime owns
+ * the native binding that is rebuilt for the staged Node. Do not leave the
+ * sidebar's source-workspace 1.1.x copy nested under the plugin: on Linux it
+ * has no usable pty.node after deployment and the Web terminal degrades.
+ */
+function alignBetterSidebarPtyDependency(packageDir) {
+  const runtimePty = runtimePackageDirectory('node-pty')
+  const runtimeManifestPath = join(runtimePty, 'package.json')
+  if (!existsSync(runtimeManifestPath)) {
+    throw new Error('staged DSH runtime is missing its node-pty package')
+  }
+  const nestedPty = join(packageDir, 'node_modules', 'node-pty')
+  rmSync(nestedPty, { recursive: true, force: true })
+  mkdirSync(dirname(nestedPty), { recursive: true })
+  if (isWindowsNode) {
+    cpSync(runtimePty, nestedPty, { dereference: true, preserveTimestamps: true, recursive: true })
+  } else {
+    portableSymlink(relative(dirname(nestedPty), runtimePty), nestedPty)
+    rmSync(join(packageDir, 'node_modules', '.oh-dsh-store', 'node-pty_1.1.0'), {
+      recursive: true,
+      force: true,
+    })
+  }
+
+  const manifestPath = join(packageDir, 'package.json')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const runtimeManifest = JSON.parse(readFileSync(runtimeManifestPath, 'utf8'))
+  manifest.dependencies = {
+    ...(manifest.dependencies ?? {}),
+    'node-pty': runtimeManifest.version,
+  }
+  writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
+}
+
 function installWindowsPackageDependencies(sourceManifestPath, packageDir) {
   const manifest = JSON.parse(readFileSync(sourceManifestPath, 'utf8'))
   if (dependencyNames(manifest).size === 0) return
@@ -881,7 +940,45 @@ function installCompiledPackageHostDependencies(sourceManifestPath, packageDir) 
   }
 }
 
-function installDesktopPackages() {
+const SURFACE_PACKAGE_NAMES = Object.freeze({
+  desktop: new Set([
+    '@oh-dsh/desktop',
+    '@oh-dsh/liangshen',
+    '@oh-dsh/better-sidebar-runtime',
+    '@oh-dsh/vision',
+    '@oh-dsh/desktop-frame',
+    '@oh-dsh/skins',
+    '@oh-dsh/sidebar',
+    '@oh-dsh/panel-controls',
+    '@oh-dsh/pinned-summary',
+    '@oh-dsh/plugin-marketplace',
+  ]),
+  web: new Set([
+    '@oh-dsh/web',
+    '@oh-dsh/liangshen',
+    '@oh-dsh/better-sidebar-runtime',
+    '@oh-dsh/vision',
+    '@oh-dsh/skins',
+    '@oh-dsh/pinned-summary',
+    '@oh-dsh/sidebar',
+    '@oh-dsh/panel-controls',
+    '@oh-dsh/plugin-marketplace',
+  ]),
+  tui: new Set([
+    '@deepseek-harness-tui/dsh-tui',
+    '@oh-dsh/tui',
+    '@oh-dsh/tui-marketplace',
+    '@oh-dsh/vision',
+    '@oh-dsh/skins',
+    '@oh-dsh/plugin-marketplace',
+  ]),
+})
+
+const ALL_SURFACE_PACKAGE_NAMES = new Set(
+  [...SURFACE_PACKAGE_NAMES.desktop, ...SURFACE_PACKAGE_NAMES.web, ...SURFACE_PACKAGE_NAMES.tui],
+)
+
+function installDesktopPackages(surface = 'all') {
   const packages = [
     {
       manifest: join(root, 'package.json'),
@@ -899,6 +996,13 @@ function installDesktopPackages() {
           join(root, 'dist', 'plugins', 'better-sidebar-runtime', 'index.js'),
           'dist/index.js',
         ],
+      ],
+    },
+    {
+      manifest: join(root, 'plugins', 'liangshen', 'package.json'),
+      files: [
+        [join(root, 'dist', 'plugins', 'liangshen', 'index.js'), 'dist/index.js'],
+        [join(root, 'upstream', 'dsh-TUI', 'presets', 'liangshen'), 'presets/liangshen'],
       ],
     },
     {
@@ -960,9 +1064,16 @@ function installDesktopPackages() {
       ],
     },
   ]
+  const selected = surface === 'all' ? undefined : SURFACE_PACKAGE_NAMES[surface]
+  for (const name of ALL_SURFACE_PACKAGE_NAMES) {
+    if (selected?.has(name) !== false) continue
+    rmSync(runtimePackageDirectory(name), { recursive: true, force: true })
+  }
+
   const installedVersions = {}
   for (const spec of packages) {
     const manifest = JSON.parse(readFileSync(spec.manifest, 'utf8'))
+    if (selected !== undefined && !selected.has(manifest.name)) continue
     delete manifest.build
     delete manifest.devDependencies
     delete manifest.scripts
@@ -974,6 +1085,9 @@ function installDesktopPackages() {
     writeFileSync(join(packageDir, 'package.json'), JSON.stringify(manifest, undefined, 2) + '\n')
     installCompiledPackageDependencies(spec.manifest, packageDir)
     installCompiledPackageHostDependencies(spec.manifest, packageDir)
+    if (manifest.name === '@oh-dsh/better-sidebar-runtime') {
+      alignBetterSidebarPtyDependency(packageDir)
+    }
     for (const [source, target] of spec.files) {
       const output = join(packageDir, target)
       mkdirSync(dirname(output), { recursive: true })
@@ -994,8 +1108,10 @@ function installDesktopPackages() {
   }
   const cliManifestPath = join(runtime, 'package.json')
   const cliManifest = JSON.parse(readFileSync(cliManifestPath, 'utf8'))
+  const dependencies = { ...(cliManifest.dependencies ?? {}) }
+  for (const name of ALL_SURFACE_PACKAGE_NAMES) delete dependencies[name]
   cliManifest.dependencies = {
-    ...cliManifest.dependencies,
+    ...dependencies,
     ...installedVersions,
   }
   writeFileSync(cliManifestPath, JSON.stringify(cliManifest, undefined, 2) + '\n')
@@ -1172,8 +1288,8 @@ if (npmRelease) {
   rewriteWorkspaceLinks()
   relinkInstallationWorkspacePackages()
 }
-console.log('Installing desktop packages')
-installDesktopPackages()
+console.log(`Installing ${stageSurface} surface packages`)
+installDesktopPackages(stageSurface)
 if (npmRelease) {
   // The npm assembly carries only the CLI package; install the packaged
   // DSH notices beside it. Oh-DSH notices are updated in this repository.
