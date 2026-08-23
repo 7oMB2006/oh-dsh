@@ -449,6 +449,7 @@ function getRuntimeUpdateManager(): RuntimeUpdateManager {
   const paths = bundledRuntimePaths(resourcesRoot())
   const dataRoot = resolveOhDshHome(process.env)
   const manager = new RuntimeUpdateManager({
+    appVersion: app.getVersion(),
     bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
     currentVersion: dshRuntimeVersionOf(resolveStagedRuntimeRoot(dataRoot) ?? paths.runtimeRoot),
     dataRoot,
@@ -1071,7 +1072,13 @@ function installIpc(): void {
   })
   ipcMain.handle('desktop:runtime-update:command', async (event, raw: unknown) => {
     assertUpdateWindowSender(event)
-    return await getRuntimeUpdateManager().command(parseRuntimeUpdateCommand(raw))
+    const command = parseRuntimeUpdateCommand(raw)
+    // While another surface owns the runtime lock this Desktop is a
+    // read-only viewer: only checks are allowed, never pointer mutations.
+    if (desktopReadOnly && command.type !== 'check') {
+      throw new Error('runtime updates are unavailable while another surface owns the runtime lock')
+    }
+    return await getRuntimeUpdateManager().command(command)
   })
   ipcMain.handle('desktop:get-info', event => {
     const preview = previewWindow?.webContents.id === event.sender.id ? previewIdentity ?? null : null

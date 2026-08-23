@@ -1,0 +1,129 @@
+name: Runtime release
+
+# Publish DSH runtime bundles without cutting a full application release,
+# so the in-app runtime updater can deliver a new pinned DSH version on its
+# own (issue #123). The bundle carries the same surface plugins and the
+# compatibility manifest the updater enforces.
+on:
+  workflow_dispatch:
+    inputs:
+      release-name:
+        description: 'Release name for the runtime bundles'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: runtime-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: Bundle ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            id: macos-arm64
+            os: macos-15
+            node_platform: darwin
+            node_arch: arm64
+            runtime_platform: darwin
+          - name: macOS x64
+            id: macos-x64
+            os: macos-15-intel
+            node_platform: darwin
+            node_arch: x64
+            runtime_platform: darwin
+          - name: Linux x64
+            id: linux-x64
+            os: ubuntu-24.04
+            node_platform: linux
+            node_arch: x64
+            runtime_platform: linux
+          - name: Windows x64
+            id: windows-x64
+            os: windows-2025
+            node_platform: win
+            node_arch: x64
+            runtime_platform: win32
+    env:
+      DSH_DESKTOP_NODE_ARCH: ${{ matrix.node_arch }}
+      DSH_DESKTOP_NODE_PLATFORM: ${{ matrix.node_platform }}
+      npm_config_pm_on_fail: 'ignore'
+      DSH_DESKTOP_SIGNING: disabled
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          architecture: ${{ matrix.node_arch }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and stage the pinned runtime
+        run: pnpm run build && pnpm run stage:dsh
+
+      - name: Package the runtime bundle
+        shell: bash
+        run: |
+          DSH_VERSION="$(node -p "require('./dsh-source.json').version")"
+          APP_VERSION="$(node -p "require('./package.json').version")"
+          BUNDLE="oh-dsh-runtime-${DSH_VERSION}-${{ matrix.runtime_platform }}-${{ matrix.node_arch }}.tar.gz"
+          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\"}" \
+            > .stage/oh-dsh-runtime-manifest.json
+          tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
+          shasum -a 256 "${BUNDLE}" > "${BUNDLE}.sha256"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-bundle-${{ matrix.id }}
+          compression-level: 0
+          path: |
+            oh-dsh-runtime-*.tar.gz
+            oh-dsh-runtime-*.tar.gz.sha256
+
+  publish:
+    name: Publish runtime release
+    needs: bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: bundles
+          pattern: runtime-bundle-*
+          merge-multiple: true
+
+      - name: Create or update the runtime release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
+            --title "${{ inputs.release-name }}" \
+            --notes "Decoupled DSH runtime bundles built from $GITHUB_SHA." \
+            bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 \
+            || gh release upload "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
+            bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 --clobber

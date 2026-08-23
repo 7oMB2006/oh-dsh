@@ -23,6 +23,13 @@ export const RUNTIME_UPDATE_REPOSITORY = 'hust-open-atom-club/oh-dsh'
 export const RUNTIME_BUNDLE_PREFIX = 'oh-dsh-runtime-'
 export const RUNTIME_POINTER_FILE = 'current.json'
 export const RUNTIMES_DIRECTORY = 'runtimes'
+/** Compatibility manifest shipped at the root of every runtime bundle. */
+export const RUNTIME_BUNDLE_MANIFEST = 'oh-dsh-runtime-manifest.json'
+
+export interface RuntimeBundleManifest {
+  bundledByAppVersion: string
+  dshVersion: string
+}
 
 export interface RuntimeBundleCandidate {
   dshVersion: string
@@ -122,6 +129,13 @@ export interface RuntimeUpdateManagerOptions {
   dataRoot: string
   /** Bundled Node binary used to smoke-verify a staged runtime. */
   nodeBinary: string
+  /**
+   * Version of this application build. A bundle is only installable when it
+   * was produced by an application no newer than the running one: the bundle
+   * embeds this project's surface plugins and adapters, whose cross-boundary
+   * contracts only stay compatible within that constraint.
+   */
+  appVersion: string
   platform?: NodeJS.Platform
   arch?: string
   /** GitHub releases API base; overridable for tests. */
@@ -272,6 +286,26 @@ export class RuntimeUpdateManager {
       mkdirSync(stageRoot, { recursive: true })
       const run = this.#options.runCommand ?? defaultRunCommand
       await run(tarBinary(this.#options.platform), ['-xzf', archivePath, '-C', stageRoot], {})
+      const stageRootAbs = stageRoot
+      const manifestPath = join(stageRootAbs, RUNTIME_BUNDLE_MANIFEST)
+      if (!existsSync(manifestPath)) {
+        throw new Error('runtime bundle is missing its compatibility manifest')
+      }
+      let bundleManifest: RuntimeBundleManifest
+      try {
+        bundleManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as RuntimeBundleManifest
+      } catch (error) {
+        throw new Error(`runtime bundle manifest is unreadable: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      if (bundleManifest.dshVersion !== candidate.dshVersion) {
+        throw new Error(`runtime bundle manifest declares DSH ${String(bundleManifest.dshVersion)}, expected ${candidate.dshVersion}`)
+      }
+      if (compareDshVersions(bundleManifest.bundledByAppVersion, this.#options.appVersion) > 0) {
+        throw new Error(
+          `runtime bundle was produced by Oh-DSH ${bundleManifest.bundledByAppVersion}, newer than this application `
+          + `${this.#options.appVersion}; update Oh-DSH Desktop first`,
+        )
+      }
       const stagedRuntime = join(stageRoot, 'dsh-runtime')
       if (!existsSync(join(stagedRuntime, 'lib', 'bin.js'))) {
         throw new Error('runtime bundle did not contain a dsh-runtime/lib/bin.js entry')

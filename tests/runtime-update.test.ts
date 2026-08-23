@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import { Readable } from 'node:stream'
 import {
   compareDshVersions,
+  RUNTIME_BUNDLE_MANIFEST,
   parseRuntimeBundleAsset,
   readRuntimePointer,
   resolveStagedRuntimeRoot,
@@ -30,7 +31,11 @@ test('runtime bundle asset names parse per platform and arch', () => {
   assert.equal(parseRuntimeBundleAsset('oh-dsh-tui-0.1.7-darwin-arm64.tar.gz', 'darwin', 'arm64'), null)
 })
 
-function stagedLayout(root: string, version: string): string {
+function stagedLayout(root: string, version: string, appVersion = '0.1.7'): string {
+  writeFileSync(join(root, RUNTIME_BUNDLE_MANIFEST), JSON.stringify({
+    bundledByAppVersion: appVersion,
+    dshVersion: version,
+  }))
   const runtimeRoot = join(root, 'runtimes', version, 'dsh-runtime')
   mkdirSync(join(runtimeRoot, 'lib'), { recursive: true })
   writeFileSync(join(runtimeRoot, 'lib', 'bin.js'), '')
@@ -80,6 +85,7 @@ test('runtime update manager selects the newest matching bundle', async () => {
   const states: string[] = []
   try {
     const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -112,6 +118,7 @@ test('runtime update manager stages, verifies, and activates a bundle', async ()
     const fixtureRuntime = stagedLayout(fixtureRoot, '0.1.1-rc.2')
     let applied = false
     const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -133,6 +140,7 @@ test('runtime update manager stages, verifies, and activates a bundle', async ()
         if (file === 'tar') {
           const target = args.at(-1)!
           cpSync(fixtureRuntime, join(target, 'dsh-runtime'), { recursive: true })
+          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
           return { stderr: '', stdout: '' }
         }
         const runtimeRoot = join(dirname(args[0]!), '..')
@@ -163,6 +171,7 @@ test('runtime update manager reports up to date without a newer bundle', async (
   const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-uptodate-'))
   try {
     const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
       arch: 'arm64',
       bundledVersion: '0.1.1-rc.2',
       currentVersion: '0.1.1-rc.2',
@@ -187,6 +196,7 @@ test('runtime update manager refuses to activate a failed smoke check', async ()
   try {
     stagedLayout(fixtureRoot, '0.1.1-rc.2')
     const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -203,7 +213,9 @@ test('runtime update manager refuses to activate a failed smoke check', async ()
       platform: 'darwin',
       runCommand: async (file, args) => {
         if (file === 'tar') {
-          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', 'dsh-runtime'), join(args.at(-1)!, 'dsh-runtime'), { recursive: true })
+          const target = args.at(-1)!
+          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', 'dsh-runtime'), join(target, 'dsh-runtime'), { recursive: true })
+          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
           return { stderr: '', stdout: '' }
         }
         // A lying runtime that reports a different version than the bundle.
@@ -213,7 +225,7 @@ test('runtime update manager refuses to activate a failed smoke check', async ()
     await manager.command({ type: 'check' })
     const failed = await manager.command({ type: 'install' })
     assert.equal(failed.status, 'error')
-    if (failed.status === 'error') assert.match(failed.message, /smoke/)
+    if (failed.status === 'error') assert.match(failed.message, /smoke check/)
     assert.equal(readRuntimePointer(dataRoot), null)
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
@@ -225,6 +237,7 @@ test('runtime update manager surfaces check failures without changing state', as
   const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-checkfail-'))
   try {
     const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
       arch: 'arm64',
       bundledVersion: '0.1.0-rc.7',
       currentVersion: '0.1.0-rc.7',
@@ -238,5 +251,48 @@ test('runtime update manager surfaces check failures without changing state', as
     if (state.status === 'error') assert.equal(state.stage, 'check')
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
+  }
+})
+
+test('runtime update manager refuses bundles from a newer application', async () => {
+  const dataRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-newerapp-'))
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'oh-dsh-runtime-fixture3-'))
+  try {
+    // Bundle produced by a newer Oh-DSH Desktop than the running one.
+    stagedLayout(fixtureRoot, '0.1.1-rc.2', '0.2.0')
+    const manager = new RuntimeUpdateManager({
+      appVersion: '0.1.7',
+      arch: 'arm64',
+      bundledVersion: '0.1.0-rc.7',
+      currentVersion: '0.1.0-rc.7',
+      dataRoot,
+      fetchImpl: (async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.includes('/releases')) {
+          return fakeReleasesResponse([{ name: 'oh-dsh-runtime-0.1.1-rc.2-darwin-arm64.tar.gz' }])
+        }
+        if (url.endsWith('.sha256')) return new Response(null, { status: 404 })
+        return new Response('x', { status: 200 })
+      }) as typeof fetch,
+      nodeBinary: process.execPath,
+      platform: 'darwin',
+      runCommand: async (file, args) => {
+        if (file === 'tar') {
+          const target = args.at(-1)!
+          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', 'dsh-runtime'), join(target, 'dsh-runtime'), { recursive: true })
+          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
+          return { stderr: '', stdout: '' }
+        }
+        return { stderr: '', stdout: '0.1.1-rc.2\n' }
+      },
+    })
+    await manager.command({ type: 'check' })
+    const refused = await manager.command({ type: 'install' })
+    assert.equal(refused.status, 'error')
+    if (refused.status === 'error') assert.match(refused.message, /update Oh-DSH Desktop first/)
+    assert.equal(readRuntimePointer(dataRoot), null)
+  } finally {
+    rmSync(dataRoot, { recursive: true, force: true })
+    rmSync(fixtureRoot, { recursive: true, force: true })
   }
 })

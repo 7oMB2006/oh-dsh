@@ -69,6 +69,8 @@ export interface LoadCatalogOptions {
 export interface ProductionMarketplacePlatformOptions {
   /** Surface-owned app-data root for cache and credential helpers. */
   appDataPath?: string
+  /** Read-only viewers read the catalog cache but never write it. */
+  cacheReadOnly?: boolean
   cliEntry: string
   /** Working directory for spawned commands; omitted in read-only viewers. */
   cwd?: string
@@ -474,6 +476,7 @@ export class ProductionMarketplacePlatform implements MarketplacePlatform {
       return cached.document
     }
     const save = (document: unknown, etag: string | null): void => {
+      if (this.#options.cacheReadOnly === true) return
       try {
         writeCatalogCache(cachePath, {
           document,

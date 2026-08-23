@@ -1808,3 +1808,39 @@ test('read-only viewer manager browses without writing or transacting', async ()
     rmSync(appDataPath, { recursive: true, force: true })
   }
 })
+
+test('read-only viewers load the catalog without writing the shared cache', async () => {
+  const appDataPath = mkdtempSync(join(tmpdir(), 'oh-dsh-marketplace-cache-readonly-'))
+  try {
+    const createPlatform = (cacheReadOnly: boolean): ProductionMarketplacePlatform =>
+      new ProductionMarketplacePlatform({
+        appDataPath,
+        cacheReadOnly,
+        cliEntry: '/unused/dsh.mjs',
+        env: {
+          OH_DSH_MARKETPLACE_CATALOG: 'public-owner/public-catalog/data/plugins.json',
+          PATH: '',
+        },
+        fetch: async (): Promise<Response> =>
+          new Response(JSON.stringify(catalogDocument()), { status: 200 }),
+        nodeBinary: process.execPath,
+        pnpmEntry: '/unused/pnpm.mjs',
+      })
+
+    assert.deepEqual(await createPlatform(true).loadCatalog(), catalogDocument())
+    assert.equal(
+      existsSync(join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')),
+      false,
+      'viewer mode must not create the shared catalog cache',
+    )
+
+    assert.deepEqual(await createPlatform(false).loadCatalog(), catalogDocument())
+    assert.equal(
+      existsSync(join(appDataPath, 'plugin-marketplace', 'catalog-cache.json')),
+      true,
+      'writer mode still refreshes the shared catalog cache',
+    )
+  } finally {
+    rmSync(appDataPath, { recursive: true, force: true })
+  }
+})

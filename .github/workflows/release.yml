@@ -147,9 +147,13 @@ jobs:
         shell: bash
         run: |
           DSH_VERSION="$(node -p "require('./dsh-source.json').version")"
+          APP_VERSION="$(node -p "require('./package.json').version")"
           BUNDLE="release/oh-dsh-runtime-${DSH_VERSION}-${{ matrix.runtime_platform }}-${{ matrix.node_arch }}.tar.gz"
           mkdir -p release
-          tar -czf "${BUNDLE}" -C .stage dsh-runtime
+          printf '%s\n' "{\"dshVersion\":\"${DSH_VERSION}\",\"bundledByAppVersion\":\"${APP_VERSION}\"}" \
+            > .stage/oh-dsh-runtime-manifest.json
+          tar -czf "${BUNDLE}" -C .stage dsh-runtime oh-dsh-runtime-manifest.json
+          rm .stage/oh-dsh-runtime-manifest.json
           shasum -a 256 "${BUNDLE}" | sed "s#  release/#  #" > "${BUNDLE}.sha256"
 
       - name: Verify updater metadata

@@ -232,9 +232,12 @@ export function createSurfaceMarketplaceHost(input: {
   const platform = new ProductionMarketplacePlatform({
     appDataPath: paths.appDataPath,
     cliEntry: paths.cliEntry,
-    // In read-only viewer mode the working directory is not created; spawned
-    // catalog commands must not inherit a nonexistent cwd (ENOENT).
-    ...(input.readOnly === true ? {} : { cwd: workingDirectory }),
+    // In read-only viewer mode the working directory is not created (spawned
+    // catalog commands must not inherit a nonexistent cwd, ENOENT) and the
+    // catalog cache under the shared data root is never written.
+    ...(input.readOnly === true
+      ? { cacheReadOnly: true }
+      : { cwd: workingDirectory }),
     env: input.environment,
     nodeBinary: paths.nodeBinary,
     pnpmEntry: paths.pnpmEntry,
