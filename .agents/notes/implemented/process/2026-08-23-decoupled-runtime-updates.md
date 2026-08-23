@@ -45,7 +45,11 @@ model — required a full Oh-DSH Desktop release before users could get it.
   bundle embeds this project's surface plugins, and only a matching
   contract revision guarantees their boundaries. Manifest-less or
   mismatched bundles are refused as non-retryable, and install errors
-  report the failing stage (download/verify/extract/activate). A
+  report the failing stage (download/verify/extract/activate). Runtime
+  selection revalidates the contract at every startup, so a bundle
+  staged by an older application retires itself after a contract bump.
+  Post-activation download cleanup is best-effort and can never turn a
+  committed activation into a reported failure. A
   `workflow_dispatch` "Runtime release" workflow publishes bundles
   alone (tag pinned to the dispatched commit via `--target`), so a DSH
   bump does not need an application release. Viewer Desktops (runtime

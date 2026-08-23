@@ -32,13 +32,15 @@ test('runtime bundle asset names parse per platform and arch', () => {
 })
 
 function stagedLayout(root: string, version: string, runtimeContract: number = 1): string {
-  writeFileSync(join(root, RUNTIME_BUNDLE_MANIFEST), JSON.stringify({
+  const runtimeRoot = join(root, 'runtimes', version, 'dsh-runtime')
+  mkdirSync(join(runtimeRoot, 'lib'), { recursive: true })
+  // The compatibility manifest ships beside the runtime directory, exactly
+  // as it is laid out inside a runtime bundle.
+  writeFileSync(join(dirname(runtimeRoot), RUNTIME_BUNDLE_MANIFEST), JSON.stringify({
     bundledByAppVersion: '0.1.7',
     dshVersion: version,
     runtimeContract,
   }))
-  const runtimeRoot = join(root, 'runtimes', version, 'dsh-runtime')
-  mkdirSync(join(runtimeRoot, 'lib'), { recursive: true })
   writeFileSync(join(runtimeRoot, 'lib', 'bin.js'), '')
   writeFileSync(join(runtimeRoot, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version }))
   return runtimeRoot
@@ -59,6 +61,12 @@ test('staged runtime pointer resolves only valid deployments', () => {
     // A pointer naming a different version than the deployment is ignored.
     writePointer(join(dataRoot, 'runtimes'), { dshRuntimeRoot: runtimeRoot, version: '9.9.9' })
     assert.equal(resolveStagedRuntimeRoot(dataRoot), null)
+
+    // Startup revalidates the bundle's runtime contract revision: a bundle
+    // staged by an application with a different contract is ignored.
+    writePointer(join(dataRoot, 'runtimes'), { dshRuntimeRoot: runtimeRoot, version: '0.1.1-rc.2' })
+    assert.equal(resolveStagedRuntimeRoot(dataRoot, { runtimeContract: 1 }), runtimeRoot)
+    assert.equal(resolveStagedRuntimeRoot(dataRoot, { runtimeContract: 2 }), null)
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
   }
@@ -141,7 +149,7 @@ test('runtime update manager stages, verifies, and activates a bundle', async ()
         if (file === 'tar') {
           const target = args.at(-1)!
           cpSync(fixtureRuntime, join(target, 'dsh-runtime'), { recursive: true })
-          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
+          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
           return { stderr: '', stdout: '' }
         }
         const runtimeRoot = join(dirname(args[0]!), '..')
@@ -216,7 +224,7 @@ test('runtime update manager refuses to activate a failed smoke check', async ()
         if (file === 'tar') {
           const target = args.at(-1)!
           cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', 'dsh-runtime'), join(target, 'dsh-runtime'), { recursive: true })
-          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
+          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
           return { stderr: '', stdout: '' }
         }
         // A lying runtime that reports a different version than the bundle.
@@ -281,7 +289,7 @@ test('runtime update manager refuses bundles from a newer application', async ()
         if (file === 'tar') {
           const target = args.at(-1)!
           cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', 'dsh-runtime'), join(target, 'dsh-runtime'), { recursive: true })
-          cpSync(join(fixtureRoot, RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
+          cpSync(join(fixtureRoot, 'runtimes', '0.1.1-rc.2', RUNTIME_BUNDLE_MANIFEST), join(target, RUNTIME_BUNDLE_MANIFEST))
           return { stderr: '', stdout: '' }
         }
         return { stderr: '', stdout: '0.1.1-rc.2\n' }

@@ -143,13 +143,17 @@ async function retireDuplicateMacBundles(): Promise<void> {
   }
 }
 
+const ohDshRuntimeContract: number = JSON.parse(
+  readFileSync(join(currentDir, '..', 'package.json'), 'utf8'),
+).ohDshRuntimeContract
+
 function runtimePaths(): BundledRuntimePaths {
   // An explicitly overridden resources root wins; otherwise a validated
   // staged runtime from an in-app DSH update takes precedence over the
   // runtime bundled with this application build.
   const explicitRoot = process.env.OH_DSH_RESOURCES_ROOT ?? process.env.DSH_OH_WEB_ROOT
   const staged = explicitRoot === undefined || explicitRoot === ''
-    ? resolveStagedRuntimeRoot(resolveOhDshHome(process.env))
+    ? resolveStagedRuntimeRoot(resolveOhDshHome(process.env), { runtimeContract: ohDshRuntimeContract })
     : null
   return bundledRuntimePaths(resourcesRoot(), process.platform, staged ?? undefined)
 }
@@ -449,9 +453,11 @@ function getRuntimeUpdateManager(): RuntimeUpdateManager {
   const paths = bundledRuntimePaths(resourcesRoot())
   const dataRoot = resolveOhDshHome(process.env)
   const manager = new RuntimeUpdateManager({
-    runtimeContract: JSON.parse(readFileSync(join(currentDir, '..', 'package.json'), 'utf8')).ohDshRuntimeContract,
+    runtimeContract: ohDshRuntimeContract,
     bundledVersion: dshRuntimeVersionOf(paths.runtimeRoot),
-    currentVersion: dshRuntimeVersionOf(resolveStagedRuntimeRoot(dataRoot) ?? paths.runtimeRoot),
+    currentVersion: dshRuntimeVersionOf(
+      resolveStagedRuntimeRoot(dataRoot, { runtimeContract: ohDshRuntimeContract }) ?? paths.runtimeRoot,
+    ),
     dataRoot,
     nodeBinary: paths.nodeBinary,
     onLog: message => { appendLog('desktop', `[runtime-update] ${message}`) },

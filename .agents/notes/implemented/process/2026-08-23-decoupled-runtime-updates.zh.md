@@ -38,7 +38,9 @@ Desktop 才能到达用户。
   判定，而非应用包版本：bundle 内嵌本项目的表面插件，只有契约版本
   一致才能保证其边界。缺失 manifest 或契约不匹配的 bundle 以不可
   重试错误拒绝；安装错误会报告实际失败的阶段
-  （download/verify/extract/activate）。`workflow_dispatch` 的
+  （download/verify/extract/activate）。运行时选择在每次启动时重新
+  校验契约，契约升级后由旧应用暂存的 bundle 会自行失效。激活后的
+  下载清理为尽力而为，绝不会把已提交的激活变成报错的失败。`workflow_dispatch` 的
   "Runtime release" 工作流可单独发布 bundle（tag 通过 `--target`
   固定到派发的提交），DSH 升级不再需要应用发版。Desktop 处于查看端
   （运行时锁被其他表面持有）时，IPC 边界拒绝

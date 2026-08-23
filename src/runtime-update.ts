@@ -12,7 +12,7 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { promisify } from 'node:util'
@@ -337,7 +337,13 @@ export class RuntimeUpdateManager {
       stage = 'activate'
       this.#setState({ status: 'staging', bundledVersion: this.#options.bundledVersion, candidate, currentVersion: this.#options.currentVersion, stage: 'activate' })
       writePointer(updateRoot, { dshRuntimeRoot: stagedRuntime, version: candidate.dshVersion })
-      rmSync(downloadsRoot, { recursive: true, force: true })
+      // Reclaiming the download archive must never turn a committed
+      // activation into a reported failure (e.g. a Windows scanner EPERM).
+      try {
+        rmSync(downloadsRoot, { recursive: true, force: true })
+      } catch (error) {
+        this.#options.onLog?.(`could not clean up runtime downloads: ${error instanceof Error ? error.message : String(error)}`)
+      }
       this.#options.currentVersion = candidate.dshVersion
       this.#candidate = null
       this.#busy = false
@@ -406,9 +412,14 @@ export function readRuntimePointer(dataRoot: string): RuntimePointer | null {
 /**
  * Resolve the active staged runtime root: the pointer must reference a
  * deployable runtime (lib/bin.js present, manifest version matching the
- * pointer). Anything else falls back to the bundled runtime.
+ * pointer) whose bundle declares the caller's runtime contract revision.
+ * Anything else falls back to the bundled runtime — including a bundle
+ * staged by an older application after a contract bump.
  */
-export function resolveStagedRuntimeRoot(dataRoot: string): string | null {
+export function resolveStagedRuntimeRoot(
+  dataRoot: string,
+  options: { runtimeContract?: number } = {},
+): string | null {
   const pointer = readRuntimePointer(dataRoot)
   if (pointer === null) return null
   if (!existsSync(join(pointer.dshRuntimeRoot, 'lib', 'bin.js'))) return null
@@ -417,6 +428,17 @@ export function resolveStagedRuntimeRoot(dataRoot: string): string | null {
     if (manifest.version !== pointer.version) return null
   } catch {
     return null
+  }
+  if (options.runtimeContract !== undefined) {
+    try {
+      const bundleManifest = JSON.parse(readFileSync(
+        join(dirname(pointer.dshRuntimeRoot), RUNTIME_BUNDLE_MANIFEST),
+        'utf8',
+      )) as RuntimeBundleManifest
+      if (bundleManifest.runtimeContract !== options.runtimeContract) return null
+    } catch {
+      return null
+    }
   }
   return pointer.dshRuntimeRoot
 }

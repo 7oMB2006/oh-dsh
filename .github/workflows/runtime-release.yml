@@ -122,10 +122,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "${{ inputs.release-name }}" \
-            --notes "Decoupled DSH runtime bundles built from $GITHUB_SHA." \
-            bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 \
-            || gh release upload "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
-            bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 --clobber
+          set -euo pipefail
+          if gh release view "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # An existing release may only be appended to when its tag
+            # resolves to this dispatch's commit; otherwise the assets
+            # would be attributed to the wrong source.
+            TAG_NAME="$(gh release view "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+            # Prefer the dereferenced line so annotated tags resolve to the commit.
+            TAG_COMMIT="$(git ls-remote "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$TAG_NAME^{}" "refs/tags/$TAG_NAME" | grep -m1 '\^{}' | cut -f1 || true)"
+            TAG_COMMIT="${TAG_COMMIT:-$(git ls-remote "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/$TAG_NAME" | cut -f1)}"
+            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
+              echo "::error::release ${{ inputs.release-name }} is tagged at $TAG_COMMIT, not this dispatch ($GITHUB_SHA); refusing to clobber it"
+              exit 1
+            fi
+            gh release upload "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
+              bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256 --clobber
+          else
+            gh release create "${{ inputs.release-name }}" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "${{ inputs.release-name }}" \
+              --notes "Decoupled DSH runtime bundles built from $GITHUB_SHA." \
+              bundles/oh-dsh-runtime-*.tar.gz bundles/oh-dsh-runtime-*.tar.gz.sha256
+          fi
