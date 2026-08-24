@@ -81,7 +81,9 @@ complements it for first install and scripted setup.
 
 - The documented installer URL is `raw.githubusercontent.com/.../main/install.sh`,
   so the script evolves with the branch rather than being a frozen release
-  asset; `release.yml` is unchanged.
+  asset; `release.yml` is unchanged. The landing page ships the one-liner in
+  a copyable terminal block under the hero's surface cards, so the site and
+  the installer URL must stay in sync manually.
 - Release resolution depends on GitHub's compact REST JSON shape. The
   digest parser is dependency-free `awk`/`grep`/`sed` that isolates asset
   objects by their `},{` separators (nested `uploader` objects defeat a

@@ -65,7 +65,9 @@ desktop 自更新；shell 安装器补足首次安装与脚本化场景。
 ## Consequences
 
 - 文档化安装 URL 是 `raw.githubusercontent.com/.../main/install.sh`，脚本
-  随分支演进，而不是冻结的 release 资产；`release.yml` 不变。
+  随分支演进，而不是冻结的 release 资产；`release.yml` 不变。落地页在
+  hero 区 surface 卡片下方以可复制的终端块展示这行命令，站点与安装 URL
+  需要保持人工同步。
 - 版本解析依赖 GitHub 的紧凑 REST JSON 形态。摘要解析器是无依赖的
   `awk`/`grep`/`sed`，按 `},{` 分隔资产对象（嵌套的 `uploader` 对象会让按
   `{` 切分的方案失效）；任何使摘要查找失效的形态变化都会以可操作的错误
