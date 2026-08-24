@@ -71,6 +71,59 @@ Git Review、浏览器、文件、会话与插件状态由本地工作台统一�
 
 ## 下载与安装
 
+### 首选：命令行安装
+
+Linux 与 macOS 使用仓库根目录的 `install.sh` 安装最新稳定版。默认安装
+TUI，并将 `ohdsh` 注册到 `~/.local/bin`；新开一个终端后即可使用：
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash
+```
+
+需要 Web 或 Desktop 时显式选择发行形态：
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface web
+
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface desktop
+```
+
+Windows 使用仓库根目录的 `install.ps1`；不带参数时同样默认安装 TUI：
+
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
+安装完成后，通过统一命令启动已安装的界面：
+
+```sh
+# 终端界面
+ohdsh tui
+
+# Web 界面
+ohdsh web
+
+# Desktop 应用
+ohdsh desktop
+```
+
+`ohdsh` 只会启动已经安装的 surface；Desktop 的直接入口
+`oh-dsh-desktop` 仍然保留。Linux/macOS 如果当前终端还没有加载新的 PATH，
+请重新打开终端；Windows 请使用新终端。
+
+安装器在校验发布的 SHA-256 摘要之前不会触碰旧安装，下载失败、摘要不匹配
+或解压中断都保持原安装可用；重复执行同一命令即为原地升级，
+`--uninstall` 按 surface 卸载。完整选项、环境变量与 surface 矩阵见
+[安装说明](./docs/usage.zh.md#使用-installsh-安装)。
+
+### 从 GitHub Release 手动安装
+
 从 [GitHub Releases](https://github.com/hust-open-atom-club/oh-dsh/releases/latest)
 选择需要的发行形态：
 
@@ -84,51 +137,7 @@ Git Review、浏览器、文件、会话与插件状态由本地工作台统一�
 - **Windows：**运行安装包，或解压便携版后启动。
 - **Linux：**直接运行 AppImage，或使用 `apt` 安装 deb。
 
-macOS 与 Linux 可以用仓库根目录的 `install.sh` 一键安装最新稳定版；
-Windows 使用 `install.ps1`：
-
-```sh
-curl -fsSL \
-  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
-  | bash -s -- --surface desktop
-```
-
-```powershell
-irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
-```
-
-`--surface` 可选 `desktop`（默认）、`web` 或 `tui`，每个 surface 只安装
-自己的文件与启动器。安装器在校验发布的 SHA-256 摘要之前不会触碰旧安装，
-下载失败、摘要不匹配或解压中断都保持原安装可用；升级成功后会删除旧安装，
-不会累积副本。重复执行同一命令即为原地升级，`--uninstall` 按 surface
-卸载。每个 surface 还会在每次启动时检查一次更新的稳定版：TUI 与 Web
-打印提示并通过 `ohdsh update` 升级，desktop 通过更新窗口通知。完整选项、
-环境变量与 surface 矩阵见
-[安装说明](./docs/usage.zh.md#使用-installsh-安装)。
-
-Web-only 与 TUI-only 包解压后即可运行：
-
-```sh
-# Web UI，默认监听 http://127.0.0.1:3080
-./bin/ohdsh web
-
-# Terminal UI
-./bin/ohdsh tui
-```
-
-Windows 使用 `bin\ohdsh.cmd web` 或 `bin\ohdsh.cmd tui`。
-
-### 安装统一命令
-
-macOS 完整版可将应用内的启动器加入 `PATH`：
-
-```sh
-sudo ln -sf \
-  "/Applications/Oh-DSH Desktop.app/Contents/Resources/bin/ohdsh" \
-  /usr/local/bin/ohdsh
-```
-
-Web-only 与 TUI-only 包可直接运行 `./bin/ohdsh`，也可以把它加入 `PATH`。
+安装脚本是推荐入口；Release 资产适合需要手动选择包或离线分发的场景。
 
 ## 使用
 
