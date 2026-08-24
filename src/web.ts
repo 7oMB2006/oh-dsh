@@ -20,6 +20,7 @@ import {
   type RuntimeExit,
 } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
+import { checkForUpdate, formatUpdateNotice } from './self-update.ts'
 import { resolveProductVersion } from './version.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
@@ -321,6 +322,13 @@ export async function main(
     if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
+    // One non-blocking startup update check; the notice arrives as a single
+    // line once resolved and never delays the server.
+    void checkForUpdate(version, env).then(result => {
+      if (result?.updateAvailable === true) {
+        stdout.write(formatUpdateNotice(result))
+      }
+    }).catch(() => {})
     if (options.open && browserOpened === false) {
       browserOpened = true
       openBrowser(url.href, process.platform)

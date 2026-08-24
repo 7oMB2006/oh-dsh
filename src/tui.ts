@@ -15,6 +15,7 @@ import {
   type BundledRuntimePaths,
 } from './runtime-paths.ts'
 import { resolveProductVersion } from './version.ts'
+import { startupUpdateNotice } from './self-update.ts'
 
 /** Default Oh-DSH-owned home, isolated from the upstream DSH CLI. */
 export const DEFAULT_TUI_HOME = defaultOhDshHome()
@@ -238,6 +239,10 @@ export async function main(
   }
 
   const root = resolveTuiRoot(env)
+  // One bounded startup update check, printed before the first TUI frame so
+  // it survives in the inline scrollback like the codex-TUI notice.
+  const notice = await startupUpdateNotice(resolveTuiVersion(root), env)
+  if (notice !== undefined) stderr.write(notice)
   const stagedNode = process.platform === 'win32'
     ? join(root, '.stage', 'node-runtime', 'node.exe')
     : join(root, '.stage', 'node-runtime', 'bin', 'node')
