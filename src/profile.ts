@@ -25,6 +25,7 @@ export const BUNDLED_DESKTOP_CLIENT_PLUGINS = [
 /** Host-only capability providers shipped inside the desktop runtime. */
 export const BUNDLED_DESKTOP_HOST_PLUGINS = [
   '@oh-dsh/better-sidebar-runtime',
+  '@oh-dsh/liangshen',
 ] as const
 
 /** Every protected plugin shipped inside the desktop distribution. */

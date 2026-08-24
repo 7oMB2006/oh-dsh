@@ -34,10 +34,11 @@ def main():
         "plugin-marketplace": os.path.join("plugins", "plugin-marketplace"),
         "better-sidebar-runtime": os.path.join("plugins", "better-sidebar-runtime"),
         "vision": os.path.join("plugins", "vision"),
+        "liangshen": os.path.join("plugins", "liangshen"),
     }
     selected = {
         "full": set(plugin_dirs) | {"tui-renderer"},
-        "web": {"web", "skins", "sidebar", "panel-controls", "pinned-summary", "better-sidebar-runtime", "vision"},
+        "web": {"web", "skins", "sidebar", "panel-controls", "pinned-summary", "better-sidebar-runtime", "vision", "liangshen"},
         "tui": {"tui", "tui-renderer", "skins", "vision"},
     }.get(surface)
     if selected is None:
@@ -106,6 +107,14 @@ def main():
                 src = os.path.join(src_base, fname)
                 if os.path.exists(src):
                     shutil.copy2(src, os.path.join(dst_dir, fname))
+
+        # The Liangshen package ships its preset beside dist/ exactly as
+        # stage-dsh.mjs stages upstream/dsh-TUI/presets/liangshen.
+        if plugin_key == "liangshen":
+            preset_src = os.path.join(bundle_root, "tui-renderer", "presets", "liangshen")
+            if not os.path.isdir(preset_src):
+                raise FileNotFoundError(f"missing liangshen preset: {preset_src}")
+            shutil.copytree(preset_src, os.path.join(package_dir, "presets", "liangshen"))
 
         installed_versions[name] = manifest["version"]
         print(f"registered {name}")

@@ -19,6 +19,7 @@ mkdirSync(dist, { recursive: true })
 
 const pluginPackages = [
   { directory: 'better-sidebar-runtime', hostOnly: true },
+  { directory: 'liangshen', hostOnly: true },
   {
     directory: 'vision',
     id: '@oh-dsh/vision',

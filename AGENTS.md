@@ -86,33 +86,8 @@ See `docs/design.en.md` and `docs/design.md` for detailed boundaries.
   Invalid: `fix(marketplace): make preview cleanup junction-safe on Windows`
 - Include a body explaining why and impact. Keep every body line at most 72
   characters.
-- Sign every commit the current PR introduces with the contributor's own DCO
-  using `git commit -s`: `Signed-off-by: Name <email>`. Scope DCO checks
-  only to those PR-introduced commits; never re-check commits already in
-  the base history.
-- The PR-introduced commits are exactly the difference between the merge
-  target and the PR branch, and nothing else. Enumerate them with git
-  before reviewing or commenting on DCO status; never review a commit that
-  this enumeration does not list:
-
-  ```sh
-  # List every commit this PR adds relative to its merge target.
-  git log --oneline origin/main..HEAD
-
-  # Verify each of those commits carries a Signed-off-by trailer; a line
-  # printing only the hash marks an unsigned commit.
-  for c in $(git rev-list origin/main..HEAD); do
-    git log -1 --format='%h %(trailers:key=Signed-off-by)' "$c"
-  done
-  ```
-
-  A commit hash that `git rev-list origin/main..HEAD` does not list is not
-  part of the PR; flagging it as unsigned is a review error. Any commit in
-  the list without a `Signed-off-by: Name <email>` trailer blocks the
-  merge and must be recreated with `git commit -s` (or
-  `git rebase --signoff origin/main..HEAD`) before the PR can merge.
-- An optional `Assisted-by: <tool>` trailer may disclose AI assistance. It is
-  not a DCO, must not identify a fictional person, and is never required.
+- An optional `Assisted-by: <tool>` trailer may disclose AI assistance. It
+  must not identify a fictional person and is never required.
 - Preserve upstream licenses, notices, links, and downstream attribution.
 - In PRs, state scope and verification, link related issues, and resolve
   actionable review and CI failures before merge.

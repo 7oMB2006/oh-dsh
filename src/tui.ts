@@ -49,8 +49,8 @@ Options:
   --resume <session>     resume an existing session id
   --lang <zh|en>         initial interface language
   --preset <name>        initial agent preset
-  --fullscreen           use the alternate screen (default)
-  --inline               keep terminal scrollback instead
+  --fullscreen           use the alternate screen
+  --inline               keep terminal scrollback instead (default)
   --help                 show this help
 
 Environment:
@@ -91,7 +91,7 @@ export function parseTuiArgs(
       ?? optionalEnv(env, 'OH_DSH_HOME')
       ?? defaultDataRoot,
     fullscreen: envFullscreen === undefined
-      ? true
+      ? false
       : parseBoolean(envFullscreen, 'DSH_OH_TUI_FULLSCREEN'),
     help: false,
     ...(envLang === undefined ? {} : { lang: language(envLang) }),
@@ -182,9 +182,6 @@ export function tuiLaunchSpec(
   const cwd = resolve(options.cwd)
   const childEnv: NodeJS.ProcessEnv = {
     ...env,
-    CC_TUI_LANG: options.lang,
-    CC_TUI_PRESET: options.preset,
-    DSH_CC_RESUME_SESSION: options.sessionId,
     DSH_HOME: dataRoot,
     DSH_OH_TUI: '1',
     DSH_OH_TUI_HOME: dataRoot,
@@ -203,6 +200,11 @@ export function tuiLaunchSpec(
     OH_DSH_MARKETPLACE_PNPM_ENTRY: paths.pnpmEntry,
     PATH: runtimeSearchPath(paths, env),
   }
+  // Do not let the pinned renderer's legacy aliases trigger a warning line
+  // before the first inline frame. Oh-DSH owns the namespaced equivalents.
+  delete childEnv.CC_TUI_LANG
+  delete childEnv.CC_TUI_PRESET
+  delete childEnv.DSH_CC_RESUME_SESSION
   return {
     args: [paths.cliEntry, '--profile', TUI_PROFILE],
     command: paths.nodeBinary,

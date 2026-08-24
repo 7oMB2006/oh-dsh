@@ -156,6 +156,28 @@ ohdsh web
 ohdsh tui
 ```
 
+For local source development, use the repository Makefile to start one
+surface quickly:
+
+```sh
+make build
+make tui ARGS="--lang en"       # stage and start TUI only
+make web ARGS="--port 3080"     # stage and start Web only
+make desktop                     # stage and start Desktop only
+```
+
+`make tui` uses inline mode by default and renders from the current terminal
+cursor position; pass `ARGS="--fullscreen"` to use the alternate screen.
+Each Make target stages only its own Oh-DSH surface packages, so unrelated
+interaction surfaces are not added to the development runtime. Make uses
+`~/.ohdsh` by default; override it with `OH_DSH_HOME=/tmp/ohdsh make tui`.
+
+Desktop, Web, and TUI share the same Agent preset roster. The bundled
+`liangshen` preset keeps the root and delegated agents on Minimal's two-tool
+surface for the first request, promotes to the full catalog after the first
+tool call, and re-anchors after compaction. Select it from the Agent preset
+settings in Web/Desktop, or run `/preset liangshen` in TUI.
+
 Build the full distribution with the platform-specific `dist:mac`,
 `dist:linux`, or `dist:win` script. Build only Web with `pnpm run dist:web`,
 or only TUI with `pnpm run dist:tui`.

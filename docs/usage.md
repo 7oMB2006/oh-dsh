@@ -143,8 +143,8 @@ cd oh-dsh-tui-*/
 ```
 
 Use `bin\ohdsh.cmd tui` on Windows. TUI requires a real interactive terminal.
-It uses the alternate screen by default; upstream `dsh-TUI` owns fullscreen
-selection, scrolling, and copy behavior.
+It keeps the current terminal position by default, matching the Codex-style
+inline startup; pass `--fullscreen` to use the alternate screen.
 
 ## Unified commands
 
@@ -171,7 +171,23 @@ Common TUI options:
 | `--resume` | New session | Resume a Session id |
 | `--lang` | Upstream preference | `zh` or `en` |
 | `--preset` | `standard` | Initial Agent preset |
-| `--inline` | Off | Preserve terminal scrollback instead of alternate screen |
+| `--inline` | On | Preserve terminal scrollback instead of alternate screen |
+
+### Agent presets
+
+Desktop, Web, and TUI use the same Agent preset roster. The distribution ships
+`liangshen`, which keeps the root and delegated agents on Minimal's two-tool
+surface for the first request, promotes to the full catalog after the first
+tool call, and re-anchors after compaction. Choose it from the Agent preset
+settings in Web/Desktop; in TUI, enter:
+
+```text
+/preset liangshen
+```
+
+You can also select it at TUI startup with `ohdsh tui --preset liangshen`.
+The blank-only rule applies after a conversation has started; that choice is
+saved as the default for the next new session.
 
 ## Image recognition
 
@@ -340,6 +356,23 @@ ohdsh desktop
 ohdsh web --port 3080
 ohdsh tui
 ```
+
+For faster surface-local development, the repository Makefile stages only the
+packages required by the selected interface:
+
+```sh
+make build
+make tui ARGS="--inline --lang en"
+make web ARGS="--port 3080"
+make desktop
+```
+
+`make tui` and `make web` do not stage Desktop or other surface packages.
+Oh-DSH also disables the upstream TUI background update check; pinned runtime
+updates are handled by the Oh-DSH release flow. Make uses `~/.ohdsh` by
+default and accepts an `OH_DSH_HOME` override for isolated runs.
+`pnpm run stage:dsh` remains the full shared stage used by release-oriented
+workflows.
 
 Packaging commands:
 

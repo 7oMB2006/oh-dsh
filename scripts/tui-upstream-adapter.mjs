@@ -22,6 +22,178 @@ function replaceEvery(path, before, after) {
   writeFileSync(path, source.split(before).join(after))
 }
 
+function replaceLogoModule(path) {
+  const source = readFileSync(path, 'utf8')
+  if (
+    source.includes('function CodexStartupOverlay')
+    && source.includes('export function LogoV2({ model, effort, cwd })')
+  ) return
+
+  for (const marker of [
+    'function capitalize(text) {',
+    'export function LogoV2({ model, effort, cwd, skipIntro = false, tip, whale = true, drift, }) {',
+  ]) {
+    if (!source.includes(marker)) {
+      throw new Error(`TUI upstream adapter seam changed: ${path}`)
+    }
+  }
+
+  const replacement = `import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Box, Text } from '../ui.js';
+
+const VERSION = (() => {
+    try {
+        const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'package.json');
+        return JSON.parse(readFileSync(pkgPath, 'utf8')).version ?? '0.1.0';
+    }
+    catch {
+        return '0.1.0';
+    }
+})();
+function capitalize(text) {
+    return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
+}
+function CodexStartupOverlay({ model, effort, cwd }) {
+    const title = process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI';
+    const version = process.env.DSH_OH_TUI_VERSION ?? VERSION;
+    const effortLabel = effort === undefined ? '' : ' ' + capitalize(effort);
+    return _jsxs(Box, { alignSelf: "flex-start", borderColor: "permission", borderStyle: "round", flexDirection: "column", marginTop: 1, maxWidth: "100%", paddingX: 1, flexShrink: 0, children: [_jsxs(Text, { color: "permission", bold: true, wrap: "truncate-end", children: [">_ ", title, " (v", version, ")"] }), _jsx(Text, { children: " " }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "model:       " }), model, effortLabel, _jsx(Text, { color: "permission", dimColor: true, children: "   /model to change" })] }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "directory:   " }), cwd] })] });
+}
+
+export function LogoV2({ model, effort, cwd }) {
+    return _jsx(CodexStartupOverlay, { model, effort, cwd });
+}
+`
+  writeFileSync(path, replacement)
+}
+
+function adaptOverlayDirection(path) {
+  const source = readFileSync(path, 'utf8')
+  if (source.includes('Oh-DSH transient panels follow') && source.includes('bottom: "100%"')) return
+  if (!source.includes('bottom: "100%"') || !source.includes('export function OverlayAbove')) {
+    throw new Error(`TUI upstream adapter seam changed: ${path}`)
+  }
+  const replacement = `import { jsx as _jsx } from "react/jsx-runtime";
+import { Box } from '../ui.js';
+
+/**
+ * Oh-DSH transient panels stay above the input anchor so inline rendering can
+ * keep the panel inside the current frame and preserve terminal scrollback.
+ */
+export function OverlayAbove({ children, maxHeight, }) {
+    return (_jsx(Box, { position: "absolute", bottom: "100%", left: 0, right: 0, flexDirection: "column", justifyContent: "flex-end", overflow: "hidden", opaque: true, ...(maxHeight === undefined ? {} : { maxHeight }), children: _jsx(Box, { flexDirection: "column", flexShrink: 0, children: children }) }));
+}
+`
+  writeFileSync(path, replacement)
+}
+
+function replaceRequiredOnce(path, before, after) {
+  const source = readFileSync(path, 'utf8')
+  const first = source.indexOf(before)
+  if (first === -1) {
+    if (source.includes(after)) return
+    throw new Error(`TUI upstream adapter seam changed: ${path}`)
+  }
+  if (source.indexOf(before, first + before.length) !== -1) {
+    throw new Error(`TUI upstream adapter seam changed: ${path}`)
+  }
+  writeFileSync(path, source.slice(0, first) + after + source.slice(first + before.length))
+}
+
+function adaptStartupSpacing(messageListPath, loadedContextPath, promptInputPath) {
+  replaceRequiredOnce(
+    messageListPath,
+    'return (_jsx(Box, { flexDirection: "column", marginBottom: 1, children: _jsx(LogoV2,',
+    'return (_jsx(Box, { flexDirection: "column", children: _jsx(LogoV2,',
+  )
+  replaceRequiredOnce(
+    loadedContextPath,
+    'return (_jsxs(Box, { flexDirection: "column", marginTop: 1, marginBottom: 1, children: [_jsx(Box, { paddingX: 1,',
+    'return (_jsxs(Box, { flexDirection: "column", children: [_jsx(Box, { paddingX: 1,',
+  )
+  replaceRequiredOnce(
+    promptInputPath,
+    'return (_jsxs(Box, { flexDirection: "column", marginTop: 1, children: [floatersOpen &&',
+    'return (_jsxs(Box, { flexDirection: "column", children: [floatersOpen &&',
+  )
+}
+
+function adaptChatStartupLayout(path) {
+  const marker = '    const loadedContextVisible = channel.rows.length === 0 && channel.loadedContext !== undefined;'
+  const source = readFileSync(path, 'utf8')
+  if (source.includes('const inlineLayout = fullscreen === false;')) return
+  if (!source.includes(marker)) {
+    throw new Error(`TUI upstream adapter seam changed: ${path}`)
+  }
+  replaceOnce(
+    path,
+    marker,
+    `${marker}\n    const inlineLayout = fullscreen === false;`,
+  )
+  replaceOnce(
+    path,
+    'return (_jsxs(Box, { ref: wakeTickRef, flexDirection: "column", flexGrow: 1, width: "100%", children:',
+    'return (_jsxs(Box, { ref: wakeTickRef, flexDirection: "column", flexGrow: inlineLayout ? 0 : 1, width: "100%", children:',
+  )
+  replaceOnce(
+    path,
+    'flexDirection: "row", flexGrow: 1, flexShrink: 1, width: "100%", children:',
+    'flexDirection: "row", flexGrow: inlineLayout ? 0 : 1, flexShrink: inlineLayout ? 0 : 1, width: "100%", children:',
+  )
+  replaceOnce(
+    path,
+    'flexGrow: 1, flexShrink: 1, stickyScroll: true',
+    'flexGrow: inlineLayout ? 0 : 1, flexShrink: inlineLayout ? 0 : 1, stickyScroll: true',
+  )
+}
+
+function adaptScrollBoxContentGrowth(path) {
+  const before = 'children: _jsx(Box, { flexDirection: "column", flexGrow: 1, flexShrink: 0, width: "100%", children: children })'
+  const after = 'children: _jsx(Box, { flexDirection: "column", flexGrow: style.flexGrow ?? 0, flexShrink: 0, width: "100%", children: children })'
+  replaceOnce(path, before, after)
+}
+
+function disableUpstreamUpdateCheck(path) {
+  const before = `    void checkForTuiUpdate().then((update) => {
+        if (update === undefined || exited || updateRequested)
+            return;
+        channel.notify(t('update-available', { current: update.current, latest: update.latest }), { color: 'warning', timeoutMs: 12000 });
+    });`
+  const after = `    if (process.env.DSH_OH_TUI !== '1') {
+        void checkForTuiUpdate().then((update) => {
+            if (update === undefined || exited || updateRequested)
+                return;
+            channel.notify(t('update-available', { current: update.current, latest: update.latest }), { color: 'warning', timeoutMs: 12000 });
+        });
+    }`
+  replaceOnce(path, before, after)
+}
+
+function disableInlineAutoReanchor(path) {
+  // Fullscreen launches use the alternate screen, where the upstream
+  // reanchor-and-render cadence must keep working; only inline launches
+  // suppress it.
+  const guard = "process.env.DSH_OH_TUI !== '1' || process.env.OH_DSH_TUI_FULLSCREEN === '1'"
+  const idleBefore = `            this.log.requestViewportReanchor();
+            this.renderNow();`
+  const idleAfter = `            if (${guard}) {
+                this.log.requestViewportReanchor();
+                this.renderNow();
+            }`
+  replaceOnce(path, idleBefore, idleAfter)
+
+  const stderrBefore = `                        this.log.requestViewportReanchor();
+                        this.scheduleRender();`
+  const stderrAfter = `                        if (${guard}) {
+                            this.log.requestViewportReanchor();
+                            this.scheduleRender();
+                        }`
+  replaceOnce(path, stderrBefore, stderrAfter)
+}
+
 /**
  * Apply the small Oh-DSH adapter to a copied upstream package. Exact-match
  * guards make an upstream layout change fail packaging instead of silently
@@ -42,18 +214,17 @@ export function adaptTuiRendererPackage(packageDir) {
   )
 
   const logo = join(lib, 'components', 'LogoV2.js')
-  replaceOnce(
-    logo,
-    "sweep('✦ dsh-TUI', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
-    "sweep(process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI', t, wordmarkRGB, wordmarkShimmerRGB, 60)",
-  )
-  replaceOnce(
-    logo,
-    "'  v' + VERSION",
-    "'  v' + (process.env.DSH_OH_TUI_VERSION ?? VERSION)",
+  replaceLogoModule(logo)
+  adaptOverlayDirection(join(lib, 'components', 'OverlayAbove.js'))
+  adaptStartupSpacing(
+    join(lib, 'components', 'MessageList.js'),
+    join(lib, 'components', 'LoadedContextPanel.js'),
+    join(lib, 'components', 'PromptInput.js'),
   )
 
   const chat = join(lib, 'screens', 'Chat.js')
+  adaptScrollBoxContentGrowth(join(lib, 'ink', 'components', 'ScrollBox.js'))
+  adaptChatStartupLayout(chat)
   replaceOnce(
     chat,
     '`${titlePrefix} 🐋 ${channel.sessionTitle}`',
@@ -71,6 +242,8 @@ export function adaptTuiRendererPackage(packageDir) {
   }
 
   const plugin = join(lib, 'dsh-adapter', 'plugin.js')
+  disableUpstreamUpdateCheck(plugin)
+  disableInlineAutoReanchor(join(lib, 'ink', 'ink.js'))
   replaceEvery(
     plugin,
     'dsh-tui requires an interactive terminal',

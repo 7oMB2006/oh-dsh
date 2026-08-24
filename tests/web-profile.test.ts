@@ -112,6 +112,7 @@ test('web bundle patch mounts the web-capable Oh-DSH plugins', () => {
   const patch = readFileSync(join(root, 'web', 'cordis.patch.yml'), 'utf8')
   for (const row of [
     'oh-web',
+    'oh-liangshen',
     'oh-better-sidebar-runtime',
     'oh-vision',
     'oh-skins',

@@ -36,6 +36,6 @@
       activity: !!js "process.env.OH_DSH_TUI_ACTIVITY !== '0'"
       activityFrames: !!js process.env.OH_DSH_TUI_ACTIVITY_FRAMES ?? undefined
       contextBar: !!js "process.env.OH_DSH_TUI_CONTEXT_BAR !== '0'"
-      fullscreen: !!js "process.env.OH_DSH_TUI_FULLSCREEN !== '0'"
+      fullscreen: !!js "process.env.OH_DSH_TUI_FULLSCREEN === '1'"
       lang: !!js process.env.OH_DSH_TUI_LANG ?? undefined
       preset: !!js process.env.OH_DSH_TUI_PRESET ?? undefined
