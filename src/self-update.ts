@@ -27,12 +27,15 @@ export function updateCheckEnabled(env: NodeJS.ProcessEnv): boolean {
   return !(value === '0' || value.toLowerCase() === 'false')
 }
 
-export function latestReleaseApiUrl(env: NodeJS.ProcessEnv): string {
+export function latestReleaseApiUrl(
+  env: NodeJS.ProcessEnv,
+  repository: string = OFFICIAL_REPOSITORY,
+): string {
   const base = env[UPDATE_API_BASE_ENV]?.replace(/\/+$/, '')
   if (base !== undefined && base !== '') {
-    return `${base}/repos/${OFFICIAL_REPOSITORY}/releases/latest`
+    return `${base}/repos/${repository}/releases/latest`
   }
-  return `https://api.github.com/repos/${OFFICIAL_REPOSITORY}/releases/latest`
+  return `https://api.github.com/repos/${repository}/releases/latest`
 }
 
 /**
@@ -43,6 +46,7 @@ export function latestReleaseApiUrl(env: NodeJS.ProcessEnv): string {
 export async function fetchLatestVersion(
   env: NodeJS.ProcessEnv,
   fetchImpl: UpdateFetcher = fetch,
+  repository: string = OFFICIAL_REPOSITORY,
 ): Promise<string | undefined> {
   if (!updateCheckEnabled(env)) return undefined
   const headers: Record<string, string> = {
@@ -54,7 +58,7 @@ export async function fetchLatestVersion(
     headers.authorization = `Bearer ${token}`
   }
   try {
-    const response = await fetchImpl(latestReleaseApiUrl(env), {
+    const response = await fetchImpl(latestReleaseApiUrl(env, repository), {
       headers,
       signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS),
     })
@@ -73,10 +77,11 @@ export async function checkForUpdate(
   current: string,
   env: NodeJS.ProcessEnv,
   fetchImpl: UpdateFetcher = fetch,
+  repository: string = OFFICIAL_REPOSITORY,
 ): Promise<UpdateCheckResult | undefined> {
   const normalizedCurrent = valid(current) ?? undefined
   if (normalizedCurrent === undefined) return undefined
-  const latest = await fetchLatestVersion(env, fetchImpl)
+  const latest = await fetchLatestVersion(env, fetchImpl, repository)
   if (latest === undefined) return undefined
   return {
     current: normalizedCurrent,
@@ -98,9 +103,10 @@ export async function startupUpdateNotice(
   current: string,
   env: NodeJS.ProcessEnv,
   fetchImpl: UpdateFetcher = fetch,
+  repository: string = OFFICIAL_REPOSITORY,
 ): Promise<string | undefined> {
   if (!updateCheckEnabled(env)) return undefined
-  const check = checkForUpdate(current, env, fetchImpl)
+  const check = checkForUpdate(current, env, fetchImpl, repository)
   const budget = new Promise<undefined>(resolve => {
     setTimeout(resolve, STARTUP_NOTICE_BUDGET_MS)
   })
@@ -130,10 +136,14 @@ export function installerRecordHome(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  void platform
+  // install.ps1 derives the default state root from USERPROFILE; follow the
+  // same variable so a HOME set by Git Bash cannot split the two roots.
+  const userHome = platform === 'win32'
+    ? env.USERPROFILE ?? homedir()
+    : env.HOME ?? homedir()
   const stateRoot = env.OH_DSH_HOME !== undefined && env.OH_DSH_HOME !== ''
     ? env.OH_DSH_HOME
-    : join(env.HOME ?? homedir(), '.ohdsh')
+    : join(userHome, '.ohdsh')
   return join(stateRoot, 'installer')
 }
 
@@ -150,7 +160,7 @@ export function installerPayloadHome(
     if (localAppData !== undefined && localAppData !== '') {
       return join(localAppData, 'oh-dsh')
     }
-    return join(env.HOME ?? homedir(), 'AppData', 'Local', 'oh-dsh')
+    return join(env.USERPROFILE ?? homedir(), 'AppData', 'Local', 'oh-dsh')
   }
   const xdgDataHome = env.XDG_DATA_HOME
   if (xdgDataHome !== undefined && xdgDataHome !== '') {
@@ -190,8 +200,10 @@ export function readLauncherRecord(
   const content = readFile(join(installerRecordHome(platform, env), 'launcher.env'))
   if (content === undefined) return {}
   const record: LauncherRecord = {}
-  // Line values tolerate CRLF: install.ps1 writes Windows line endings.
-  for (const rawLine of content.split('\n')) {
+  // Line values tolerate CRLF and a UTF-8 BOM: install.ps1 writes Windows
+  // line endings and PowerShell 5.1 UTF-8 output starts with a BOM.
+  const normalized = content.startsWith('\uFEFF') ? content.slice(1) : content
+  for (const rawLine of normalized.split('\n')) {
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     if (line.startsWith('WEB_DEST=')) record.webDest = line.slice('WEB_DEST='.length)
     else if (line.startsWith('TUI_DEST=')) record.tuiDest = line.slice('TUI_DEST='.length)
@@ -203,8 +215,9 @@ export function readLauncherRecord(
 }
 
 function markerSurface(root: string): 'web' | 'tui' | undefined {
-  const content = readTextAt(join(root, '.oh-dsh-install.env'))
-  if (content === undefined) return undefined
+  const raw = readTextAt(join(root, '.oh-dsh-install.env'))
+  if (raw === undefined) return undefined
+  const content = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
   for (const rawLine of content.split('\n')) {
     const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     if (!line.startsWith('OH_DSH_INSTALL_SURFACE=')) continue

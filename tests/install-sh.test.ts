@@ -99,6 +99,10 @@ async function makeMacDesktopZip(
   await writeFile(executable, `#!/bin/sh\necho desktop-${version}\n`)
   await chmod(executable, 0o755)
   await writeFile(join(appDir, 'Contents', 'Resources', 'app.asar'), 'asar')
+  await writeFile(
+    join(appDir, 'Contents', 'Info.plist'),
+    `CFBundleIdentifier=ai.deepseek.oh-dsh-desktop\nCFBundleShortVersionString=${version}\n`,
+  )
   const zipPath = join(staging, `Oh-DSH-Desktop-${version}-${arch}.zip`)
   if (process.platform === 'darwin') {
     run('ditto', ['-c', '-k', '--keepParent', appDir, zipPath])
@@ -465,7 +469,9 @@ test('uninstall removes the surface payload, launcher, and desktop app', { skip:
     ])
     const { home, env } = await makeSandbox(github)
     const spy = await makeLsregisterSpy(home)
+    const plutil = await makePlutilSpy(home)
     env.OH_DSH_LSREGISTER = spy.bin
+    env.OH_DSH_PLUTIL = plutil.bin
 
     const payload = join(home, 'payload')
     const bin = join(home, 'bin')
@@ -796,6 +802,30 @@ test('the linux desktop refuses to replace an unowned executable', { skip: skipO
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /refusing to replace/)
     assert.equal(await readFile(join(bin, 'oh-dsh-desktop'), 'utf8'), 'unrelated tool\n')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('relocating a surface retires the previous installation', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    const first = join(home, 'first')
+    const second = join(home, 'second')
+    const common = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin]
+    assert.equal((await runInstaller([...common, '--dest', first], env)).status, 0)
+    assert.equal((await runInstaller([...common, '--dest', second], env)).status, 0)
+
+    assert.ok(!(await exists(first)), 'the previous payload must be retired')
+    assert.match(await readFile(join(second, 'bin', 'ohdsh'), 'utf8'), /here/)
+    const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
+    assert.match(record, new RegExp(`^WEB_DEST=${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
     await github.stop()
   }

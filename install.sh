@@ -381,6 +381,25 @@ same_version_installed() {
   return 0
 }
 
+verify_replaceable_app() {
+  # $1: existing bundle path. Accepts bundles carrying our Info.plist
+  # identity; a directory without a verifiable Oh-DSH identity is refused
+  # instead of being deleted sight unseen.
+  app=$1
+  plist="$app/Contents/Info.plist"
+  if [ ! -f "$plist" ]; then
+    die "refusing to replace $app: it has no Contents/Info.plist and may not be an Oh-DSH installation"
+  fi
+  plutil_bin=${OH_DSH_PLUTIL:-$PLUTIL_DEFAULT}
+  if [ ! -x "$plutil_bin" ]; then
+    die "refusing to replace $app: its identity cannot be verified (plutil unavailable); remove it manually first"
+  fi
+  identifier=$("$plutil_bin" -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null || true)
+  if [ "$identifier" != "$BUNDLE_ID" ]; then
+    die "refusing to replace $app: bundle identifier ${identifier:-unreadable} is not $BUNDLE_ID"
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Launcher dispatching (web and tui payloads each carry only their own
 # surface's dependencies, so one launcher must route each surface to the
@@ -395,10 +414,13 @@ surface_dest_key() {
 
 write_launcher_env() {
   # Record the surface destination and the launcher directory so `ohdsh
-  # update` can reconstruct the exact install locations.
+  # update` can reconstruct the exact install locations. Relocating a
+  # surface retires the previous installer-owned payload afterwards, so
+  # exactly one installation remains per surface.
   key=$(surface_dest_key)
   mkdir -p "$record_home"
   surface_key=${key%_DEST}
+  relocated_previous=$(marker_field "$launcher_env" "$key")
   tmp="$launcher_env.tmp.$$"
   {
     [ -f "$launcher_env" ] \
@@ -408,6 +430,11 @@ write_launcher_env() {
     printf '%s_REPO=%s\n' "$surface_key" "$repo"
   } > "$tmp"
   mv -f "$tmp" "$launcher_env"
+  if [ -n "$relocated_previous" ] && [ "$relocated_previous" != "$dest" ] \
+    && [ "$(marker_field "$relocated_previous/.oh-dsh-install.env" OH_DSH_INSTALL_SURFACE)" = "$surface" ]; then
+    rm -rf "$relocated_previous"
+    log "Retired the previous $surface installation at $relocated_previous"
+  fi
 }
 
 # Remove one surface's destination record; returns 1 when no surfaces remain.
@@ -484,6 +511,7 @@ remove_desktop_mac() {
   app="$dest/$APP_NAME.app"
   removed=0
   if [ -d "$app" ]; then
+    verify_replaceable_app "$app"
     rm -rf "$app"
     log "Removed $app"
     removed=1
@@ -508,6 +536,10 @@ remove_desktop_mac() {
 remove_desktop_linux() {
   image="$dest/oh-dsh-desktop"
   if [ -f "$image" ]; then
+    if [ ! -f "$desktop_marker" ] \
+      || [ "$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)" != "$dest" ]; then
+      die "refusing to remove $image: the desktop marker does not prove this destination is Oh-DSH-owned"
+    fi
     rm -f "$image"
     log "Removed $image"
   else
@@ -817,24 +849,6 @@ quit_running_app() {
   die 'Oh-DSH Desktop did not quit cleanly; close it and rerun the installer'
 }
 
-verify_replaceable_app() {
-  # $1: existing bundle path. Accepts bundles carrying our Info.plist
-  # identity; a directory without a verifiable Oh-DSH identity is refused
-  # instead of being deleted sight unseen.
-  app=$1
-  plist="$app/Contents/Info.plist"
-  if [ ! -f "$plist" ]; then
-    die "refusing to replace $app: it has no Contents/Info.plist and may not be an Oh-DSH installation"
-  fi
-  plutil_bin=${OH_DSH_PLUTIL:-$PLUTIL_DEFAULT}
-  if [ ! -x "$plutil_bin" ]; then
-    die "refusing to replace $app: its identity cannot be verified (plutil unavailable); remove it manually first"
-  fi
-  identifier=$("$plutil_bin" -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null || true)
-  if [ "$identifier" != "$BUNDLE_ID" ]; then
-    die "refusing to replace $app: bundle identifier ${identifier:-unreadable} is not $BUNDLE_ID"
-  fi
-}
 
 install_desktop_mac() {
   extract_dir="$workdir/extract"

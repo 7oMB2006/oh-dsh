@@ -20,7 +20,7 @@ import {
   type RuntimeExit,
 } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
-import { checkForUpdate, formatUpdateNotice } from './self-update.ts'
+import { checkForUpdate, formatUpdateNotice, readLauncherRecord } from './self-update.ts'
 import { resolveProductVersion } from './version.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
@@ -327,7 +327,14 @@ export async function main(
     // restarts; the notice arrives as a single line and never blocks.
     if (updateNoticeStarted === false) {
       updateNoticeStarted = true
-      void checkForUpdate(version, env).then(result => {
+      // Fork installs check their own recorded repository.
+      const record = readLauncherRecord(env)
+      void checkForUpdate(
+        version,
+        env,
+        fetch,
+        record.webRepo !== undefined && record.webRepo !== '' ? record.webRepo : undefined,
+      ).then(result => {
         if (result?.updateAvailable === true) {
           stdout.write(formatUpdateNotice(result))
         }
