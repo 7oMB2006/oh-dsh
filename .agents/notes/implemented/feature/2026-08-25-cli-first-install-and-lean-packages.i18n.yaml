@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-cli-first-install-and-lean-packages.md
-2026-08-25-cli-first-install-and-lean-packages.md: a1845a17717e725f81c4931a1db6b19225f8f037
-2026-08-25-cli-first-install-and-lean-packages.zh.md: 35a9fa258ed40f556b9b01d0ff9db561953c8e57
+2026-08-25-cli-first-install-and-lean-packages.md: c7372147be72c887fdd8b3d6ae917283e8c374cc
+2026-08-25-cli-first-install-and-lean-packages.zh.md: 2c4fa74e6eda0bebb652177e870127d5b1ddc1d3

@@ -15,8 +15,9 @@ download suggests.
 
 ## Decision
 
-- Default `install.sh` and `install.ps1` to the TUI surface. Web and Desktop
-  remain explicit `--surface`/`-Surface` choices.
+- Extend the [cross-surface installer decision](2026-08-24-install-sh-cross-surface-installer.md)
+  by defaulting `install.sh` and `install.ps1` to the TUI surface. Web and
+  Desktop remain explicit `--surface`/`-Surface` choices.
 - Have each installer record a Desktop executable in the shared dispatcher
   records. The generated `ohdsh desktop` command launches that executable,
   while the direct `oh-dsh-desktop` entry remains available.

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-install-sh-cross-surface-installer.md
-2026-08-24-install-sh-cross-surface-installer.md: aec9eecec3eacccb2b6430d48fea0e5eef496e98
-2026-08-24-install-sh-cross-surface-installer.zh.md: bebff850f79007b3b5354d0641b76264d1cff636
+2026-08-24-install-sh-cross-surface-installer.md: 34a859d85a955b3676f20c4b7d677f5595da55ff
+2026-08-24-install-sh-cross-surface-installer.zh.md: ccd691b299525531257f176fffbf1483af5fad58

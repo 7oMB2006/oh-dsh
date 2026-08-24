@@ -13,8 +13,9 @@ Status: implemented
 
 ## 决策
 
-- `install.sh` 与 `install.ps1` 默认安装 TUI；Web 和 Desktop 仍通过
-  `--surface`/`-Surface` 显式选择。
+- 在[跨 surface 安装器决策](2026-08-24-install-sh-cross-surface-installer.md)
+  的基础上，`install.sh` 与 `install.ps1` 默认安装 TUI；Web 和 Desktop
+  仍通过 `--surface`/`-Surface` 显式选择。
 - 两个安装器都把 Desktop 可执行文件写入共享的 dispatcher（调度器）记录。
   生成的 `ohdsh desktop` 会启动该可执行文件，同时保留直接的
   `oh-dsh-desktop` 入口。

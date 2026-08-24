@@ -14,11 +14,13 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
 ## Decision
 
 - 在仓库根目录提供一个覆盖全部三种 surface 的 POSIX `sh` 安装器，通过
-  `--surface desktop|web|tui`（默认 `desktop`）选择。每个 surface 只安装
+  `--surface desktop|web|tui`（默认 `tui`）选择。命令行优先的默认值与
+  Desktop 共用路由记录在[命令行优先安装器 Note](2026-08-25-cli-first-install-and-lean-packages.md)
+  中。每个 surface 只安装
   自己的文件：macOS desktop 是 `/Applications` 下的 `.app`，附带 Launch
   Services 刷新与残留包清退；Linux desktop 是 `~/.local/bin` 下的
-  AppImage；web/tui 是载荷加生成的调度式 `ohdsh` 启动器（见下方启动器
-  条目）。只有 desktop 会注册应用入口。
+  AppImage；命令行访问使用生成的调度式 `ohdsh` 启动器，其记录也接受
+  Desktop 可执行文件（见下方启动器条目）。只有 desktop 会注册应用入口。
 - 下载校验使用 GitHub REST API 已为每个资产发布的 `digest`（sha256）字段。
   它无需改动发布流程即可覆盖所有既有 Release，且在摘要缺失或不匹配时
   拒绝安装（fail closed）。
@@ -28,11 +30,12 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
   `.oh-dsh-install.env`、`<OH_DSH_HOME>/installer/desktop.env`）让
   相同版本的重复执行变成无操作，除非传入 `--force`；`--uninstall` 执行
   反向卸载。
-- web/tui 安装在 bin 目录放置调度式 `ohdsh` 启动器而不是符号链接：web 与
-  tui 的载荷各自只携带自己 surface 的依赖，一个共享符号链接会让第二次
-  安装破坏第一个 surface。启动器在安装器数据目录的 `launcher.env` 中记录
-  每个 surface 的载荷位置，把 `ohdsh web`/`ohdsh tui` 路由到提供该 surface
-  的载荷；卸载其中一个 surface 时会为剩余的 surface 刷新启动器。
+- Web 与 TUI 安装在 bin 目录放置调度式 `ohdsh` 启动器而不是符号链接：它们
+  的载荷各自只携带自己的 surface 依赖，一个共享符号链接会让第二次安装破坏
+  第一个 surface。Desktop 安装也把原生可执行文件写入同一份启动器记录，因此
+  dispatcher 为所有已安装 surface 提供路由，把 `ohdsh web`、`ohdsh tui` 与
+  `ohdsh desktop` 分别交给各自的 owner；卸载其中一个 surface 时会为剩余的
+  surface 刷新启动器。
 - 标记是惰性的 `KEY=value` 文本：写入时做字符集校验，读取时逐行解析
   （绝不 source），并记录目标目录使 desktop 幂等以请求的位置为键；
   "已安装"快速路径额外校验应用、镜像、载荷与启动器仍然存在，普通重跑
@@ -72,7 +75,8 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
 统一来源。
 
 **默认使用交互式 surface 选择器。** 不采纳：`curl | bash` 天然非交互；
-显式、有文档的 `--surface` 加旗舰默认值 `desktop` 让一行命令保持确定性。
+显式、有文档的 `--surface` 加命令行默认值 `tui` 让一行命令保持确定性，
+Desktop 与 Web 仍需显式选择。
 
 **配套一个 Windows PowerShell 安装器。** 最初不采纳，让首个安装器保持
 Unix-only，由 NSIS `.exe` 覆盖 Windows desktop；后续因 web/tui 的 `win-x64`
