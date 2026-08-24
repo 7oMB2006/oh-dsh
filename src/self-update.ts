@@ -404,9 +404,15 @@ function spawnDetachedWindowsUpdate(
     .map(arg => (arg.startsWith('-') ? arg : windowsQuoted(arg)))
     .join(' ')
   const escapedScript = windowsQuoted(scriptPath)
+  // The helper is detached with silent stdio, so its diagnostics and exit
+  // status are persisted for the user instead of vanishing with the console.
+  const logPath = join(installerRecordHome('win32', env), 'update.log')
+  const escapedLog = windowsQuoted(logPath)
   const waitAndRun = [
     `while (Get-Process -Id ${String(process.pid)} -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 250 }`,
-    `& ${escapedScript} ${flags}`,
+    `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': update starting')`,
+    `& ${escapedScript} ${flags} *>> ${escapedLog}`,
+    `Add-Content -LiteralPath ${escapedLog} -Value ([string](Get-Date) + ': update exited with ' + $LASTEXITCODE)`,
   ].join('; ')
   const child = spawn(
     'powershell',
@@ -415,7 +421,8 @@ function spawnDetachedWindowsUpdate(
   )
   child.unref()
   process.stdout.write(
-    'Oh-DSH: the upgrade continues in the background after this process exits.\n',
+    `Oh-DSH: the upgrade continues in the background after this process exits.\n` +
+    `Progress and failures are logged at ${logPath}\n`,
   )
   return 0
 }

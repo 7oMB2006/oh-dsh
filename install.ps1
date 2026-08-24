@@ -44,12 +44,14 @@ $PayloadHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
 $DefaultRecordRoot = ''
 if ($DataHome -eq '') {
     if ($env:OH_DSH_INSTALLER_HOME) {
+        # An env-derived root is still a custom location: the dispatcher must
+        # keep baking it instead of switching to the %USERPROFILE% branch.
         $DataHome = $env:OH_DSH_INSTALLER_HOME
     } else {
         $stateRoot = if ($env:OH_DSH_HOME) { $env:OH_DSH_HOME } else { Join-Path $env:USERPROFILE '.ohdsh' }
         $DataHome = Join-Path $stateRoot 'installer'
+        $DefaultRecordRoot = $DataHome
     }
-    $DefaultRecordRoot = $DataHome
 }
 
 function Write-Step {
@@ -172,8 +174,18 @@ function Write-Dispatcher {
     # $ShimPath: launcher location. The dispatcher resolves each surface's
     # payload from launcher.env at run time. With the default record root the
     # script stays pure ASCII by expanding %USERPROFILE% / %OH_DSH_HOME% at
-    # run time, so localized profile paths never need to be embedded.
+    # run time, so localized profile paths never need to be embedded. An
+    # unrelated file at the target is never overwritten.
     param([string]$ShimPath)
+    if (Test-Path -LiteralPath $ShimPath) {
+        $existing = Get-Content -LiteralPath $ShimPath -Raw
+        $ours = ($existing -like '*OHRECORD*') `
+            -or ($existing -like '*launcher.env*') `
+            -or (($existing -like '*CALL*') -and ($existing -like '*\bin\ohdsh.cmd*'))
+        if (-not $ours) {
+            Die "refusing to replace $ShimPath : it is not an Oh-DSH launcher; remove it or pass another -BinDir"
+        }
+    }
     $recordSetup = if ($DefaultRecordRoot -ne '' -and $DataHome -eq $DefaultRecordRoot) {
         @(
             'SET "OHRECORD=%USERPROFILE%\.ohdsh\installer\launcher.env"',
