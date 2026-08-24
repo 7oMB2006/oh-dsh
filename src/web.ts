@@ -261,6 +261,10 @@ export async function main(
       '--host', options.host,
       '--port', String(options.port),
       ...options.trustedHosts.flatMap(host => ['--trusted-host', host]),
+      // The launcher owns the browser handoff (--open/--no-open, interactive
+      // default, DSH_OH_WEB_OPEN below); without this flag dsh-web-app's
+      // webStartup default would open a second tab on top of it.
+      '--no-open',
     ],
     cliEntry: paths.cliEntry,
     cwd: dataRoot,
