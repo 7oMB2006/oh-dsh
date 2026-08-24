@@ -29,14 +29,17 @@ param(
     [switch]$Force,
     [switch]$Uninstall,
     [string]$ApiBase = 'https://api.github.com',
-    [string]$DownloadBase = 'https://github.com'
+    [string]$DownloadBase = 'https://github.com',
+    # Installer bookkeeping root (markers and launcher records). Defaults to
+    # %LOCALAPPDATA%\oh-dsh; override to relocate or isolate an install.
+    [string]$DataHome = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $AppName = 'Oh-DSH Desktop'
 $ExecutableName = 'oh-dsh-desktop'
-$DataHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
+if ($DataHome -eq '') { $DataHome = Join-Path $env:LOCALAPPDATA 'oh-dsh' }
 
 function Write-Step {
     param([string]$Message)

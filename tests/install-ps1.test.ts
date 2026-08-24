@@ -227,6 +227,7 @@ const env = {}
       '-DownloadBase', github.downloadBase,
       '-Dest', payload,
       '-BinDir', bin,
+      '-DataHome', join(home, 'data'),
     ]
     assert.equal((await runInstaller(args, env)).status, 0)
     const uninstall = await runInstaller([...args, '-Uninstall'], env)

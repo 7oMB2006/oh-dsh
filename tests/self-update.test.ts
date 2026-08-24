@@ -116,11 +116,15 @@ test('installer plans target the platform script and surface', () => {
     'http://127.0.0.1:9/install.sh',
   )
 
-  const unixPlan = selfUpdatePlan('web', 'linux')
+  const unixPlan = selfUpdatePlan('web', 'linux', 'hust-open-atom-club/oh-dsh', {
+    HOME: '/nonexistent-clean-home',
+  })
   assert.equal(unixPlan.command, 'sh')
   assert.deepEqual(unixPlan.args, ['<script>', '--surface', 'web'])
 
-  const windowsPlan = selfUpdatePlan('tui', 'win32')
+  const windowsPlan = selfUpdatePlan('tui', 'win32', 'hust-open-atom-club/oh-dsh', {
+    LOCALAPPDATA: 'Z:\\no-such-place',
+  })
   assert.equal(windowsPlan.command, 'powershell')
   assert.deepEqual(
     windowsPlan.args.slice(0, 4),
@@ -180,7 +184,7 @@ test('runSelfUpdate reports a failed installer download', async () => {
 test('launcher records are parsed inertly and drive update destinations', () => {
   const env = { XDG_DATA_HOME: '/data', HOME: '/home' }
   const record = readLauncherRecord(env, 'linux', path =>
-    path === '/data/oh-dsh/launcher.env'
+    path.replaceAll('\\', '/').endsWith('/data/oh-dsh/launcher.env')
       ? 'WEB_DEST=/opt/oh web\nTUI_DEST=/opt/oh tui\nBIN_DIR=/opt/bin\nOH_DSH_NOPE=ignored\n'
       : undefined,
   )

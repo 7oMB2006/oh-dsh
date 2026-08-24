@@ -172,7 +172,9 @@ export function readLauncherRecord(
   const content = readFile(join(installerDataHome(platform, env), 'launcher.env'))
   if (content === undefined) return {}
   const record: LauncherRecord = {}
-  for (const line of content.split('\n')) {
+  // Line values tolerate CRLF: install.ps1 writes Windows line endings.
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     if (line.startsWith('WEB_DEST=')) record.webDest = line.slice('WEB_DEST='.length)
     else if (line.startsWith('TUI_DEST=')) record.tuiDest = line.slice('TUI_DEST='.length)
     else if (line.startsWith('BIN_DIR=')) record.binDir = line.slice('BIN_DIR='.length)
@@ -183,7 +185,8 @@ export function readLauncherRecord(
 function markerSurface(root: string): 'web' | 'tui' | undefined {
   const content = readTextAt(join(root, '.oh-dsh-install.env'))
   if (content === undefined) return undefined
-  for (const line of content.split('\n')) {
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
     if (!line.startsWith('OH_DSH_INSTALL_SURFACE=')) continue
     const value = line.slice('OH_DSH_INSTALL_SURFACE='.length)
     return value === 'web' || value === 'tui' ? value : undefined
@@ -210,7 +213,10 @@ export function detectDistributionSurface(
   const marked = markerSurface(target)
   if (marked !== undefined) return marked
 
-  if (platform === 'darwin' && target.includes('.app/Contents/Resources')) return 'desktop'
+  if (platform === 'darwin'
+    && target.split(/[\\/]/).join('/').includes('.app/Contents/Resources')) {
+    return 'desktop'
+  }
   if (env.OH_DSH_DESKTOP_APP !== undefined && env.OH_DSH_DESKTOP_APP !== '') return 'desktop'
 
   const sourceRoot = env.OH_DSH_SOURCE_ROOT
