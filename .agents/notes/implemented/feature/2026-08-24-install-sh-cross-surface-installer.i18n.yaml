@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-install-sh-cross-surface-installer.md
+2026-08-24-install-sh-cross-surface-installer.md: d43c24a9791d98f484db516a93d579e96fb8f8fe
+2026-08-24-install-sh-cross-surface-installer.zh.md: 1083485a831b52ab6ad3430acf77b22b57bd0066

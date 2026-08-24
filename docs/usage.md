@@ -11,6 +11,70 @@ English | [中文](usage.zh.md)
 The full distribution includes all three surfaces, so one installation
 supports `desktop`, `web`, and `tui`.
 
+## Install with install.sh
+
+`install.sh`, at the repository root, installs the latest stable Release
+without cloning the repository. It needs `curl` and `tar` (`ditto` or
+`unzip` for the macOS desktop package), and it never requires root for
+user-local web/tui installs.
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface tui
+```
+
+Surface matrix and default locations:
+
+| Surface | macOS (arm64/x64) | Linux (x64) | Windows |
+| --- | --- | --- | --- |
+| desktop (default) | `Oh-DSH Desktop.app` into `/Applications` with a Launch Services refresh | AppImage into `~/.local/bin/oh-dsh-desktop` | use the `.exe` installer, not install.sh |
+| web | payload in `~/.local/share/oh-dsh/web` plus an `ohdsh` symlink in `~/.local/bin` | same | extract the portable `win-x64` archive |
+| tui | payload in `~/.local/share/oh-dsh/tui` plus an `ohdsh` symlink in `~/.local/bin` | same | extract the portable `win-x64` archive |
+
+Only the desktop surface creates a desktop application entry. web and tui
+never register with Launch Services or create `.app` bundles.
+
+Options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--surface` | `desktop` | `desktop`, `web`, or `tui`; each installs only its own files and launcher |
+| `--version` | latest stable | Pin a release tag such as `v0.1.8`. Prereleases are never selected implicitly; they install only when pinned explicitly |
+| `--dest` | see matrix above | Destination directory |
+| `--bin-dir` | `~/.local/bin` | Directory for the `ohdsh` launcher symlink (web/tui) |
+| `--repo` | `hust-open-atom-club/oh-dsh` | Install from another fork |
+| `--force` | off | Reinstall when the same version is already present |
+| `--uninstall` | off | Remove the installed surface |
+| `--os`, `--arch` | detected | Override target selection (`darwin`/`linux`, `arm64`/`x64`) |
+
+Equivalent environment variables: `OH_DSH_SURFACE`, `OH_DSH_VERSION`,
+`OH_DSH_INSTALL_DIR`, `OH_DSH_BIN_DIR`, `OH_DSH_REPO`, `OH_DSH_OS`, and
+`OH_DSH_ARCH`; options win over the environment. `GH_TOKEN`/`GITHUB_TOKEN`
+authenticate the GitHub API request (useful behind rate limits), and
+`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` override the endpoint bases for
+testing.
+
+Upgrade, verification, and uninstall behavior:
+
+- The installer reads the SHA-256 digest GitHub publishes for each Release
+  asset and verifies the download before touching the previous
+  installation. A failed download, checksum mismatch, or interrupted
+  extraction leaves the previous install usable and reports the failure;
+  partially staged files are cleaned up.
+- Re-running the installer with the same version is a no-op unless `--force`
+  is passed. A newer version replaces the payload and refreshes the `ohdsh`
+  symlink atomically.
+- On macOS the previous `.app` is moved to `~/.Trash` and a stale
+  `Oh-DSH-Desktop.app` bundle is retired, so Launch Services shows a single
+  application entry. An unnotarized build may still need the right-click
+  **Open** approval described below.
+- Uninstall with `sh install.sh --uninstall --surface <name>`, honoring the
+  same `--dest`/`--bin-dir` overrides used at install time.
+
+install.sh is macOS and Linux only. On Windows, run the `.exe` installer for
+the desktop or extract the portable `win-x64` archives for web/tui.
+
 ## Install the full distribution
 
 ### macOS

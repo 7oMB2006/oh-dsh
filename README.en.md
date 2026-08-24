@@ -85,6 +85,24 @@ Choose a distribution from the
 - **Windows:** run the installer, or extract and launch the portable package.
 - **Linux:** run the AppImage, or install the deb with `apt`.
 
+macOS and Linux can also install the latest stable release with the
+repository's root-level `install.sh`:
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface desktop
+```
+
+`--surface` accepts `desktop` (default), `web`, or `tui`; each surface
+installs only its own files and launcher. The installer verifies the
+published SHA-256 digest before touching the previous installation, so a
+failed download, checksum mismatch, or interrupted extraction keeps the old
+install usable. Re-running the command upgrades in place, and `--uninstall`
+removes a surface. On Windows, keep using the installer package. Options,
+environment overrides, and the surface matrix are documented in the
+[installation guide](./docs/usage.md#install-with-installsh).
+
 Web-only and TUI-only packages are ready after extraction:
 
 ```sh

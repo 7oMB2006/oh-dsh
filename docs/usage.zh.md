@@ -10,6 +10,63 @@
 
 完整版已经包含三种形态，因此安装一次后可以使用 `desktop`、`web` 和 `tui`。
 
+## 使用 install.sh 安装
+
+仓库根目录的 `install.sh` 可以在不克隆仓库的情况下安装最新稳定 Release。
+它需要 `curl` 和 `tar`（macOS desktop 包还需要 `ditto` 或 `unzip`），
+web/tui 的用户级安装不需要 root。
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface tui
+```
+
+Surface 矩阵与默认位置：
+
+| Surface | macOS (arm64/x64) | Linux (x64) | Windows |
+| --- | --- | --- | --- |
+| desktop（默认） | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services | AppImage 安装到 `~/.local/bin/oh-dsh-desktop` | 使用 `.exe` 安装包，不经过 install.sh |
+| web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 手动解压 `win-x64` 便携包 |
+| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 手动解压 `win-x64` 便携包 |
+
+只有 desktop 会创建桌面应用入口；web 和 tui 不会注册 Launch Services，
+也不会生成 `.app` 包。
+
+选项：
+
+| 选项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `--surface` | `desktop` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
+| `--version` | 最新稳定版 | 固定 Release 标签，如 `v0.1.8`。预发布不会被自动选中，只有在显式固定时才会安装 |
+| `--dest` | 见上表 | 目标目录 |
+| `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器符号链接目录（web/tui） |
+| `--repo` | `hust-open-atom-club/oh-dsh` | 从其他 fork 安装 |
+| `--force` | 关闭 | 已安装相同版本时强制重装 |
+| `--uninstall` | 关闭 | 卸载对应 surface |
+| `--os`、`--arch` | 自动检测 | 覆盖目标选择（`darwin`/`linux`、`arm64`/`x64`） |
+
+等价的环境变量：`OH_DSH_SURFACE`、`OH_DSH_VERSION`、`OH_DSH_INSTALL_DIR`、
+`OH_DSH_BIN_DIR`、`OH_DSH_REPO`、`OH_DSH_OS`、`OH_DSH_ARCH`；命令行选项
+优先于环境变量。`GH_TOKEN`/`GITHUB_TOKEN` 用于 GitHub API 鉴权（在限流时
+有用），`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` 可为测试覆盖端点地址。
+
+升级、校验与卸载行为：
+
+- 安装器读取 GitHub 为每个 Release 资产发布的 SHA-256 摘要，并在改动旧
+  安装之前完成校验。下载失败、摘要不匹配或解压中断都会保持原安装可用并
+  报告错误；未完成的暂存文件会被清理。
+- 重复执行且版本不变时为无操作，除非传入 `--force`。新版本会原子替换载荷
+  并刷新 `ohdsh` 链接。
+- 在 macOS 上，旧的 `.app` 会移入 `~/.Trash`，残留的 `Oh-DSH-Desktop.app`
+  会被清退，Launch Services 只保留一个应用入口。未公证构建仍可能需要下文
+  的右键 **打开** 首次放行。
+- 卸载使用 `sh install.sh --uninstall --surface <name>`，并沿用安装时使用
+  的 `--dest`/`--bin-dir` 覆盖。
+
+install.sh 只支持 macOS 和 Linux。Windows 请运行 `.exe` 安装桌面版，或手动
+解压 web/tui 的 `win-x64` 便携包。
+
 ## 安装完整版
 
 ### macOS
