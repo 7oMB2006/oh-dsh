@@ -28,4 +28,4 @@ Status: implemented
 
 桌面不再打开第二个浏览器窗口。URL 行仍然打印，所以桌面运行时监督与打包的 web 启动器保持不变。`openBrowser` 配置现在在桌面界面上有一个静态默认值，其取值由桌面发行版决定，而非上游 bundle。
 
-比 rc.2 更新的已固定 DSH 版本在 `web-app` 中仍保留自动打开；桌面 patch 无论如何都把它固定为关闭。`ohdsh web` 启动器不再获得上游交棒：自它开始向 runtime 传递 `--no-open` 起（见 [2026-08-24-web-launcher-owns-browser-handoff.zh](2026-08-24-web-launcher-owns-browser-handoff.zh.md)），该界面的浏览器交棒由启动器独占持有，独立的 `dsh --profile web` 保留上游交互式默认。
+比 rc.2 更新的已固定 DSH 版本在 `web-app` 中仍保留自动打开；桌面 patch 无论如何都把它固定为关闭。`ohdsh web` 启动器不再获得上游交棒：自它开始向 runtime 传递 `--no-open` 起（见 [2026-08-24-web-launcher-owns-browser-handoff](2026-08-24-web-launcher-owns-browser-handoff.md)），该界面的浏览器交棒由启动器独占持有，独立的 `dsh --profile web` 保留上游交互式默认。
