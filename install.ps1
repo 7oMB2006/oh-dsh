@@ -569,6 +569,19 @@ try {
     }
     Move-Item -LiteralPath $Payload -Destination $Staged
 
+    # A pre-existing fixed backup name must be empty or ours; Move-Item
+    # would otherwise nest into it and the cleanup would delete foreign data.
+    if (Test-Path -LiteralPath "$FinalDest.previous") {
+        $backupEmpty = $null -eq (Get-ChildItem -LiteralPath "$FinalDest.previous" -Force | Select-Object -First 1)
+        $backupMarker = Read-Marker -Path (Join-Path "$FinalDest.previous" '.oh-dsh-install.env')
+        $backupOurs = ($null -ne $backupMarker -and $backupMarker['OH_DSH_INSTALL_SURFACE'] -eq $Surface)
+        if ($backupEmpty -or $backupOurs) {
+            Remove-Item -LiteralPath "$FinalDest.previous" -Recurse -Force
+        } else {
+            Die "refusing to replace $FinalDest.previous : it is not an Oh-DSH $Surface payload"
+        }
+    }
+
     $HadPrevious = $false
     if (Test-Path -LiteralPath $FinalDest) {
         $markerValues = Read-Marker -Path (Join-Path $FinalDest '.oh-dsh-install.env')

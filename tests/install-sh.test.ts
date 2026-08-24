@@ -977,3 +977,54 @@ test('linux desktop stale-file cleanup respects destination ownership', { skip: 
     await github.stop()
   }
 })
+
+test('a mistyped uninstall destination keeps the real records', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    assert.equal((await runInstaller(['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin], env)).status, 0)
+
+    const typo = await runInstaller(
+      ['--uninstall', '--surface', 'web', '--dest', join(home, 'wrong-dest'), '--bin-dir', bin],
+      env,
+    )
+    assert.equal(typo.status, 0, typo.stderr)
+    const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
+    assert.match(record, /^WEB_DEST=/m, 'the real destination record must survive')
+    assert.ok(await exists(join(home, '.local', 'share', 'oh-dsh', 'web')), 'the real payload must survive')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a launcher symlink to an unrecorded payload is refused', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    const foreignPayload = join(home, 'other', 'bin')
+    await mkdir(foreignPayload, { recursive: true })
+    await writeFile(join(foreignPayload, 'ohdsh'), '#!/bin/sh\n')
+    await chmod(join(foreignPayload, 'ohdsh'), 0o755)
+    await mkdir(bin, { recursive: true })
+    await symlink(join(foreignPayload, 'ohdsh'), join(bin, 'ohdsh'))
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /not a recorded Oh-DSH payload launcher/)
+    assert.equal(await readlink(join(bin, 'ohdsh')), join(foreignPayload, 'ohdsh'))
+  } finally {
+    await github.stop()
+  }
+})

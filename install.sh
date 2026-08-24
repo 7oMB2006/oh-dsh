@@ -474,10 +474,17 @@ ensure_dispatcher_target_available() {
   target=$1
   if [ -L "$target" ]; then
     link_target=$(readlink "$target")
-    case "$link_target" in
-      */bin/ohdsh) return 0 ;;
-      *) die "refusing to replace $target: it links to $link_target, not an Oh-DSH payload launcher" ;;
-    esac
+    for candidate_root in \
+      "$(marker_field "$launcher_env" WEB_DEST)" \
+      "$(marker_field "$launcher_env" TUI_DEST)" \
+      "$data_home/web" \
+      "$data_home/tui"; do
+      [ -n "$candidate_root" ] || continue
+      if [ "$link_target" = "$candidate_root/bin/ohdsh" ]; then
+        return 0
+      fi
+    done
+    die "refusing to replace $target: it links to $link_target, not a recorded Oh-DSH payload launcher"
   fi
   if [ -e "$target" ] \
     && ! grep -q 'Oh-DSH launcher installed by install.sh' "$target" 2>/dev/null; then
@@ -622,15 +629,22 @@ remove_surface_payload() {
     esac
   fi
 
-  if remove_launcher_env_key "$(surface_dest_key)"; then
-    install_dispatcher "$link"
-    log "Launcher $link now serves the remaining installed surfaces"
-    removed=1
-  elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ] \
-    && grep -q 'Oh-DSH launcher installed by install.sh' "$link" 2>/dev/null; then
-    rm -f "$link"
-    log "Removed launcher $link"
-    removed=1
+  # Records and the launcher only change when this destination's payload
+  # (or its launcher) was actually removed; a mistyped --dest leaves the
+  # real installation's records intact.
+  if [ "$removed" = 1 ] || [ -n "$(marker_field "$launcher_env" "$(surface_dest_key)")" ]; then
+    if [ "$removed" = 1 ] || [ "$(marker_field "$launcher_env" "$(surface_dest_key)")" = "$dest" ]; then
+      if remove_launcher_env_key "$(surface_dest_key)"; then
+        install_dispatcher "$link"
+        log "Launcher $link now serves the remaining installed surfaces"
+        removed=1
+      elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ] \
+        && grep -q 'Oh-DSH launcher installed by install.sh' "$link" 2>/dev/null; then
+        rm -f "$link"
+        log "Removed launcher $link"
+        removed=1
+      fi
+    fi
   fi
   [ "$removed" = 1 ] || log "No $surface installation found at $dest; nothing to remove"
 }
@@ -1046,8 +1060,12 @@ install_desktop_mac() {
     fi
   done
   for stale in "$dest/.$APP_NAME.app.install."*; do
-    if [ -d "$stale" ] && [ -d "$stale/Contents" ]; then
-      rm -rf "$stale"
+    if [ -d "$stale" ]; then
+      if stale_bundle_is_ours "$stale"; then
+        rm -rf "$stale"
+      else
+        printf 'install.sh: warning: leaving %s in place (unverifiable bundle)\n' "$stale" >&2
+      fi
     fi
   done
 
