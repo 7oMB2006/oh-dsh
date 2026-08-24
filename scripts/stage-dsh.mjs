@@ -277,6 +277,49 @@ function ensureNodeRuntime() {
   }
 }
 
+function stripNodeBinary() {
+  if (isWindowsNode) return
+  const executable = join(nodeRuntime, 'bin', 'node')
+  const result = spawnSync('strip', ['-x', executable], { stdio: 'ignore' })
+  if (result.error !== undefined || result.status !== 0) {
+    console.log('Skipping Node binary symbol stripping: strip is unavailable')
+    return
+  }
+  console.log(`Stripped Node binary: ${executable}`)
+}
+
+function pruneNodeRuntime() {
+  const removable = [
+    join(nodeRuntime, 'include'),
+    join(nodeRuntime, 'share'),
+    join(nodeRuntime, 'lib', 'node_modules', 'npm'),
+    join(nodeRuntime, 'node_modules', 'npm'),
+  ]
+  for (const path of removable) rmSync(path, { recursive: true, force: true })
+  for (const name of ['corepack', 'npm', 'npx']) {
+    rmSync(join(nodeRuntime, 'bin', name), { recursive: true, force: true })
+  }
+  console.log('Pruned Node runtime development files and npm')
+}
+
+function pruneRuntimeDevelopmentFiles() {
+  const removable = ['.d.ts', '.map', '.ts', '.tsx']
+  let count = 0
+  const visit = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) {
+        visit(path)
+      } else if (entry.isFile() && removable.some(extension => entry.name.endsWith(extension))) {
+        rmSync(path, { force: true })
+        count += 1
+      }
+    }
+  }
+  visit(join(runtime, 'node_modules'))
+  console.log(`Pruned ${count} DSH runtime development files`)
+}
+
 function shouldCopyWorkspaceEntry(sourceRoot, source) {
   const rel = relative(sourceRoot, source)
   if (rel === '') return true
@@ -1306,6 +1349,11 @@ assertSelfContained(runtime, 'DSH runtime')
 ensureNodeRuntime()
 assertSelfContained(nodeRuntime, 'Node runtime')
 ensureLinuxPtyBuild()
+pruneRuntimeDevelopmentFiles()
+pruneNodeRuntime()
+stripNodeBinary()
+assertSelfContained(runtime, 'pruned DSH runtime')
+assertSelfContained(nodeRuntime, 'pruned Node runtime')
 
 const stagedNode = join(nodeRuntime, isWindowsNode ? 'node.exe' : join('bin', 'node'))
 const hostPlatform = { darwin: 'darwin', linux: 'linux', win: 'win32' }[nodePlatform]
