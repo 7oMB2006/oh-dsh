@@ -1075,3 +1075,49 @@ test('desktop uninstalls keep the marker for other destinations', { skip: skipOn
     await github.stop()
   }
 })
+
+test('downloads never carry the GitHub token to the download base', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'clean'),
+    ])
+    const { home, env } = await makeSandbox(github, { GH_TOKEN: 'ghp_super-secret' })
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(github.downloadsWithAuthorization(), 0, 'the token must never reach the download base')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a corrupted mac app fails the same-version fast path', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeMacDesktopZip('0.1.8', 'arm64'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const plutil = await makePlutilSpy(home)
+    env.OH_DSH_PLUTIL = plutil.bin
+    const apps = join(home, 'Applications')
+    const args = ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    await rm(join(apps, 'Oh-DSH Desktop.app', 'Contents', 'MacOS', 'Oh-DSH Desktop'))
+    const repair = await runInstaller(args, env)
+    assert.equal(repair.status, 0, repair.stderr)
+    assert.doesNotMatch(repair.stdout, /already installed/)
+    assert.ok(
+      await exists(join(apps, 'Oh-DSH Desktop.app', 'Contents', 'MacOS', 'Oh-DSH Desktop')),
+      'the executable must be restored',
+    )
+  } finally {
+    await github.stop()
+  }
+})

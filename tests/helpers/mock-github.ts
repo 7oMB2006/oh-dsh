@@ -14,6 +14,7 @@ export class MockGitHub {
   private readonly releases = new Map<string, MockAsset[]>()
   private readonly downloads = new Map<string, number>()
   private readonly requests: string[] = []
+  private authorizedDownloads = 0
   private latestTag = ''
   private server: Server | undefined
   apiBase = ''
@@ -46,6 +47,7 @@ export class MockGitHub {
         if (asset) {
           const key = `${download[1]}/${download[2]}`
           this.downloads.set(key, (this.downloads.get(key) ?? 0) + 1)
+          if (req.headers.authorization !== undefined) this.authorizedDownloads += 1
           send(200, asset.bytes, 'application/octet-stream')
           return
         }
@@ -118,6 +120,11 @@ export class MockGitHub {
       })),
     }
     return JSON.stringify(payload, null, this.pretty ? 2 : undefined)
+  }
+
+  /** Downloads that carried an Authorization header (must stay zero). */
+  downloadsWithAuthorization(): number {
+    return this.authorizedDownloads
   }
 
   downloadCount(tag: string, name: string): number {

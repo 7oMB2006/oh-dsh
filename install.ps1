@@ -500,8 +500,11 @@ try {
     $Archive = Join-Path $WorkDir $AssetName
     $Url = "$DownloadBase/$Repo/releases/download/$Tag/$AssetName"
     Write-Step "Downloading $AssetName"
+    # The token is for the GitHub API only; downloads never carry it, so a
+    # custom -DownloadBase mirror cannot receive the credential.
+    $downloadHeaders = @{ 'User-Agent' = 'oh-dsh-install' }
     try {
-        Invoke-WebRequest -Uri $Url -OutFile $Archive -Headers $Headers -UseBasicParsing
+        Invoke-WebRequest -Uri $Url -OutFile $Archive -Headers $downloadHeaders -UseBasicParsing
     } catch {
         Die "failed to download $Url : $($_.Exception.Message)"
     }

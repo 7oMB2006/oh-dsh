@@ -288,6 +288,8 @@ sha256_file() {
 }
 
 gh_curl() {
+  # The token is for the GitHub API only; it must never leak to a custom
+  # download mirror through OH_DSH_DOWNLOAD_BASE.
   auth=''
   if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
     auth="Authorization: Bearer ${GH_TOKEN:-$GITHUB_TOKEN}"
@@ -304,6 +306,12 @@ gh_curl() {
       -H 'User-Agent: oh-dsh-install' \
       "$@"
   fi
+}
+
+download_curl() {
+  curl -fsSL --retry 3 --retry-delay 2 \
+    -H 'User-Agent: oh-dsh-install' \
+    "$@"
 }
 
 json_compact() {
@@ -383,7 +391,9 @@ same_version_installed() {
     desktop)
       [ "$(marker_field "$1" OH_DSH_INSTALL_DEST)" = "$dest" ] || return 1
       if [ "$os" = darwin ]; then
-        [ -d "$dest/$APP_NAME.app" ] || return 1
+        app_current="$dest/$APP_NAME.app"
+        stale_bundle_is_ours "$app_current" || return 1
+        [ -n "$(find "$app_current/Contents/MacOS" -type f -perm -u+x 2>/dev/null | head -n 1)" ] || return 1
       else
         [ -x "$dest/oh-dsh-desktop" ] || return 1
       fi
@@ -752,7 +762,7 @@ fi
 archive="$workdir/$asset"
 url="$download_base/$repo/releases/download/$tag/$asset"
 log "Downloading $asset"
-gh_curl -o "$archive" "$url" \
+download_curl -o "$archive" "$url" \
   || die "failed to download $url"
 
 actual=$(sha256_file "$archive")
