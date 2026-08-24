@@ -94,8 +94,14 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 
 `ohdsh update`（或 `ohdsh update web` / `ohdsh update tui`）在 macOS、
 Linux 与 Windows 上升级已打包的 web/tui 发行版：它重新运行对应平台的
-安装脚本，走与全新安装相同的校验与原子替换流程。在源码检出中执行时会
-提示改用 git。
+安装脚本，走与全新安装相同的校验与原子替换流程。安装来源采用 Codex
+式的推断——依据运行路径、载荷内的安装标记以及 `launcher.env` 记录的
+目标位置——绝不依赖构建时注入的标记，并会还原安装时的
+`--dest`/`--bin-dir`，让更新落在当初安装的位置。位于安装器不认识的
+路径上的安装会被拒绝并给出指引。在源码检出中执行时会提示改用 git。
+
+更新只基于 Release：所有 surface 都用 semver 与已发布的稳定 GitHub
+Release 比较；不存在 commit 级或滚动更新通道。
 
 更新检查使用公开的 GitHub API，最多阻塞启动约 1.5 秒，离线时静默失败。
 设置 `OH_DSH_UPDATE_CHECK=0` 可在所有 surface 上关闭检查。`ohdsh update`

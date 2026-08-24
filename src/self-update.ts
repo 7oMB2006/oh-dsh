@@ -1,9 +1,9 @@
 /** Startup self-update checks and installer-driven upgrades for Oh-DSH. */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { gt, valid } from 'semver'
 
 export const OFFICIAL_REPOSITORY = 'hust-open-atom-club/oh-dsh'
@@ -37,7 +37,8 @@ export function latestReleaseApiUrl(env: NodeJS.ProcessEnv): string {
 
 /**
  * Resolve the latest stable release version, or undefined when the check
- * fails, is disabled, or returns something that is not a stable tag.
+ * fails, is disabled, or returns something that is not a stable tag. Updates
+ * are release-based only: no commit-level or rolling channel is consulted.
  */
 export async function fetchLatestVersion(
   env: NodeJS.ProcessEnv,
@@ -120,47 +121,175 @@ export function installScriptUrl(
   return `https://raw.githubusercontent.com/${repository}/main/${script}`
 }
 
-/** Which distribution layout the launcher is running from. */
+/**
+ * The installer bookkeeping directory that install.sh and install.ps1 own.
+ * Updates are inferred from these records and from the running path — never
+ * from a flag baked into the build.
+ */
+export function installerDataHome(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (platform === 'win32') {
+    const localAppData = env.LOCALAPPDATA
+    if (localAppData !== undefined && localAppData !== '') {
+      return join(localAppData, 'oh-dsh')
+    }
+    return join(env.HOME ?? homedir(), 'AppData', 'Local', 'oh-dsh')
+  }
+  const xdgDataHome = env.XDG_DATA_HOME
+  if (xdgDataHome !== undefined && xdgDataHome !== '') {
+    return join(xdgDataHome, 'oh-dsh')
+  }
+  // install.sh derives this from $HOME; honor the same override here.
+  return join(env.HOME ?? homedir(), '.local', 'share', 'oh-dsh')
+}
+
+export interface LauncherRecord {
+  webDest?: string
+  tuiDest?: string
+  binDir?: string
+}
+
+function readTextAt(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Read the launcher destinations the installers record, codex-style: the
+ * records plus the running path decide how a self-update must run. Parsing
+ * is inert line matching; the file is never evaluated.
+ */
+export function readLauncherRecord(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  readFile: (path: string) => string | undefined = readTextAt,
+): LauncherRecord {
+  const content = readFile(join(installerDataHome(platform, env), 'launcher.env'))
+  if (content === undefined) return {}
+  const record: LauncherRecord = {}
+  for (const line of content.split('\n')) {
+    if (line.startsWith('WEB_DEST=')) record.webDest = line.slice('WEB_DEST='.length)
+    else if (line.startsWith('TUI_DEST=')) record.tuiDest = line.slice('TUI_DEST='.length)
+    else if (line.startsWith('BIN_DIR=')) record.binDir = line.slice('BIN_DIR='.length)
+  }
+  return record
+}
+
+function markerSurface(root: string): 'web' | 'tui' | undefined {
+  const content = readTextAt(join(root, '.oh-dsh-install.env'))
+  if (content === undefined) return undefined
+  for (const line of content.split('\n')) {
+    if (!line.startsWith('OH_DSH_INSTALL_SURFACE=')) continue
+    const value = line.slice('OH_DSH_INSTALL_SURFACE='.length)
+    return value === 'web' || value === 'tui' ? value : undefined
+  }
+  return undefined
+}
+
+/**
+ * Decide which distribution the launcher is running from. Like codex, infer
+ * from the install records and the path itself; no build flag marks the
+ * source. Order: the payload's own install marker, the desktop bundle path,
+ * the source-root contract, the installer's default payload paths, the
+ * launcher destination records, then the payload layout for manually
+ * extracted archives.
+ */
 export function detectDistributionSurface(
   root: string,
   env: NodeJS.ProcessEnv,
   pathExists: (path: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
 ): 'desktop' | 'web' | 'tui' | 'source' {
-  if (env.OH_DSH_DESKTOP_APP !== undefined && env.OH_DSH_DESKTOP_APP !== '') {
-    return 'desktop'
+  const target = resolve(root)
+
+  const marked = markerSurface(target)
+  if (marked !== undefined) return marked
+
+  if (platform === 'darwin' && target.includes('.app/Contents/Resources')) return 'desktop'
+  if (env.OH_DSH_DESKTOP_APP !== undefined && env.OH_DSH_DESKTOP_APP !== '') return 'desktop'
+
+  const sourceRoot = env.OH_DSH_SOURCE_ROOT
+  const packaged = (env.DSH_OH_TUI_ROOT !== undefined && env.DSH_OH_TUI_ROOT !== '')
+    || (env.DSH_OH_WEB_ROOT !== undefined && env.DSH_OH_WEB_ROOT !== '')
+  if (sourceRoot !== undefined && sourceRoot !== '' && !packaged) return 'source'
+
+  const dataHome = installerDataHome(platform, env)
+  if (target === resolve(join(dataHome, 'web'))) return 'web'
+  if (target === resolve(join(dataHome, 'tui'))) return 'tui'
+
+  const record = readLauncherRecord(env, platform)
+  if (record.webDest !== undefined && record.webDest !== '' && target === resolve(record.webDest)) {
+    return 'web'
   }
-  const packaged = env.DSH_OH_TUI_ROOT !== undefined || env.DSH_OH_WEB_ROOT !== undefined
-  if (env.OH_DSH_SOURCE_ROOT !== undefined && env.OH_DSH_SOURCE_ROOT !== '' && !packaged) {
-    return 'source'
+  if (record.tuiDest !== undefined && record.tuiDest !== '' && target === resolve(record.tuiDest)) {
+    return 'tui'
   }
-  if (pathExists(join(root, 'lib', 'oh-dsh-web', 'main.js'))) return 'web'
-  if (pathExists(join(root, 'lib', 'oh-dsh', 'cli.js'))) return 'tui'
-  return packaged ? 'tui' : 'source'
+
+  if (pathExists(join(target, 'lib', 'oh-dsh-web', 'main.js'))) return 'web'
+  if (pathExists(join(target, 'lib', 'oh-dsh', 'cli.js'))) return 'tui'
+  return 'source'
 }
 
 /** The command line that upgrades one surface with the platform installer. */
+export interface SelfUpdatePlan {
+  scriptUrl: string
+  command: string
+  args: string[]
+  /** Destination overrides reconstructed from the installer records. */
+  dest?: string
+  binDir?: string
+}
+
 export function selfUpdatePlan(
   surface: 'web' | 'tui',
   platform: NodeJS.Platform = process.platform,
   repository: string = OFFICIAL_REPOSITORY,
   env: NodeJS.ProcessEnv = {},
-): { scriptUrl: string; command: string; args: string[] } {
+): SelfUpdatePlan {
   const scriptUrl = installScriptUrl(platform, repository, env)
+  const record = readLauncherRecord(env, platform)
+  const dest = surface === 'web' ? record.webDest : record.tuiDest
   if (platform === 'win32') {
-    return {
-      scriptUrl,
-      command: 'powershell',
-      args: [
-        '-NoProfile', '-ExecutionPolicy', 'Bypass',
-        '-File', '<script>', '-Surface', surface,
-      ],
+    const args = [
+      '-NoProfile', '-ExecutionPolicy', 'Bypass',
+      '-File', '<script>', '-Surface', surface,
+    ]
+    if (dest !== undefined && dest !== '') args.push('-Dest', dest)
+    if (record.binDir !== undefined && record.binDir !== '') {
+      args.push('-BinDir', record.binDir)
     }
+    return { scriptUrl, command: 'powershell', args }
   }
-  return {
-    scriptUrl,
-    command: 'sh',
-    args: ['<script>', '--surface', surface],
+  const args = ['<script>', '--surface', surface]
+  if (dest !== undefined && dest !== '') args.push('--dest', dest)
+  if (record.binDir !== undefined && record.binDir !== '') {
+    args.push('--bin-dir', record.binDir)
   }
+  return { scriptUrl, command: 'sh', args }
+}
+
+/**
+ * Verify the running root is a location the installer owns (its recorded or
+ * default destination), so an update never silently installs somewhere else.
+ */
+export function installerOwnsRoot(
+  root: string,
+  surface: 'web' | 'tui',
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const target = resolve(root)
+  if (markerSurface(target) === surface) return true
+  const dataHome = installerDataHome(platform, env)
+  if (target === resolve(join(dataHome, surface))) return true
+  const record = readLauncherRecord(env, platform)
+  const recorded = surface === 'web' ? record.webDest : record.tuiDest
+  return recorded !== undefined && recorded !== '' && target === resolve(recorded)
 }
 
 /** Download the installer script and run it for one surface. */

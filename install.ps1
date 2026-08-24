@@ -93,9 +93,9 @@ function Read-Marker {
 $LauncherEnv = Join-Path $DataHome 'launcher.env'
 
 function Write-LauncherEnv {
-    # Record this surface's payload destination; one dispatcher serves every
-    # installed surface, so the second surface never steals the first one's
-    # launcher.
+    # Record this surface's payload destination and the launcher directory
+    # so `ohdsh update` can reconstruct the exact install locations; one
+    # dispatcher serves every installed surface.
     $key = "$($Surface.ToUpperInvariant())_DEST"
     if (-not (Test-Path -LiteralPath $DataHome)) {
         New-Item -ItemType Directory -Path $DataHome -Force | Out-Null
@@ -103,10 +103,11 @@ function Write-LauncherEnv {
     $lines = @()
     if (Test-Path -LiteralPath $LauncherEnv) {
         $lines = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-            $_ -notmatch "^$key="
+            $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR='
         })
     }
     $lines += "$key=$FinalDest"
+    $lines += "BIN_DIR=$FinalBinDir"
     Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding ASCII
 }
 
@@ -115,7 +116,7 @@ function Remove-LauncherEnvKey {
     if (-not (Test-Path -LiteralPath $LauncherEnv)) { return $false }
     $key = "$($Surface.ToUpperInvariant())_DEST"
     $remaining = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-        $_ -notmatch "^$key="
+        $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR='
     })
     if ($remaining.Count -gt 0) {
         Set-Content -LiteralPath $LauncherEnv -Value $remaining -Encoding ASCII
@@ -344,7 +345,20 @@ try {
         Die "failed to download $Url : $($_.Exception.Message)"
     }
 
-    $ActualHash = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    # Hash through .NET instead of Get-FileHash: the cmdlet's module is not
+    # reliably auto-loadable in every spawned PowerShell environment.
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Archive)
+        try {
+            $hashBytes = $sha256.ComputeHash($stream)
+        } finally {
+            $stream.Dispose()
+        }
+    } finally {
+        $sha256.Dispose()
+    }
+    $ActualHash = ([System.BitConverter]::ToString($hashBytes)).Replace('-', '').ToLowerInvariant()
     if ($ActualHash -ne $ExpectedHash) {
         Die "checksum mismatch for $AssetName : expected sha256:$ExpectedHash, got sha256:$ActualHash; the previous installation was left untouched"
     }

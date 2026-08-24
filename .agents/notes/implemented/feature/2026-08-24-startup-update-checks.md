@@ -28,11 +28,18 @@ scripts performing the upgrade.
   notification that opens the update window.
 - `ohdsh update` upgrades packaged web/tui distributions on all platforms
   by downloading `install.sh`/`install.ps1` from the repository's main
-  branch and running it with the detected surface (`lib/oh-dsh-web/main.js`
-  marks web, otherwise the packaged layout is tui). Source checkouts are
-  refused with a pointer to git; the desktop redirects to its own verified
-  updater, which owns quit-and-replace lifecycle the shell path cannot
-  safely replicate while the app is running.
+  branch and running it for the detected surface. Source inference follows
+  the Codex model — the running path, the payload's
+  `.oh-dsh-install.env` marker, and the destinations recorded in
+  `launcher.env` — rather than any flag baked into the build; the recorded
+  `--dest`/`--bin-dir` are reconstructed so updates land where the install
+  did, and roots the installers do not own are refused with guidance.
+  Source checkouts are refused with a pointer to git; the desktop
+  redirects to its own verified updater, which owns quit-and-replace
+  lifecycle the shell path cannot safely replicate while the app runs.
+- Updates are release-based only: surfaces compare against published
+  stable GitHub Releases with semver. Commit-level rolling channels were
+  explicitly rejected as too unstable for this project.
 - The landing page shows the install command for the detected platform
   (curl one-liner on macOS/Linux, `irm | iex` on Windows) with the copy
   button.

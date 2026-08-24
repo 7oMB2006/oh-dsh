@@ -22,10 +22,15 @@ Status: implemented
   启动执行既有的 `DesktopUpdateManager.check()`，并在发现新版本时弹出一次
   系统通知，点击打开更新窗口。
 - `ohdsh update` 在所有平台升级已打包的 web/tui 发行版：从仓库 main 分支
-  下载 `install.sh`/`install.ps1`，并以检测到的 surface 运行
-  （`lib/oh-dsh-web/main.js` 标记 web，其余打包布局视为 tui）。源码检出
-  会被拒绝并提示改用 git；desktop 重定向到自带的校验更新器——应用运行中
-  的退出与替换生命周期，shell 路径无法安全复刻。
+  下载 `install.sh`/`install.ps1`，并以检测到的 surface 运行。来源推断
+  采用 Codex 的模式——依据运行路径、载荷内的 `.oh-dsh-install.env` 标记
+  以及 `launcher.env` 记录的目标位置——而不是任何构建时注入的标记；
+  记录中的 `--dest`/`--bin-dir` 会被还原，使更新落在当初安装的位置，
+  安装器不认识的根路径会被拒绝并给出指引。源码检出会被拒绝并提示改用
+  git；desktop 重定向到自带的校验更新器——应用运行中的退出与替换生命
+  周期，shell 路径无法安全复刻。
+- 更新只基于 Release：各 surface 用 semver 与已发布的稳定 GitHub
+  Release 比较。commit 级滚动通道被明确否决——对本项目而言太不稳定。
 - 落地页按检测到的平台展示安装命令（macOS/Linux 为 curl 一行命令，
   Windows 为 `irm | iex`），并保留复制按钮。
 

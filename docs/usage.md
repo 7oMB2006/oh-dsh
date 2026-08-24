@@ -110,8 +110,17 @@ Every surface checks for a newer stable Release once per launch:
 `ohdsh update` (or `ohdsh update web` / `ohdsh update tui`) upgrades a
 packaged web/tui distribution on macOS, Linux, and Windows by re-running
 the matching installer script with the same verification and atomic
-replacement as a fresh install. From a source checkout it asks you to use
-git instead.
+replacement as a fresh install. The installation source is inferred the
+way Codex does it — from the running path, the payload's install marker,
+and the destinations recorded in `launcher.env` — never from a flag baked
+into the build, and the recorded `--dest`/`--bin-dir` are reconstructed so
+an update lands exactly where the install did. An installation at a
+location the installers do not own is refused with guidance. From a source
+checkout it asks you to use git instead.
+
+Updates are release-based only: every surface compares against published
+stable GitHub Releases with semver; there is no commit-level or rolling
+update channel.
 
 The checks use the public GitHub API, never block startup for more than
 about a second and a half, and fail silently offline. Set

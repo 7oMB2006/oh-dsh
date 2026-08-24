@@ -391,12 +391,15 @@ surface_dest_key() {
 }
 
 write_launcher_env() {
+  # Record the surface destination and the launcher directory so `ohdsh
+  # update` can reconstruct the exact install locations.
   key=$(surface_dest_key)
   mkdir -p "$data_home"
   tmp="$launcher_env.tmp.$$"
   {
-    [ -f "$launcher_env" ] && sed "/^$key=/d" "$launcher_env"
+    [ -f "$launcher_env" ] && sed -e "/^$key=/d" -e '/^BIN_DIR=/d' "$launcher_env"
     printf '%s=%s\n' "$key" "$dest"
+    printf 'BIN_DIR=%s\n' "$bin_dir"
   } > "$tmp"
   mv -f "$tmp" "$launcher_env"
 }
@@ -406,8 +409,8 @@ remove_launcher_env_key() {
   # $1: key
   [ -f "$launcher_env" ] || return 1
   tmp="$launcher_env.tmp.$$"
-  sed "/^$1=/d" "$launcher_env" > "$tmp"
-  if [ -s "$tmp" ]; then
+  sed -e "/^$1=/d" -e '/^BIN_DIR=/d' "$launcher_env" > "$tmp"
+  if grep -Eq '^(WEB|TUI)_DEST=' "$tmp"; then
     mv -f "$tmp" "$launcher_env"
     return 0
   fi

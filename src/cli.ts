@@ -8,6 +8,7 @@ import { OH_DSH_HOME_ENV } from './data-root.ts'
 import { UsageError } from './errors.ts'
 import {
   detectDistributionSurface,
+  installerOwnsRoot,
   runSelfUpdate,
 } from './self-update.ts'
 import { main as runTui, resolveTuiRoot } from './tui.ts'
@@ -202,7 +203,17 @@ export async function runUpdateCommand(
     return 0
   }
   const surface = requested === 'web' || requested === 'tui' ? requested : distribution
-  stdout.write(`Upgrading Oh-DSH ${surface} with the latest stable installer...\n`)
+  // The running root must be a location the installer owns (its recorded or
+  // default destination), inferred from path and install records, so an
+  // update never silently installs somewhere else.
+  if (!installerOwnsRoot(root, surface, env)) {
+    stderr.write(
+      `ohdsh update: this installation at ${root} has no installer record for surface '${surface}'. ` +
+      'Re-run install.sh (or install.ps1) with --dest matching this location, or reinstall to the default location.\n',
+    )
+    return 2
+  }
+  stdout.write(`Upgrading Oh-DSH ${surface} with the latest stable release installer...\n`)
   return await runSelfUpdate(surface, env)
 }
 
