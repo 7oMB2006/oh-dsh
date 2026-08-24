@@ -1,7 +1,7 @@
 /** Startup self-update checks and installer-driven upgrades for Oh-DSH. */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { gt, valid } from 'semver'
@@ -122,11 +122,26 @@ export function installScriptUrl(
 }
 
 /**
- * The installer bookkeeping directory that install.sh and install.ps1 own.
- * Updates are inferred from these records and from the running path — never
- * from a flag baked into the build.
+ * Installer bookkeeping root (launcher records, desktop markers): under the
+ * shared Oh-DSH state root owned by src/data-root.ts, so one OH_DSH_HOME
+ * override moves every record together with the app's shared state.
  */
-export function installerDataHome(
+export function installerRecordHome(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  void platform
+  const stateRoot = env.OH_DSH_HOME !== undefined && env.OH_DSH_HOME !== ''
+    ? env.OH_DSH_HOME
+    : join(env.HOME ?? homedir(), '.ohdsh')
+  return join(stateRoot, 'installer')
+}
+
+/**
+ * Default payload destinations the installers own (programs, not state):
+ * XDG data home on Unix, %LOCALAPPDATA% on Windows.
+ */
+export function installerPayloadHome(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -169,7 +184,7 @@ export function readLauncherRecord(
   platform: NodeJS.Platform = process.platform,
   readFile: (path: string) => string | undefined = readTextAt,
 ): LauncherRecord {
-  const content = readFile(join(installerDataHome(platform, env), 'launcher.env'))
+  const content = readFile(join(installerRecordHome(platform, env), 'launcher.env'))
   if (content === undefined) return {}
   const record: LauncherRecord = {}
   // Line values tolerate CRLF: install.ps1 writes Windows line endings.
@@ -224,9 +239,9 @@ export function detectDistributionSurface(
     || (env.DSH_OH_WEB_ROOT !== undefined && env.DSH_OH_WEB_ROOT !== '')
   if (sourceRoot !== undefined && sourceRoot !== '' && !packaged) return 'source'
 
-  const dataHome = installerDataHome(platform, env)
-  if (target === resolve(join(dataHome, 'web'))) return 'web'
-  if (target === resolve(join(dataHome, 'tui'))) return 'tui'
+  const payloadHome = installerPayloadHome(platform, env)
+  if (target === resolve(join(payloadHome, 'web'))) return 'web'
+  if (target === resolve(join(payloadHome, 'tui'))) return 'tui'
 
   const record = readLauncherRecord(env, platform)
   if (record.webDest !== undefined && record.webDest !== '' && target === resolve(record.webDest)) {
@@ -291,48 +306,150 @@ export function installerOwnsRoot(
 ): boolean {
   const target = resolve(root)
   if (markerSurface(target) === surface) return true
-  const dataHome = installerDataHome(platform, env)
-  if (target === resolve(join(dataHome, surface))) return true
+  const payloadHome = installerPayloadHome(platform, env)
+  if (target === resolve(join(payloadHome, surface))) return true
   const record = readLauncherRecord(env, platform)
   const recorded = surface === 'web' ? record.webDest : record.tuiDest
   return recorded !== undefined && recorded !== '' && target === resolve(recorded)
 }
 
-/** Download the installer script and run it for one surface. */
+/** Whether an installer-owned installation of one surface exists anywhere. */
+export function surfaceIsInstalled(
+  surface: 'web' | 'tui',
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  pathExists: (path: string) => boolean = existsSync,
+): boolean {
+  const record = readLauncherRecord(env, platform)
+  const recorded = surface === 'web' ? record.webDest : record.tuiDest
+  if (recorded !== undefined && recorded !== '') {
+    return pathExists(join(recorded, 'bin', 'ohdsh'))
+  }
+  return pathExists(join(installerPayloadHome(platform, env), surface, 'bin', 'ohdsh'))
+}
+
+/**
+ * The install script bundled into web/tui packages at lib/oh-dsh/. `ohdsh
+ * update` prefers it over a download, so the upgrade runs the script that
+ * matches the installed version and works without raw.githubusercontent.
+ */
+export function bundledInstallScript(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+  pathExists: (path: string) => boolean = existsSync,
+): string | undefined {
+  const script = join(
+    root,
+    'lib',
+    'oh-dsh',
+    platform === 'win32' ? 'install.ps1' : 'install.sh',
+  )
+  return pathExists(script) ? script : undefined
+}
+
+function windowsQuoted(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`
+}
+
+/**
+ * On Windows the packaged CLI runs from the payload being replaced, and a
+ * mapped node.exe cannot be moved while this process lives. Hand the work to
+ * a detached helper that waits for this process to exit, then runs the
+ * installer on its own.
+ */
+function spawnDetachedWindowsUpdate(
+  scriptPath: string,
+  plan: SelfUpdatePlan,
+  env: NodeJS.ProcessEnv,
+): number {
+  const flags = plan.args
+    .filter(arg => arg !== '-NoProfile' && arg !== '-ExecutionPolicy'
+      && arg !== 'Bypass' && arg !== '-File' && arg !== '<script>')
+    .map(arg => (arg.startsWith('-') ? arg : windowsQuoted(arg)))
+    .join(' ')
+  const escapedScript = windowsQuoted(scriptPath)
+  const waitAndRun = [
+    `while (Get-Process -Id ${String(process.pid)} -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 250 }`,
+    `& ${escapedScript} ${flags}`,
+  ].join('; ')
+  const child = spawn(
+    'powershell',
+    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', waitAndRun],
+    { detached: true, stdio: 'ignore', env, windowsHide: true },
+  )
+  child.unref()
+  process.stdout.write(
+    'Oh-DSH: the upgrade continues in the background after this process exits.\n',
+  )
+  return 0
+}
+
+/**
+ * Run the installer for one surface. The script bundled with the running
+ * package is preferred; otherwise it is downloaded over TLS. On Windows the
+ * installer runs detached after this process exits (see above).
+ */
 export async function runSelfUpdate(
   surface: 'web' | 'tui',
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
   fetchImpl: UpdateFetcher = fetch,
+  root: string = '',
 ): Promise<number> {
   const plan = selfUpdatePlan(surface, platform, OFFICIAL_REPOSITORY, env)
-  let script: string
-  try {
-    const response = await fetchImpl(plan.scriptUrl)
-    if (!response.ok) {
-      throw new Error(`unexpected status ${String(response.status)}`)
-    }
-    script = await response.text()
-  } catch (error) {
-    throw new Error(
-      `failed to download the installer from ${plan.scriptUrl}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
+  const bundled = root !== '' ? bundledInstallScript(root, platform) : undefined
+  if (platform === 'win32') {
+    const scriptPath = bundled ?? join(
+      installerRecordHome(platform, env),
+      'update-install.ps1',
     )
+    if (bundled === undefined) {
+      let script: string
+      try {
+        const response = await fetchImpl(plan.scriptUrl)
+        if (!response.ok) {
+          throw new Error(`unexpected status ${String(response.status)}`)
+        }
+        script = await response.text()
+      } catch (error) {
+        throw new Error(
+          `failed to download the installer from ${plan.scriptUrl}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        )
+      }
+      mkdirSync(installerRecordHome(platform, env), { recursive: true })
+      writeFileSync(scriptPath, script, { mode: 0o755 })
+    }
+    return spawnDetachedWindowsUpdate(scriptPath, plan, env)
   }
-  const workdir = mkdtempSync(join(tmpdir(), 'oh-dsh-self-update-'))
-  const scriptPath = join(
-    workdir,
-    platform === 'win32' ? 'install.ps1' : 'install.sh',
-  )
-  try {
+  let scriptPath = bundled
+  let workdir = ''
+  if (scriptPath === undefined) {
+    let script: string
+    try {
+      const response = await fetchImpl(plan.scriptUrl)
+      if (!response.ok) {
+        throw new Error(`unexpected status ${String(response.status)}`)
+      }
+      script = await response.text()
+    } catch (error) {
+      throw new Error(
+        `failed to download the installer from ${plan.scriptUrl}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+    workdir = mkdtempSync(join(tmpdir(), 'oh-dsh-self-update-'))
+    scriptPath = join(workdir, 'install.sh')
     writeFileSync(scriptPath, script, { mode: 0o755 })
+  }
+  try {
     const args = plan.args.map(arg => (arg === '<script>' ? scriptPath : arg))
     return await new Promise<number>((resolve, reject) => {
       const child = spawn(plan.command, args, {
         env,
         stdio: 'inherit',
-        ...(platform === 'win32' ? { windowsHide: true } : {}),
       })
       child.once('error', reject)
       child.once('exit', code => {
@@ -340,6 +457,6 @@ export async function runSelfUpdate(
       })
     })
   } finally {
-    rmSync(workdir, { force: true, recursive: true })
+    if (workdir !== '') rmSync(workdir, { force: true, recursive: true })
   }
 }

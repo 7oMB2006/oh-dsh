@@ -19,9 +19,10 @@ installed the latest stable release for any surface.
   surfaces through `--surface desktop|web|tui` (default `desktop`). Each
   surface installs only its own files: an `.app` under `/Applications` with
   a Launch Services refresh and stale-bundle retirement for macOS desktop,
-  an AppImage under `~/.local/bin` for Linux desktop, and a payload plus
-  `ohdsh` symlink for web/tui. Only the desktop surface ever registers an
-  application entry.
+  an AppImage under `~/.local/bin` for Linux desktop, and a payload plus a
+  generated dispatching `ohdsh` launcher for web/tui (see the launcher
+  bullet below). Only the desktop surface ever registers an application
+  entry.
 - Verify every download against the `digest` (sha256) field the GitHub REST
   API already publishes for every asset. This covers every existing release
   without changing the release workflow, and fails closed when a digest is
@@ -120,9 +121,13 @@ complements it for first install and scripted setup.
   with an actionable message rather than installing unverified bytes.
 - Unauthenticated installs share the 60 req/hr/IP GitHub API limit;
   `GH_TOKEN`/`GITHUB_TOKEN` are documented for constrained environments.
-- Installer bookkeeping lives under `~/.local/share/oh-dsh` and inside the
-  payload; `~/.ohdsh` remains exclusively the shared application data root
-  owned by `src/data-root.ts`.
+- Installer bookkeeping (launcher records, desktop markers) lives under
+  `<OH_DSH_HOME>/installer` — inside the shared application data root owned
+  by `src/data-root.ts`, so one override moves it with app state. Payloads
+  stay under the XDG data home / `%LOCALAPPDATA%` because they are
+  programs, not state. The web/tui packages bundle `install.sh` and
+  `install.ps1` at `lib/oh-dsh/`, and `ohdsh update` prefers that bundled,
+  version-matched script over a download.
 - `tests/install-sh.test.ts` runs on macOS and Linux hosts and
   `tests/install-ps1.test.ts` on Windows (both against the shared mock
   GitHub server); each suite skips on the other platforms. The macOS

@@ -30,8 +30,9 @@ param(
     [switch]$Uninstall,
     [string]$ApiBase = 'https://api.github.com',
     [string]$DownloadBase = 'https://github.com',
-    # Installer bookkeeping root (markers and launcher records). Defaults to
-    # %LOCALAPPDATA%\oh-dsh; override to relocate or isolate an install.
+    # Installer bookkeeping root (launcher records and desktop markers);
+    # defaults to <shared Oh-DSH state root>\installer (OH_DSH_HOME), like
+    # install.sh. Override to relocate or isolate the records.
     [string]$DataHome = ''
 )
 
@@ -39,7 +40,13 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $AppName = 'Oh-DSH Desktop'
 $ExecutableName = 'oh-dsh-desktop'
-if ($DataHome -eq '') { $DataHome = Join-Path $env:LOCALAPPDATA 'oh-dsh' }
+$PayloadHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
+$DefaultRecordRoot = ''
+if ($DataHome -eq '') {
+    $stateRoot = if ($env:OH_DSH_HOME) { $env:OH_DSH_HOME } else { Join-Path $env:USERPROFILE '.ohdsh' }
+    $DataHome = Join-Path $stateRoot 'installer'
+    $DefaultRecordRoot = $DataHome
+}
 
 function Write-Step {
     param([string]$Message)
@@ -74,12 +81,12 @@ function Get-PayloadDest {
         return ''
     }
     if ($Dest -ne '') { return $Dest }
-    return (Join-Path $DataHome $Surface)
+    return (Join-Path $PayloadHome $Surface)
 }
 
 function Get-BinDir {
     if ($BinDir -ne '') { return $BinDir }
-    return (Join-Path $DataHome 'bin')
+    return (Join-Path $PayloadHome 'bin')
 }
 
 function Read-Marker {
@@ -111,7 +118,7 @@ function Write-LauncherEnv {
     }
     $lines += "$key=$FinalDest"
     $lines += "BIN_DIR=$FinalBinDir"
-    Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding ASCII
+    Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding Default
 }
 
 function Remove-LauncherEnvKey {
@@ -119,10 +126,10 @@ function Remove-LauncherEnvKey {
     if (-not (Test-Path -LiteralPath $LauncherEnv)) { return $false }
     $key = "$($Surface.ToUpperInvariant())_DEST"
     $remaining = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-        $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR='
+        $_ -notmatch "^$key="
     })
     if ($remaining.Count -gt 0) {
-        Set-Content -LiteralPath $LauncherEnv -Value $remaining -Encoding ASCII
+        Set-Content -LiteralPath $LauncherEnv -Value $remaining -Encoding Default
         return $true
     }
     Remove-Item -LiteralPath $LauncherEnv -Force
@@ -131,15 +138,26 @@ function Remove-LauncherEnvKey {
 
 function Write-Dispatcher {
     # $ShimPath: launcher location. The dispatcher resolves each surface's
-    # payload from launcher.env at run time.
+    # payload from launcher.env at run time. With the default record root the
+    # script stays pure ASCII by expanding %USERPROFILE% / %OH_DSH_HOME% at
+    # run time, so localized profile paths never need to be embedded.
     param([string]$ShimPath)
+    $recordSetup = if ($DefaultRecordRoot -ne '' -and $DataHome -eq $DefaultRecordRoot) {
+        @(
+            'SET "OHRECORD=%USERPROFILE%\.ohdsh\installer\launcher.env"',
+            'IF DEFINED OH_DSH_HOME SET "OHRECORD=%OH_DSH_HOME%\installer\launcher.env"'
+        )
+    } else {
+        @("SET `"OHRECORD=$LauncherEnv`"")
+    }
     $body = @(
         '@echo off',
         'SETLOCAL',
         'SET "WEB_DEST="',
-        'SET "TUI_DEST="',
-        "IF EXIST `"$LauncherEnv`" (",
-        "  FOR /F `"usebackq tokens=1,* delims==`" %%A IN (`"$LauncherEnv`") DO (",
+        'SET "TUI_DEST="'
+    ) + $recordSetup + @(
+        'IF EXIST "%OHRECORD%" (',
+        '  FOR /F "usebackq tokens=1,* delims==" %%A IN ("%OHRECORD%") DO (',
         '    IF /I "%%A"=="WEB_DEST" SET "WEB_DEST=%%B"',
         '    IF /I "%%A"=="TUI_DEST" SET "TUI_DEST=%%B"',
         '  )',
@@ -165,7 +183,7 @@ function Write-Dispatcher {
         'CALL "%ROOT%\bin\ohdsh.cmd" %*',
         'EXIT /B %ERRORLEVEL%'
     )
-    Set-Content -LiteralPath $ShimPath -Value ($body -join "`r`n") -Encoding ASCII
+    Set-Content -LiteralPath $ShimPath -Value ($body -join "`r`n") -Encoding Default
 }
 
 function Write-Marker {
@@ -180,9 +198,10 @@ function Write-Marker {
         "OH_DSH_INSTALL_VERSION=$script:ReleaseVersion",
         "OH_DSH_INSTALL_ASSET=$script:AssetName",
         "OH_DSH_INSTALL_OS=win",
-        "OH_DSH_INSTALL_ARCH=$DetectedArch"
+        "OH_DSH_INSTALL_ARCH=$DetectedArch",
+        "OH_DSH_INSTALL_DEST=$script:EffectiveDest"
     )
-    Set-Content -LiteralPath $Path -Value $lines -Encoding ASCII
+    Set-Content -LiteralPath $Path -Value $lines -Encoding Default
 }
 
 function Remove-SurfaceInstall {
@@ -191,6 +210,12 @@ function Remove-SurfaceInstall {
             (Join-Path $env:LOCALAPPDATA 'Programs' 'Oh-DSH Desktop'),
             (Join-Path $env:LOCALAPPDATA 'Programs' 'oh-dsh-desktop')
         )
+        $marker = Join-Path $DataHome 'desktop.env'
+        if (Test-Path -LiteralPath $marker) {
+            $values = Read-Marker -Path $marker
+            $recordedDest = $values['OH_DSH_INSTALL_DEST']
+            if ($recordedDest) { $candidates = @($recordedDest) + $candidates }
+        }
         $removed = $false
         foreach ($installDir in $candidates) {
             if (-not (Test-Path -LiteralPath $installDir)) { continue }
@@ -207,7 +232,7 @@ function Remove-SurfaceInstall {
             Write-Step "Removed $installDir"
             $removed = $true
         }
-        $marker = Join-Path $DataHome 'desktop\install.env'
+        $marker = Join-Path $DataHome 'desktop.env'
         if (Test-Path -LiteralPath $marker) {
             Remove-Item -LiteralPath $marker -Force
             Write-Step "Removed $marker"
@@ -318,7 +343,7 @@ $ExpectedHash = $Digest.Substring(7).ToLowerInvariant()
 # ---------------------------------------------------------------------------
 
 if ($Surface -eq 'desktop') {
-    $MarkerPath = Join-Path $DataHome 'desktop\install.env'
+    $MarkerPath = Join-Path $DataHome 'desktop.env'
 } else {
     $MarkerPath = Join-Path (Get-PayloadDest) '.oh-dsh-install.env'
 }
@@ -328,8 +353,18 @@ if (-not $Force) {
         -and $Marker['OH_DSH_INSTALL_SURFACE'] -eq $Surface `
         -and $Marker['OH_DSH_INSTALL_VERSION'] -eq $ReleaseVersion `
         -and $Marker['OH_DSH_INSTALL_ASSET'] -eq $AssetName) {
-        Write-Step "$Surface $ReleaseVersion ($AssetName) is already installed; pass -Force to reinstall"
-        exit 0
+        $artifactsOk = $false
+        if ($Surface -eq 'desktop') {
+            $wantedDest = [string]$Marker['OH_DSH_INSTALL_DEST']
+            $artifactsOk = ($wantedDest -eq $Dest)
+        } else {
+            $artifactsOk = (Test-Path -LiteralPath (Join-Path (Get-PayloadDest) 'bin\ohdsh.cmd')) `
+                -and (Test-Path -LiteralPath (Join-Path (Get-BinDir) 'ohdsh.cmd'))
+        }
+        if ($artifactsOk) {
+            Write-Step "$Surface $ReleaseVersion ($AssetName) is already installed; pass -Force to reinstall"
+            exit 0
+        }
     }
 }
 
@@ -372,13 +407,19 @@ try {
     # -----------------------------------------------------------------------
 
     if ($Surface -eq 'desktop') {
+        $installArgs = '/S'
+        $script:EffectiveDest = $Dest
+        if ($Dest -ne '') {
+            # NSIS requires /D= last and unquoted, without a trailing backslash.
+            $installArgs = "/S /D=$($Dest.TrimEnd('\\'))"
+        }
         Write-Step "Running the Oh-DSH Desktop installer silently"
-        $process = Start-Process -FilePath $Archive -ArgumentList '/S' -Wait -PassThru
+        $process = Start-Process -FilePath $Archive -ArgumentList $installArgs -Wait -PassThru
         if ($process.ExitCode -notin @(0, $null)) {
             Die "the desktop installer exited with $($process.ExitCode); the previous installation was left untouched"
         }
         Write-Marker -Path $MarkerPath
-        Write-Step "Installed Oh-DSH Desktop $ReleaseVersion"
+        Write-Step "Installed Oh-DSH Desktop $ReleaseVersion$(if ($Dest) { " to $Dest" })"
         exit 0
     }
 
@@ -414,6 +455,11 @@ try {
 
     $HadPrevious = $false
     if (Test-Path -LiteralPath $FinalDest) {
+        $owned = Test-Path -LiteralPath (Join-Path $FinalDest '.oh-dsh-install.env')
+        $empty = $null -eq (Get-ChildItem -LiteralPath $FinalDest -Force | Select-Object -First 1)
+        if (-not $owned -and -not $empty) {
+            Die "refusing to replace $FinalDest : it is not an Oh-DSH $Surface payload (no install marker) and is not empty"
+        }
         Move-Item -LiteralPath $FinalDest -Destination "$FinalDest.previous"
         $HadPrevious = $true
     }
@@ -440,6 +486,7 @@ try {
         New-Item -ItemType Directory -Path $FinalBinDir -Force | Out-Null
     }
     $ShimPath = Join-Path $FinalBinDir 'ohdsh.cmd'
+    $script:EffectiveDest = $FinalDest
     Write-LauncherEnv
     Write-Dispatcher -ShimPath $ShimPath
     # The marker turns the install "current" only after the launcher exists.

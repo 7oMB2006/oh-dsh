@@ -125,9 +125,13 @@ update channel.
 The checks use the public GitHub API, never block startup for more than
 about a second and a half, and fail silently offline. Set
 `OH_DSH_UPDATE_CHECK=0` to disable them everywhere. `ohdsh update`
-downloads the installer script from the repository's `main` branch over
-TLS; `OH_DSH_INSTALL_SCRIPT_URL` can point it at a mirror or a local copy
-for testing.
+prefers the installer script bundled inside the package at
+`lib/oh-dsh/install.sh` (or `install.ps1`) and only downloads it from the
+repository's `main` branch over TLS when the bundle is absent;
+`OH_DSH_INSTALL_SCRIPT_URL` can point the download at a mirror or a local
+copy for testing. On Windows the update runs detached after the current
+process exits, because the running payload cannot be replaced while it
+executes.
 
 ## Install the full distribution
 

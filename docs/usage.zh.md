@@ -105,8 +105,11 @@ Release 比较；不存在 commit 级或滚动更新通道。
 
 更新检查使用公开的 GitHub API，最多阻塞启动约 1.5 秒，离线时静默失败。
 设置 `OH_DSH_UPDATE_CHECK=0` 可在所有 surface 上关闭检查。`ohdsh update`
-通过 TLS 从仓库 `main` 分支下载安装脚本；`OH_DSH_INSTALL_SCRIPT_URL`
-可将其指向镜像或本地副本以便测试。
+优先使用打包在包内 `lib/oh-dsh/install.sh`（或 `install.ps1`）的安装
+脚本，仅当包内没有时才通过 TLS 从仓库 `main` 分支下载；
+`OH_DSH_INSTALL_SCRIPT_URL` 可将下载指向镜像或本地副本以便测试。在
+Windows 上，更新会在当前进程退出后以分离方式执行，因为运行中的载荷
+无法在执行时被替换。
 
 ## 安装完整版
 

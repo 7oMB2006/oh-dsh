@@ -17,8 +17,8 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
   `--surface desktop|web|tui`（默认 `desktop`）选择。每个 surface 只安装
   自己的文件：macOS desktop 是 `/Applications` 下的 `.app`，附带 Launch
   Services 刷新与残留包清退；Linux desktop 是 `~/.local/bin` 下的
-  AppImage；web/tui 是载荷加 `ohdsh` 符号链接。只有 desktop 会注册应用
-  入口。
+  AppImage；web/tui 是载荷加生成的调度式 `ohdsh` 启动器（见下方启动器
+  条目）。只有 desktop 会注册应用入口。
 - 下载校验使用 GitHub REST API 已为每个资产发布的 `digest`（sha256）字段。
   它无需改动发布流程即可覆盖所有既有 Release，且在摘要缺失或不匹配时
   拒绝安装（fail closed）。
@@ -97,8 +97,12 @@ desktop 自更新；shell 安装器补足首次安装与脚本化场景。
   提示失败关闭，而不是安装未校验的字节。
 - 未鉴权安装共享 GitHub API 每IP 每小时 60 次的限额；受限环境可使用文档中
   的 `GH_TOKEN`/`GITHUB_TOKEN`。
-- 安装器的簿记位于 `~/.local/share/oh-dsh` 与载荷内部；`~/.ohdsh` 仍然
-  完全是由 `src/data-root.ts` 拥有的共享应用数据根。
+- 安装器簿记（launcher 记录、desktop 标记）位于
+  `<OH_DSH_HOME>/installer`——在 `src/data-root.ts` 拥有的共享应用数据根
+  之内，一次覆盖即可随应用状态一起迁移。载荷留在 XDG 数据目录 /
+  `%LOCALAPPDATA%`，因为它们是程序而非状态。web/tui 包把 `install.sh`
+  与 `install.ps1` 打包进 `lib/oh-dsh/`，`ohdsh update` 优先使用这份与
+  版本匹配的脚本而不是下载。
 - `tests/install-sh.test.ts` 在 macOS 与 Linux 主机运行，
   `tests/install-ps1.test.ts` 在 Windows 运行（共用同一个 mock GitHub
   服务器）；两个套件在对方平台跳过。macOS desktop 场景没有 Windows 对应

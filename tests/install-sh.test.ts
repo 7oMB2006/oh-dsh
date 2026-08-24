@@ -333,7 +333,7 @@ test('macOS desktop installs register the app bundle and retire verified stale b
     assert.ok(!(await exists(staleBackup)), 'stale pre-upgrade backups must be removed')
     const lsregisterLog = await readFile(spy.logPath, 'utf8')
     assert.match(lsregisterLog, new RegExp(`-f .*${'Oh-DSH Desktop.app'}`))
-    const markerPath = join(home, '.local', 'share', 'oh-dsh', 'desktop', 'install.env')
+    const markerPath = join(home, '.ohdsh', 'installer', 'desktop.env')
     const marker = await readFile(markerPath, 'utf8')
     assert.match(marker, /^OH_DSH_INSTALL_SURFACE=desktop$/m)
     assert.match(marker, /^OH_DSH_INSTALL_ASSET=Oh-DSH-Desktop-0\.1\.8-arm64\.zip$/m)
@@ -614,7 +614,7 @@ test('desktop idempotency is keyed by the requested destination', { skip: skipOn
     assert.ok(await exists(join(appsB, 'Oh-DSH Desktop.app')))
     assert.equal(github.downloadCount('v0.1.8', 'Oh-DSH-Desktop-0.1.8-arm64.zip'), 2)
     const marker = await readFile(
-      join(home, '.local', 'share', 'oh-dsh', 'desktop', 'install.env'),
+      join(home, '.ohdsh', 'installer', 'desktop.env'),
       'utf8',
     )
     assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${appsB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
@@ -663,6 +663,60 @@ test('release parsing tolerates pretty-printed JSON responses', { skip: skipOnWi
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /Verified sha256:/)
     assert.match(await readFile(join(home, 'payload', 'bin', 'ohdsh'), 'utf8'), /pretty/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a marker-less non-empty destination is never replaced', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'fresh'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const documents = join(home, 'Documents')
+    await mkdir(documents, { recursive: true })
+    await writeFile(join(documents, 'thesis.md'), 'irreplaceable')
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', documents, '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /refusing to replace/)
+    assert.ok(await exists(join(documents, 'thesis.md')), 'unrelated data must survive')
+
+    // An empty destination installs without complaint.
+    const empty = join(home, 'empty-dest')
+    await mkdir(empty, { recursive: true })
+    const intoEmpty = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', empty, '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(intoEmpty.status, 0, intoEmpty.stderr)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('BIN_DIR survives while another surface remains installed', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'webmark'),
+      await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'tuimark'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    assert.equal((await runInstaller(['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin], env)).status, 0)
+    assert.equal((await runInstaller(['--surface', 'tui', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin], env)).status, 0)
+
+    assert.equal((await runInstaller(['--uninstall', '--surface', 'web', '--bin-dir', bin], env)).status, 0)
+    const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
+    assert.match(record, /^TUI_DEST=/m)
+    assert.match(record, /^BIN_DIR=/m, 'BIN_DIR must survive for the remaining surface')
   } finally {
     await github.stop()
   }

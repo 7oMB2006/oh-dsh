@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import {
+  bundledInstallScript,
   checkForUpdate,
   detectDistributionSurface,
   fetchLatestVersion,
@@ -14,6 +15,7 @@ import {
   readLauncherRecord,
   runSelfUpdate,
   selfUpdatePlan,
+  surfaceIsInstalled,
   startupUpdateNotice,
   updateCheckEnabled,
   type UpdateFetcher,
@@ -182,19 +184,17 @@ test('runSelfUpdate reports a failed installer download', async () => {
 })
 
 test('launcher records are parsed inertly and drive update destinations', () => {
-  const env = { XDG_DATA_HOME: '/data', HOME: '/home' }
+  const env = { OH_DSH_HOME: '/state', HOME: '/home' }
   const record = readLauncherRecord(env, 'linux', path =>
-    path.replaceAll('\\', '/').endsWith('/data/oh-dsh/launcher.env')
+    path.replaceAll('\\', '/').endsWith('/state/installer/launcher.env')
       ? 'WEB_DEST=/opt/oh web\nTUI_DEST=/opt/oh tui\nBIN_DIR=/opt/bin\nOH_DSH_NOPE=ignored\n'
       : undefined,
   )
   assert.deepEqual(record, { webDest: '/opt/oh web', tuiDest: '/opt/oh tui', binDir: '/opt/bin' })
 
   const plan = selfUpdatePlan('web', 'linux', 'hust-open-atom-club/oh-dsh', {
-    ...env,
-    OH_DSH_UPDATE_API_BASE: undefined,
-    XDG_DATA_HOME: env.XDG_DATA_HOME,
-    HOME: env.HOME,
+    OH_DSH_HOME: '/nowhere',
+    HOME: '/home',
   })
   // No records on disk in this environment: plain default install flags.
   assert.deepEqual(plan.args, ['<script>', '--surface', 'web'])
@@ -202,28 +202,31 @@ test('launcher records are parsed inertly and drive update destinations', () => 
 
 test('selfUpdatePlan reconstructs recorded destinations per platform', async () => {
   const home = await mkdtemp(join(tmpdir(), 'oh-dsh-plan-'))
-  const dataHome = join(home, '.local', 'share', 'oh-dsh')
-  await mkdir(dataHome, { recursive: true })
-  await writeFile(join(dataHome, 'launcher.env'), 'WEB_DEST=/custom/web\nBIN_DIR=/custom/bin\n')
+  const recordHome = join(home, '.ohdsh', 'installer')
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), 'WEB_DEST=/custom/web\nBIN_DIR=/custom/bin\n')
   const unixPlan = selfUpdatePlan('web', 'linux', 'hust-open-atom-club/oh-dsh', { HOME: home })
   assert.deepEqual(unixPlan.args, [
     '<script>', '--surface', 'web', '--dest', '/custom/web', '--bin-dir', '/custom/bin',
   ])
 
   const winHome = await mkdtemp(join(tmpdir(), 'oh-dsh-plan-win-'))
-  const winData = join(winHome, 'oh-dsh')
+  const winData = join(winHome, '.ohdsh', 'installer')
   await mkdir(winData, { recursive: true })
   await writeFile(join(winData, 'launcher.env'), 'WEB_DEST=C:\\custom web\nBIN_DIR=C:\\custom bin\n')
-  const winPlan = selfUpdatePlan('web', 'win32', 'hust-open-atom-club/oh-dsh', { LOCALAPPDATA: winHome })
+  const winPlan = selfUpdatePlan('web', 'win32', 'hust-open-atom-club/oh-dsh', {
+    OH_DSH_HOME: join(winHome, '.ohdsh'),
+  })
   assert.deepEqual(winPlan.args.slice(-4), ['-Dest', 'C:\\custom web', '-BinDir', 'C:\\custom bin'])
 })
 
 test('installer ownership follows markers, defaults, and records', async () => {
   const home = await mkdtemp(join(tmpdir(), 'oh-dsh-owns-'))
-  const dataHome = join(home, '.local', 'share', 'oh-dsh')
+  const recordHome = join(home, '.ohdsh', 'installer')
+  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
   const env = { HOME: home }
 
-  const defaultPayload = join(dataHome, 'web')
+  const defaultPayload = join(payloadHome, 'web')
   await mkdir(defaultPayload, { recursive: true })
   await writeFile(join(defaultPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=web\n')
   assert.equal(installerOwnsRoot(defaultPayload, 'web', env, 'linux'), true)
@@ -234,14 +237,15 @@ test('installer ownership follows markers, defaults, and records', async () => {
   assert.equal(installerOwnsRoot(foreign, 'web', env, 'linux'), false)
 
   const custom = join(home, 'custom tui')
-  await mkdir(join(dataHome), { recursive: true })
-  await writeFile(join(dataHome, 'launcher.env'), `TUI_DEST=${custom}\nBIN_DIR=${join(home, 'bin')}\n`)
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${custom}\nBIN_DIR=${join(home, 'bin')}\n`)
   assert.equal(installerOwnsRoot(custom, 'tui', env, 'linux'), true)
 })
 
 test('detection prefers the payload marker and app path over layout probes', async () => {
   const home = await mkdtemp(join(tmpdir(), 'oh-dsh-detect2-'))
-  const dataHome = join(home, '.local', 'share', 'oh-dsh')
+  const recordHome = join(home, '.ohdsh', 'installer')
+  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
   const env = { HOME: home }
 
   // A payload marker wins even inside a foreign directory.
@@ -262,14 +266,14 @@ test('detection prefers the payload marker and app path over layout probes', asy
   )
 
   // The installer's default payload path is recognized without a marker.
-  const defaultWeb = join(dataHome, 'web')
+  const defaultWeb = join(payloadHome, 'web')
   await mkdir(defaultWeb, { recursive: true })
   assert.equal(detectDistributionSurface(defaultWeb, env, () => false, 'linux'), 'web')
 
   // Recorded custom destinations are recognized via launcher.env.
   const customTui = join(home, 'custom tui')
-  await mkdir(dataHome, { recursive: true })
-  await writeFile(join(dataHome, 'launcher.env'), `TUI_DEST=${customTui}\n`)
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${customTui}\n`)
   await mkdir(customTui, { recursive: true })
   assert.equal(detectDistributionSurface(customTui, env, () => false, 'linux'), 'tui')
 
@@ -282,4 +286,47 @@ test('detection prefers the payload marker and app path over layout probes', asy
     detectDistributionSurface(manual, { HOME: home, OH_DSH_SOURCE_ROOT: home }, undefined),
     'source',
   )
+})
+
+test('the bundled installer script is preferred over a download', { skip: !isUnix }, async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-bundled-'))
+  const packageRoot = join(home, 'pkg')
+  await mkdir(join(packageRoot, 'lib', 'oh-dsh'), { recursive: true })
+  const ranPath = join(home, 'ran.txt')
+  await writeFile(
+    join(packageRoot, 'lib', 'oh-dsh', 'install.sh'),
+    `#!/bin/sh\nprintf '%s\\n' "$*" > ${JSON.stringify(ranPath)}\n`,
+  )
+
+  let fetched = false
+  const fetchImpl: UpdateFetcher = async () => {
+    fetched = true
+    return new Response('# downloaded', { status: 200 })
+  }
+  const code = await runSelfUpdate('tui', { ...process.env }, 'linux', fetchImpl, packageRoot)
+  assert.equal(code, 0)
+  assert.equal(fetched, false, 'no download when the package bundles the script')
+  assert.equal(await readFile(ranPath, 'utf8'), '--surface tui\n')
+  assert.equal(bundledInstallScript(packageRoot, 'linux'), join(packageRoot, 'lib', 'oh-dsh', 'install.sh'))
+  assert.equal(bundledInstallScript(packageRoot, 'win32'), undefined)
+})
+
+test('surfaceIsInstalled follows records and default payload paths', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-installed-'))
+  const recordHome = join(home, '.ohdsh', 'installer')
+  const env = { HOME: home }
+
+  assert.equal(surfaceIsInstalled('web', env, 'linux'), false)
+
+  const payloadHome = join(home, '.local', 'share', 'oh-dsh')
+  await mkdir(join(payloadHome, 'web', 'bin'), { recursive: true })
+  await writeFile(join(payloadHome, 'web', 'bin', 'ohdsh'), '')
+  assert.equal(surfaceIsInstalled('web', env, 'linux'), true)
+  assert.equal(surfaceIsInstalled('tui', env, 'linux'), false)
+
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${join(home, 'custom tui')}\n`)
+  await mkdir(join(home, 'custom tui', 'bin'), { recursive: true })
+  await writeFile(join(home, 'custom tui', 'bin', 'ohdsh'), '')
+  assert.equal(surfaceIsInstalled('tui', env, 'linux'), true)
 })

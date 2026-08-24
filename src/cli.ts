@@ -10,6 +10,7 @@ import {
   detectDistributionSurface,
   installerOwnsRoot,
   runSelfUpdate,
+  surfaceIsInstalled,
 } from './self-update.ts'
 import { main as runTui, resolveTuiRoot } from './tui.ts'
 import { main as runWeb } from './web.ts'
@@ -198,23 +199,28 @@ export async function runUpdateCommand(
     stderr.write('ohdsh update needs a packaged installation; update a source checkout with git instead.\n')
     return 2
   }
-  if (distribution === 'desktop') {
+  if (distribution === 'desktop' || requested === 'desktop') {
     stdout.write('The desktop application updates itself: open Oh-DSH Desktop -> Check for Updates...\n')
     return 0
   }
-  const surface = requested === 'web' || requested === 'tui' ? requested : distribution
-  // The running root must be a location the installer owns (its recorded or
-  // default destination), inferred from path and install records, so an
-  // update never silently installs somewhere else.
-  if (!installerOwnsRoot(root, surface, env)) {
+  const explicit = requested === 'web' || requested === 'tui'
+  const surface = explicit ? requested : distribution
+  // Ownership is inferred from install records and paths, never from a build
+  // flag: the detected payload's own root, or — for an explicitly requested
+  // surface — any installer-owned installation of that surface.
+  const owned = explicit
+    ? surfaceIsInstalled(surface, env)
+    : installerOwnsRoot(root, surface, env)
+  if (!owned) {
     stderr.write(
-      `ohdsh update: this installation at ${root} has no installer record for surface '${surface}'. ` +
-      'Re-run install.sh (or install.ps1) with --dest matching this location, or reinstall to the default location.\n',
+      `ohdsh update: no installer-owned ${surface} installation was found` +
+      (explicit ? '' : ` at ${root}`) +
+      '. Re-run install.sh (or install.ps1) with --dest matching the location, or reinstall to the default location.\n',
     )
     return 2
   }
   stdout.write(`Upgrading Oh-DSH ${surface} with the latest stable release installer...\n`)
-  return await runSelfUpdate(surface, env)
+  return await runSelfUpdate(surface, env, process.platform, undefined, root)
 }
 
 /** Dispatch one surface command. */

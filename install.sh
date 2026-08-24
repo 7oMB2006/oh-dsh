@@ -165,7 +165,11 @@ command -v curl >/dev/null 2>&1 || die 'curl is required (https://curl.se)'
 
 api_base=${OH_DSH_API_BASE:-$API_BASE_DEFAULT}
 download_base=${OH_DSH_DOWNLOAD_BASE:-$DOWNLOAD_BASE_DEFAULT}
+# Payload destinations follow the XDG data home; installer bookkeeping
+# (launcher records and system-install markers) lives under the shared Oh-DSH
+# state root owned by src/data-root.ts, so one OH_DSH_HOME override moves it.
 data_home=${XDG_DATA_HOME:-$HOME/.local/share}/oh-dsh
+record_home=${OH_DSH_HOME:-$HOME/.ohdsh}/installer
 
 # ---------------------------------------------------------------------------
 # Platform detection
@@ -236,8 +240,7 @@ case "$dest" in
   */) dest=${dest%/} ;;
 esac
 
-marker_dir=$data_home/desktop
-desktop_marker=$marker_dir/install.env
+desktop_marker=$record_home/desktop.env
 
 workdir=''
 cleanup() {
@@ -384,7 +387,7 @@ same_version_installed() {
 # payload that provides it)
 # ---------------------------------------------------------------------------
 
-launcher_env=$data_home/launcher.env
+launcher_env=$record_home/launcher.env
 
 surface_dest_key() {
   printf '%s_DEST' "$(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')"
@@ -394,7 +397,7 @@ write_launcher_env() {
   # Record the surface destination and the launcher directory so `ohdsh
   # update` can reconstruct the exact install locations.
   key=$(surface_dest_key)
-  mkdir -p "$data_home"
+  mkdir -p "$record_home"
   tmp="$launcher_env.tmp.$$"
   {
     [ -f "$launcher_env" ] && sed -e "/^$key=/d" -e '/^BIN_DIR=/d' "$launcher_env"
@@ -406,10 +409,10 @@ write_launcher_env() {
 
 # Remove one surface's destination record; returns 1 when no surfaces remain.
 remove_launcher_env_key() {
-  # $1: key
+  # $1: key. BIN_DIR stays while another surface still needs the launcher.
   [ -f "$launcher_env" ] || return 1
   tmp="$launcher_env.tmp.$$"
-  sed -e "/^$1=/d" -e '/^BIN_DIR=/d' "$launcher_env" > "$tmp"
+  sed "/^$1=/d" "$launcher_env" > "$tmp"
   if grep -Eq '^(WEB|TUI)_DEST=' "$tmp"; then
     mv -f "$tmp" "$launcher_env"
     return 0
@@ -674,6 +677,12 @@ install_payload_surface() {
   previous="$dest.previous-$(timestamp)"
   had_previous=0
   if [ -e "$dest" ]; then
+    # A pre-existing destination is only replaceable when it is an
+    # installer-owned payload or an empty directory; unrelated data is never
+    # recursively deleted because of a mistyped --dest.
+    if [ ! -f "$dest/.oh-dsh-install.env" ] && [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
+      die "refusing to replace $dest: it is not an Oh-DSH $surface payload (no install marker) and is not empty"
+    fi
     mv -- "$dest" "$previous"
     had_previous=1
   fi
@@ -739,7 +748,7 @@ install_desktop_linux() {
   # Purge staged leftovers from interrupted upgrades.
   rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
 
-  mkdir -p "$marker_dir"
+  mkdir -p "$record_home"
   write_marker "$desktop_marker"
 
   log "Installed Oh-DSH Desktop $version to $image"
@@ -796,6 +805,25 @@ quit_running_app() {
     sleep 0.1
   done
   die 'Oh-DSH Desktop did not quit cleanly; close it and rerun the installer'
+}
+
+verify_replaceable_app() {
+  # $1: existing bundle path. Accepts bundles carrying our Info.plist
+  # identity; a directory without a verifiable Oh-DSH identity is refused
+  # instead of being deleted sight unseen.
+  app=$1
+  plist="$app/Contents/Info.plist"
+  if [ ! -f "$plist" ]; then
+    die "refusing to replace $app: it has no Contents/Info.plist and may not be an Oh-DSH installation"
+  fi
+  plutil_bin=${OH_DSH_PLUTIL:-$PLUTIL_DEFAULT}
+  if [ ! -x "$plutil_bin" ]; then
+    die "refusing to replace $app: its identity cannot be verified (plutil unavailable); remove it manually first"
+  fi
+  identifier=$("$plutil_bin" -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null || true)
+  if [ "$identifier" != "$BUNDLE_ID" ]; then
+    die "refusing to replace $app: bundle identifier ${identifier:-unreadable} is not $BUNDLE_ID"
+  fi
 }
 
 install_desktop_mac() {
@@ -872,6 +900,9 @@ install_desktop_mac() {
   backup=''
   had_previous=0
   if [ -e "$app_dest" ]; then
+    # Only replace a bundle that is provably ours; a foreign directory that
+    # merely shares the name must not be deleted.
+    verify_replaceable_app "$app_dest"
     backup=$(reserve_backup "$APP_NAME")
     mv -- "$app_dest" "$backup"
     had_previous=1
@@ -902,7 +933,7 @@ install_desktop_mac() {
       || printf 'install.sh: warning: Launch Services refresh failed; the app is installed but may need one Finder open to register\n' >&2
   fi
 
-  mkdir -p "$marker_dir"
+  mkdir -p "$record_home"
   write_marker "$desktop_marker"
 
   log "Installed $app_dest"
