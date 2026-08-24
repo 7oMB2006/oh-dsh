@@ -654,7 +654,7 @@ ensure_launcher_path() {
   esac
   profile="$HOME/.profile"
   shell_name=$(basename "${SHELL:-}")
-  if [ "$shell_name" = zsh ] && [ -f "${ZDOTDIR:-$HOME}/.zprofile" ]; then
+  if [ "$shell_name" = zsh ]; then
     profile="${ZDOTDIR:-$HOME}/.zprofile"
   elif [ "$shell_name" = bash ] && [ -f "$HOME/.bash_profile" ]; then
     profile="$HOME/.bash_profile"

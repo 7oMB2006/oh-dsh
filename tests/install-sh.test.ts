@@ -220,6 +220,21 @@ test('default Unix installation provides the TUI dispatcher', { skip: skipOnWind
   }
 })
 
+test('zsh installations create .zprofile for new shells', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'zsh-tui')])
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/zsh' })
+    const result = await runInstaller(['--os', 'linux', '--arch', 'x64'], env)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(await readFile(join(home, '.zprofile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.equal(await exists(join(home, '.profile')), false)
+  } finally {
+    await github.stop()
+  }
+})
+
 test('desktop install registers the unified launcher', { skip: skipOnWindows }, async () => {
   const github = new MockGitHub()
   await github.start()
