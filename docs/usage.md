@@ -315,7 +315,9 @@ and Oh-DSH skins. Its modal covers and blurs every workspace and sidebar.
 
 Choose a skin from Settings on Web or Desktop. In TUI, run `/theme` to select
 the same Deep Current, Jade Circuit, Porcelain, or Ember Dusk palette. The
-choice applies immediately and survives restarts.
+choice applies immediately and survives restarts. While a skin is active,
+Appearance changes update the fallback used by **Original**; choose
+**Original** in the skin gallery to leave the skin.
 
 ## Plugin marketplace
 
