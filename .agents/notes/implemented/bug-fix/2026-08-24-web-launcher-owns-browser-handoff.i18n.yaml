@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-web-launcher-owns-browser-handoff.md
-2026-08-24-web-launcher-owns-browser-handoff.md: 66d4e93c9e6d3434db112d304f069ec7496ea954
-2026-08-24-web-launcher-owns-browser-handoff.zh.md: 9cfbace34a9e448cf59f7f750618208f80b306b5
+2026-08-24-web-launcher-owns-browser-handoff.md: 36d85f92a80fa3e1691161fb237d6913ad4b4c50
+2026-08-24-web-launcher-owns-browser-handoff.zh.md: b69d4c15bdde74c7fbcb98c52df71531c0b8d3d8

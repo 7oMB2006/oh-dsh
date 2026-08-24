@@ -28,4 +28,4 @@ The standalone web surface is unaffected: `web/cordis.patch.yml` does not restat
 
 The desktop no longer opens a second browser window. The URL line still prints, so desktop runtime supervision and the packaged web launcher remain unchanged. The `openBrowser` config now has a static default on the desktop surface, whose value is owned by the desktop distribution rather than the upstream bundle.
 
-Pinned DSH releases newer than rc.2 keep the auto-open in `web-app`; the desktop patch pins it off regardless. Anyone running `ohdsh web` still gets the upstream default-browser handoff (and `--no-open` still works there).
+Pinned DSH releases newer than rc.2 keep the auto-open in `web-app`; the desktop patch pins it off regardless. The `ohdsh web` launcher no longer receives the upstream handoff: since it started passing `--no-open` to the runtime (see [2026-08-24-web-launcher-owns-browser-handoff](2026-08-24-web-launcher-owns-browser-handoff.md)), the launcher is the sole owner of that surface's browser handoff, and a standalone `dsh --profile web` keeps the upstream interactive default.
