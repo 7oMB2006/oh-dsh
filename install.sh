@@ -14,8 +14,8 @@
 #   sh install.sh --surface web --version v0.1.8
 #   sh install.sh --uninstall --surface desktop
 #
-# Unix/macOS only. On Windows, run the .exe installer or extract the
-# portable archives from the Release page.
+# Unix/macOS only; Windows uses install.ps1 from the same repository.
+# On Windows under Git Bash, run install.ps1 from PowerShell instead.
 
 set -eu
 
@@ -175,7 +175,7 @@ case "$kernel" in
   Darwin) detected_os=darwin ;;
   Linux) detected_os=linux ;;
   MINGW*|MSYS*|CYGWIN*)
-    die "install.sh does not support Windows shells ($kernel). Download the .exe installer or the portable archives from https://github.com/$repo/releases/latest"
+    die "install.sh does not support Windows shells ($kernel). Run install.ps1 from PowerShell: irm https://raw.githubusercontent.com/$repo/main/install.ps1 | iex"
     ;;
   *)
     die "unsupported operating system '$kernel' (supported: macOS, Linux)"
@@ -197,7 +197,7 @@ arch=${arch_arg:-$detected_arch}
 case "$os" in
   darwin|linux) ;;
   win|win32|windows)
-    die "install.sh does not install Windows releases; run the .exe installer from https://github.com/$repo/releases/latest"
+    die "install.sh does not install Windows releases; run install.ps1 from PowerShell: irm https://raw.githubusercontent.com/$repo/main/install.ps1 | iex"
     ;;
   *) die "unsupported --os '$os' (expected darwin or linux)" ;;
 esac
@@ -524,6 +524,8 @@ install_payload_surface() {
     die "failed to move the staged $surface payload into place; the previous installation was left untouched"
   fi
   rm -rf "$previous"
+  # Purge staged leftovers from interrupted upgrades.
+  rm -rf "$dest.previous-"* "$dest.install-pending."*
 
   mkdir -p "$bin_dir"
   ln -sfn "$dest/bin/ohdsh" "$bin_dir/ohdsh"
@@ -570,6 +572,8 @@ install_desktop_linux() {
     die "failed to move the staged AppImage into place; the previous installation was left untouched"
   fi
   rm -f "$previous"
+  # Purge staged leftovers from interrupted upgrades.
+  rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
 
   mkdir -p "$marker_dir"
   write_marker "$desktop_marker"
@@ -641,12 +645,10 @@ install_desktop_mac() {
     quit_running_app
   fi
 
-  backup_dir=$HOME/.Trash
-  if [ "$kernel" != Darwin ] || [ ! -d "$backup_dir" ] || [ ! -w "$backup_dir" ]; then
-    backup_dir="$dest"
-  fi
+  backup_dir=$dest
   reserve_backup() {
-    # $1: base name without .app
+    # $1: base name without .app; the backup lives beside the app only until
+    # the new bundle is validated, then it is deleted (no Trash buildup).
     stem="$1-before-$(timestamp)"
     index=0
     while :; do
@@ -692,10 +694,18 @@ install_desktop_mac() {
   fi
 
   if [ -d "$dest/$LEGACY_APP_NAME" ]; then
-    legacy_backup=$(reserve_backup 'Oh-DSH-Desktop')
-    mv -- "$dest/$LEGACY_APP_NAME" "$legacy_backup"
-    log "Moved legacy $dest/$LEGACY_APP_NAME to $legacy_backup"
+    rm -rf "$dest/$LEGACY_APP_NAME"
+    log "Removed legacy $dest/$LEGACY_APP_NAME"
   fi
+
+  # Purge stale bundles from earlier installs so Launch Services and Finder
+  # show exactly one Oh-DSH Desktop.
+  for stale in "$dest/$APP_NAME-before-"*.app "$dest/Oh-DSH-Desktop-before-"*.app; do
+    if [ -e "$stale" ]; then
+      rm -rf "$stale"
+    fi
+  done
+  rm -rf "$dest/.$APP_NAME.app.install."*
 
   lsregister_bin=${OH_DSH_LSREGISTER:-$LSREGISTER_DEFAULT}
   if [ -x "$lsregister_bin" ]; then
@@ -707,8 +717,9 @@ install_desktop_mac() {
   write_marker "$desktop_marker"
 
   log "Installed $app_dest"
-  if [ -n "$backup" ]; then
-    log "Previous app moved to $backup"
+  if [ "$had_previous" = 1 ]; then
+    rm -rf "$backup"
+    log "Removed the previous app bundle"
   fi
 }
 
