@@ -175,7 +175,15 @@ function Assert-DispatcherTarget {
     # overwritten; checked BEFORE the payload swap so a refusal cannot strand
     # a half-migrated installation.
     param([string]$ShimPath)
-    Assert-DispatcherTarget -ShimPath $ShimPath
+    if (Test-Path -LiteralPath $ShimPath) {
+        $existing = Get-Content -LiteralPath $ShimPath -Raw
+        $ours = ($existing -like '*OHRECORD*') `
+            -or ($existing -like '*launcher.env*') `
+            -or (($existing -like '*CALL*') -and ($existing -like '*\bin\ohdsh.cmd*'))
+        if (-not $ours) {
+            Die "refusing to replace $ShimPath : it is not an Oh-DSH launcher; remove it or pass another -BinDir"
+        }
+    }
 }
 
 function Write-Dispatcher {
