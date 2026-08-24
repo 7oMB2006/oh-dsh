@@ -24,8 +24,9 @@ and its upgrade boundary intact.
   completion and picker/dialog menus remain inside the inline frame, and remove
   redundant startup margins between the card, context summary, and composer.
 - Keep inline content anchored through dynamic turns by disabling the upstream
-  automatic main-screen viewport reanchor paths under the Oh-DSH launch marker;
-  explicit layout-change reanchors remain available.
+  automatic main-screen viewport reanchor paths for inline Oh-DSH launches
+  only; fullscreen launches keep the upstream reanchor and refresh cadence on
+  the alternate screen, and explicit layout-change reanchors remain available.
 - Omit any permission label from the startup card. The effective permission
   is session state that can differ after a resume or `/permission`, so a
   launch-time guess from the environment or the platform would misreport a

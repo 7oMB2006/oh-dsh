@@ -173,10 +173,13 @@ function disableUpstreamUpdateCheck(path) {
 }
 
 function disableInlineAutoReanchor(path) {
-  const source = readFileSync(path, 'utf8')
+  // Fullscreen launches use the alternate screen, where the upstream
+  // reanchor-and-render cadence must keep working; only inline launches
+  // suppress it.
+  const guard = "process.env.DSH_OH_TUI !== '1' || process.env.OH_DSH_TUI_FULLSCREEN === '1'"
   const idleBefore = `            this.log.requestViewportReanchor();
             this.renderNow();`
-  const idleAfter = `            if (process.env.DSH_OH_TUI !== '1') {
+  const idleAfter = `            if (${guard}) {
                 this.log.requestViewportReanchor();
                 this.renderNow();
             }`
@@ -184,7 +187,7 @@ function disableInlineAutoReanchor(path) {
 
   const stderrBefore = `                        this.log.requestViewportReanchor();
                         this.scheduleRender();`
-  const stderrAfter = `                        if (process.env.DSH_OH_TUI !== '1') {
+  const stderrAfter = `                        if (${guard}) {
                             this.log.requestViewportReanchor();
                             this.scheduleRender();
                         }`

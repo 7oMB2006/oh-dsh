@@ -227,8 +227,14 @@ test('TUI upstream adapter removes legacy terminal branding and scopes storage',
     assert.match(plugin, /ohdsh tui --resume/)
     assert.doesNotMatch(plugin, /dsh-tui --resume/)
     const ink = readFileSync(join(lib, 'ink', 'ink.js'), 'utf8')
-    assert.match(ink, /if \(process\.env\.DSH_OH_TUI !== '1'\) \{\s+this\.log\.requestViewportReanchor\(\);\s+this\.renderNow\(\);/)
-    assert.match(ink, /if \(process\.env\.DSH_OH_TUI !== '1'\) \{\s+this\.log\.requestViewportReanchor\(\);\s+this\.scheduleRender\(\);/)
+    assert.match(
+      ink,
+      /if \(process\.env\.DSH_OH_TUI !== '1' \|\| process\.env\.OH_DSH_TUI_FULLSCREEN === '1'\) \{\s+this\.log\.requestViewportReanchor\(\);\s+this\.renderNow\(\);/,
+    )
+    assert.match(
+      ink,
+      /if \(process\.env\.DSH_OH_TUI !== '1' \|\| process\.env\.OH_DSH_TUI_FULLSCREEN === '1'\) \{\s+this\.log\.requestViewportReanchor\(\);\s+this\.scheduleRender\(\);/,
+    )
     const messages = readFileSync(join(lib, 'i18n.js'), 'utf8')
     assert.match(messages, /~\/\.ohdsh\/tui/)
     assert.doesNotMatch(messages, /dsh-tui|~\/\.dsh-tui/)

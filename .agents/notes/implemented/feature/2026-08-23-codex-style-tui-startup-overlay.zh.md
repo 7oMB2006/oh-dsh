@@ -21,8 +21,9 @@ Status: implemented
   布局。
 - 保持瞬态浮层位于锚点上方，使命令/文件补全以及所有 picker/dialog 都留在
   inline frame 内；同时去掉启动卡片、上下文摘要和输入框之间重复的空行。
-- 在 Oh-DSH 启动标识下禁用上游自动触发的主屏 viewport 重锚，让动态回合始终
-  保持 inline 内容锚点；显式布局变化所需的 reanchor 仍然保留。
+- 仅在 inline 的 Oh-DSH 启动中禁用上游自动触发的主屏 viewport 重锚，让动态
+  回合保持 inline 内容锚点；fullscreen 启动在 alternate screen 上保留上游的
+  重锚与刷新节奏，显式布局变化所需的 reanchor 也仍然保留。
 - 启动卡片不显示权限标签。有效权限是会话状态，resume 或 `/permission`
   之后都可能变化，启动时按环境变量或平台默认值猜测会错误呈现安全相关的
   事实；权威展示仍由运行时自身的状态与权限流程负责。
