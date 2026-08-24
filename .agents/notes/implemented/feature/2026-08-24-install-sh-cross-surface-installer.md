@@ -33,12 +33,31 @@ installed the latest stable release for any surface.
   aside. Marker files (payload `.oh-dsh-install.env`,
   `~/.local/share/oh-dsh/desktop/install.env`) make same-version re-runs a
   no-op unless `--force` is passed, and `--uninstall` reverses an install.
+- web/tui installs place a dispatching `ohdsh` launcher in the bin
+  directory rather than a symlink: the web and tui payloads each carry only
+  their own surface's dependencies, so one shared symlink would make the
+  second install break the first surface. The launcher records each
+  surface's destination in `launcher.env` under the installer data home and
+  routes `ohdsh web`/`ohdsh tui` to the payload that provides the surface;
+  uninstalling one surface refreshes the launcher for the remaining one.
+- Markers are inert `KEY=value` text: values are charset-validated on
+  write and parsed line-by-line on read (never sourced), destinations are
+  recorded so desktop idempotency is keyed by the requested location, and
+  the "already installed" fast path additionally verifies the app, image,
+  payload, and launcher still exist so an ordinary rerun repairs them.
+- Uninstall of a web/tui destination is gated on a matching surface marker
+  before any recursive delete, and a legacy `Oh-DSH-Desktop.app` is retired
+  only when its Info.plist proves this bundle identity and a strictly older
+  version (plutil probes mirroring `src/mac-bundle-migration.ts`);
+  unverifiable or newer bundles are left in place with a warning.
 - Upgrades are replace-in-place: once the new installation is validated the
   previous app bundle, AppImage, or payload is deleted along with stale
   staging directories, so one surface keeps exactly one installation. The
   earlier behavior of moving the replaced macOS `.app` to `~/.Trash` was
   dropped when upgrade cleanup was added; backups now exist only between
   staging and validation.
+- The GitHub JSON parsers normalize all whitespace before matching, so
+  pretty-printed responses parse identically to compact ones.
 - macOS desktop installs use the zip artifact (ditto-preferred extraction)
   rather than the DMG; the running app is asked to quit only when the
   destination is the default `/Applications` path, so custom destinations

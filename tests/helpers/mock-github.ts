@@ -18,6 +18,8 @@ export class MockGitHub {
   private server: Server | undefined
   apiBase = ''
   downloadBase = ''
+  /** Serve pretty-printed (whitespace-rich) JSON to exercise parser tolerance. */
+  pretty = false
 
   async start(): Promise<void> {
     this.server = createServer((req, res) => {
@@ -92,7 +94,7 @@ export class MockGitHub {
 
   releaseJson(tag: string): string {
     const assets = this.releases.get(tag) ?? []
-    return JSON.stringify({
+    const payload = {
       url: `https://api.github.com/repos/${MOCK_REPO}/releases/1`,
       tag_name: tag,
       name: `Release ${tag}`,
@@ -114,7 +116,8 @@ export class MockGitHub {
         digest: `sha256:${asset.sha256}`,
         browser_download_url: `https://github.com/${MOCK_REPO}/releases/download/${tag}/${asset.name}`,
       })),
-    })
+    }
+    return JSON.stringify(payload, null, this.pretty ? 2 : undefined)
   }
 
   downloadCount(tag: string, name: string): number {

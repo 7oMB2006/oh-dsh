@@ -41,11 +41,17 @@ Surface matrix and default locations:
 | Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
 | --- | --- | --- | --- |
 | desktop (default) | `Oh-DSH Desktop.app` into `/Applications` with a Launch Services refresh | AppImage into `~/.local/bin/oh-dsh-desktop` | NSIS installer run silently (per-user) |
-| web | payload in `~/.local/share/oh-dsh/web` plus an `ohdsh` symlink in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\web` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` (added to the user PATH) |
-| tui | payload in `~/.local/share/oh-dsh/tui` plus an `ohdsh` symlink in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\tui` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` |
+| web | payload in `~/.local/share/oh-dsh/web` plus a dispatching `ohdsh` launcher in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\web` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` (added to the user PATH) |
+| tui | payload in `~/.local/share/oh-dsh/tui` plus a dispatching `ohdsh` launcher in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\tui` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` |
 
 Only the desktop surface creates a desktop application entry. web and tui
 never register with Launch Services or create `.app` bundles.
+
+The web and tui payloads each carry only their own surface's dependencies,
+so both can be installed side by side: the shared `ohdsh` launcher records
+each surface's payload and routes `ohdsh web` and `ohdsh tui` to the
+installation that provides them. Uninstalling one surface keeps the other
+usable through the same launcher.
 
 Options:
 
@@ -54,7 +60,7 @@ Options:
 | `--surface` | `desktop` | `desktop`, `web`, or `tui`; each installs only its own files and launcher |
 | `--version` | latest stable | Pin a release tag such as `v0.1.8`. Prereleases are never selected implicitly; they install only when pinned explicitly |
 | `--dest` | see matrix above | Destination directory |
-| `--bin-dir` | `~/.local/bin` | Directory for the `ohdsh` launcher symlink (web/tui) |
+| `--bin-dir` | `~/.local/bin` | Directory for the `ohdsh` launcher (web/tui) |
 | `--repo` | `hust-open-atom-club/oh-dsh` | Install from another fork |
 | `--force` | off | Reinstall when the same version is already present |
 | `--uninstall` | off | Remove the installed surface |

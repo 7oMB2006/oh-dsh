@@ -38,11 +38,15 @@ Surface 矩阵与默认位置：
 | Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
 | --- | --- | --- | --- |
 | desktop（默认） | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services | AppImage 安装到 `~/.local/bin/oh-dsh-desktop` | 静默运行 NSIS 安装器（用户级） |
-| web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\web`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd`（自动加入用户 PATH） |
-| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\tui`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd` |
+| web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建调度式 `ohdsh` 启动器 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\web`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd`（自动加入用户 PATH） |
+| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建调度式 `ohdsh` 启动器 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\tui`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd` |
 
 只有 desktop 会创建桌面应用入口；web 和 tui 不会注册 Launch Services，
 也不会生成 `.app` 包。
+
+web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可以并行安装：
+共享的 `ohdsh` 启动器记录每个 surface 的载荷位置，把 `ohdsh web` 与
+`ohdsh tui` 路由到对应的安装。卸载其中一个 surface 不影响另一个继续使用。
 
 选项：
 
@@ -51,7 +55,7 @@ Surface 矩阵与默认位置：
 | `--surface` | `desktop` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
 | `--version` | 最新稳定版 | 固定 Release 标签，如 `v0.1.8`。预发布不会被自动选中，只有在显式固定时才会安装 |
 | `--dest` | 见上表 | 目标目录 |
-| `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器符号链接目录（web/tui） |
+| `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器目录（web/tui） |
 | `--repo` | `hust-open-atom-club/oh-dsh` | 从其他 fork 安装 |
 | `--force` | 关闭 | 已安装相同版本时强制重装 |
 | `--uninstall` | 关闭 | 卸载对应 surface |
@@ -68,7 +72,7 @@ Surface 矩阵与默认位置：
   安装之前完成校验。下载失败、摘要不匹配或解压中断都会保持原安装可用并
   报告错误；未完成的暂存文件会被清理。
 - 重复执行且版本不变时为无操作，除非传入 `--force`。新版本会原子替换载荷
-  并刷新 `ohdsh` 链接。
+  并刷新 `ohdsh` 启动器。
 - 升级采用原地替换：新安装验证通过后，旧的应用包、AppImage 或载荷会连同
   残留的暂存目录与升级前备份一起删除，每个 surface 只保留一份 Oh-DSH
   安装。

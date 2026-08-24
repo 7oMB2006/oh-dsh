@@ -118,6 +118,46 @@ async function makeLsregisterSpy(
   return { bin, logPath }
 }
 
+// A plutil stand-in: `plutil -extract KEY raw -o - PLIST` prints `KEY=value`
+// lines from the fake plist, mirroring the probes install.sh performs.
+async function makePlutilSpy(
+  directory: string,
+): Promise<{ bin: string; logPath: string }> {
+  const logPath = join(directory, 'plutil.log')
+  const bin = join(directory, 'plutil')
+  await writeFile(
+    bin,
+    `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(logPath)}\n` +
+      `grep -F "$2=" "$6" | head -n 1 | cut -d= -f2-\n`,
+  )
+  await chmod(bin, 0o755)
+  return { bin, logPath }
+}
+
+async function makeFakePlist(
+  appDir: string,
+  identifier: string,
+  version: string,
+): Promise<void> {
+  await mkdir(join(appDir, 'Contents'), { recursive: true })
+  await writeFile(
+    join(appDir, 'Contents', 'Info.plist'),
+    `CFBundleIdentifier=${identifier}\nCFBundleShortVersionString=${version}\n`,
+  )
+}
+
+function runLauncher(
+  launcher: string,
+  args: string[],
+  env: Record<string, string>,
+): { status: number | null; stdout: string; stderr: string } {
+  const result = spawnSync('sh', [launcher, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...env },
+  })
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr }
+}
+
 async function makeSandbox(
   github: MockGitHub,
   extra: Record<string, string> = {},
@@ -166,11 +206,14 @@ test('web install resolves the latest stable release and installs only the web s
     assert.equal(github.downloadCount('v0.1.8', 'oh-dsh-tui-0.1.8-linux-x64.tar.gz'), 0)
     assert.ok(await exists(join(payload, 'bin', 'ohdsh')))
     assert.ok(await exists(join(payload, 'lib', 'oh-dsh', 'cli.js')))
-    assert.equal(await readlink(join(bin, 'ohdsh')), join(payload, 'bin', 'ohdsh'))
+    const dispatched = runLauncher(join(bin, 'ohdsh'), ['web'], env)
+    assert.equal(dispatched.status, 0, dispatched.stderr)
+    assert.match(dispatched.stdout, /stable/)
     const marker = await readFile(join(payload, '.oh-dsh-install.env'), 'utf8')
     assert.match(marker, /^OH_DSH_INSTALL_SURFACE=web$/m)
     assert.match(marker, /^OH_DSH_INSTALL_VERSION=0\.1\.8$/m)
     assert.match(marker, /^OH_DSH_INSTALL_ASSET=oh-dsh-web-0\.1\.8-linux-x64\.tar\.gz$/m)
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${payload.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
     assert.match(result.stdout, /Installed Oh-DSH web 0\.1\.8/)
   } finally {
     await github.stop()
@@ -247,7 +290,9 @@ test('tui installs are idempotent, --force reinstalls, and upgrades replace the 
     assert.match(await readFile(join(payload, 'bin', 'ohdsh'), 'utf8'), /new/)
     const marker = await readFile(join(payload, '.oh-dsh-install.env'), 'utf8')
     assert.match(marker, /OH_DSH_INSTALL_VERSION=0\.1\.9/)
-    assert.equal(await readlink(join(bin, 'ohdsh')), join(payload, 'bin', 'ohdsh'))
+    const upgraded = runLauncher(join(bin, 'ohdsh'), ['tui'], env)
+    assert.equal(upgraded.status, 0, upgraded.stderr)
+    assert.match(upgraded.stdout, /new/)
     const parentEntries = await readdir(home)
     assert.ok(!parentEntries.some(entry => entry.includes('previous')))
     assert.ok(!parentEntries.some(entry => entry.includes('install-pending')))
@@ -256,7 +301,7 @@ test('tui installs are idempotent, --force reinstalls, and upgrades replace the 
   }
 })
 
-test('macOS desktop installs register the app bundle and retire stale bundles; other surfaces never do', { skip: skipOnWindows }, async () => {
+test('macOS desktop installs register the app bundle and retire verified stale bundles; other surfaces never do', { skip: skipOnWindows }, async () => {
   const github = new MockGitHub()
   await github.start()
   try {
@@ -266,9 +311,13 @@ test('macOS desktop installs register the app bundle and retire stale bundles; o
     ])
     const { home, env } = await makeSandbox(github)
     const spy = await makeLsregisterSpy(home)
+    const plutil = await makePlutilSpy(home)
     env.OH_DSH_LSREGISTER = spy.bin
+    env.OH_DSH_PLUTIL = plutil.bin
     const apps = join(home, 'Applications')
-    await mkdir(join(apps, 'Oh-DSH-Desktop.app'), { recursive: true })
+    // A verified, strictly older legacy bundle and an installer-made backup.
+    const legacy = join(apps, 'Oh-DSH-Desktop.app')
+    await makeFakePlist(legacy, 'ai.deepseek.oh-dsh-desktop', '0.1.7')
     const staleBackup = join(apps, 'Oh-DSH Desktop-before-20200101-000000.app')
     await mkdir(join(staleBackup, 'Contents'), { recursive: true })
 
@@ -280,16 +329,15 @@ test('macOS desktop installs register the app bundle and retire stale bundles; o
 
     const installedApp = join(apps, 'Oh-DSH Desktop.app')
     assert.ok(await exists(join(installedApp, 'Contents', 'MacOS', 'Oh-DSH Desktop')))
-    assert.ok(!(await exists(join(apps, 'Oh-DSH-Desktop.app'))))
+    assert.ok(!(await exists(legacy)), 'verified older legacy bundles must be retired')
     assert.ok(!(await exists(staleBackup)), 'stale pre-upgrade backups must be removed')
-    assert.ok(!(await exists(join(apps, '.Oh-DSH Desktop.app.install.9999'))))
-    assert.match(result.stdout, /Removed the previous app bundle|Installed/)
     const lsregisterLog = await readFile(spy.logPath, 'utf8')
     assert.match(lsregisterLog, new RegExp(`-f .*${'Oh-DSH Desktop.app'}`))
     const markerPath = join(home, '.local', 'share', 'oh-dsh', 'desktop', 'install.env')
     const marker = await readFile(markerPath, 'utf8')
     assert.match(marker, /^OH_DSH_INSTALL_SURFACE=desktop$/m)
     assert.match(marker, /^OH_DSH_INSTALL_ASSET=Oh-DSH-Desktop-0\.1\.8-arm64\.zip$/m)
+    assert.match(marker, /^OH_DSH_INSTALL_DEST=.*Applications$/m)
 
     // Web and TUI installs must not touch application registration.
     await rm(spy.logPath, { force: true })
@@ -302,6 +350,50 @@ test('macOS desktop installs register the app bundle and retire stale bundles; o
     assert.equal(tui.status, 0, tui.stderr)
     assert.ok(!(await exists(spy.logPath)))
     assert.ok(await exists(join(payload, 'bin', 'ohdsh')))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('unverifiable or newer legacy bundles are retained', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeMacDesktopZip('0.1.8', 'arm64'),
+    ])
+    for (const [name, legacyVersion, identifier] of [
+      ['newer', '0.1.9', 'ai.deepseek.oh-dsh-desktop'],
+      ['foreign', '0.1.7', 'someone.elses.app'],
+    ] as const) {
+      const { home, env } = await makeSandbox(github)
+      const plutil = await makePlutilSpy(home)
+      env.OH_DSH_PLUTIL = plutil.bin
+      const apps = join(home, 'Applications')
+      const legacy = join(apps, 'Oh-DSH-Desktop.app')
+      await makeFakePlist(legacy, identifier, legacyVersion)
+      const result = await runInstaller(
+        ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps],
+        env,
+      )
+      assert.equal(result.status, 0, result.stderr)
+      assert.ok(await exists(legacy), `${name} legacy bundle must be retained`)
+      assert.match(result.stderr, /leaving .* in place/)
+    }
+
+    // A bundle without a readable Info.plist is unverifiable and retained.
+    const { home, env } = await makeSandbox(github)
+    const plutil = await makePlutilSpy(home)
+    env.OH_DSH_PLUTIL = plutil.bin
+    const apps = join(home, 'Applications')
+    const opaque = join(apps, 'Oh-DSH-Desktop.app')
+    await mkdir(join(opaque, 'Contents', 'MacOS'), { recursive: true })
+    const result = await runInstaller(
+      ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.ok(await exists(opaque), 'unverifiable legacy bundle must be retained')
   } finally {
     await github.stop()
   }
@@ -392,6 +484,185 @@ test('uninstall removes the surface payload, launcher, and desktop app', { skip:
     assert.ok(!(await exists(join(apps, 'Oh-DSH Desktop.app'))))
     const unregisterLog = await readFile(spy.logPath, 'utf8')
     assert.match(unregisterLog, /-u /)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('web and tui coexist through one dispatching launcher', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'webmark'),
+      await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'tuimark'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+
+    assert.equal((await runInstaller(['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin], env)).status, 0)
+    assert.equal((await runInstaller(['--surface', 'tui', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin], env)).status, 0)
+
+    const webRun = runLauncher(join(bin, 'ohdsh'), ['web'], env)
+    assert.equal(webRun.status, 0, webRun.stderr)
+    assert.match(webRun.stdout, /webmark/)
+    const tuiRun = runLauncher(join(bin, 'ohdsh'), ['tui'], env)
+    assert.equal(tuiRun.status, 0, tuiRun.stderr)
+    assert.match(tuiRun.stdout, /tuimark/)
+
+    // Uninstalling tui must keep the shared launcher serving web.
+    const uninstall = await runInstaller(['--uninstall', '--surface', 'tui', '--bin-dir', bin], env)
+    assert.equal(uninstall.status, 0, uninstall.stderr)
+    const tuiGone = runLauncher(join(bin, 'ohdsh'), ['tui'], env)
+    assert.notEqual(tuiGone.status, 0)
+    assert.match(tuiGone.stderr, /tui is not installed/)
+    const webStill = runLauncher(join(bin, 'ohdsh'), ['web'], env)
+    assert.equal(webStill.status, 0, webStill.stderr)
+    assert.match(webStill.stdout, /webmark/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('uninstall refuses destinations without a matching marker', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'keepme'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    // A marker-less destination must never be recursively deleted.
+    await rm(join(payload, '.oh-dsh-install.env'))
+    const refused = await runInstaller(['--uninstall', ...args], env)
+    assert.notEqual(refused.status, 0)
+    assert.match(refused.stderr, /refusing to remove/)
+    assert.ok(await exists(join(payload, 'bin', 'ohdsh')), 'the payload must survive the refusal')
+
+    // A mismatched destination (the home directory itself) is refused too.
+    await writeFile(join(home, 'sentinel.txt'), 'untouched')
+    const homeRefused = await runInstaller(
+      ['--uninstall', '--surface', 'web', '--dest', home, '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(homeRefused.status, 0)
+    assert.match(homeRefused.stderr, /refusing to remove/)
+    assert.ok(await exists(join(home, 'sentinel.txt')), 'unrelated directories must survive')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a corrupted marker is parsed as inert text, never executed', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'clean'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    const pwned = join(home, 'pwned')
+    await writeFile(join(payload, '.oh-dsh-install.env'), [
+      'OH_DSH_INSTALL_SURFACE=web',
+      `OH_DSH_INSTALL_VERSION=0.1.8; touch ${JSON.stringify(pwned)}`,
+      `OH_DSH_INSTALL_ASSET=$(touch ${JSON.stringify(`${home}/pwned2`)})`,
+    ].join('\n'))
+    const rerun = await runInstaller(args, env)
+    assert.equal(rerun.status, 0, rerun.stderr)
+    assert.ok(!(await exists(pwned)), 'marker text must never execute')
+    assert.ok(!(await exists(join(home, 'pwned2'))), 'marker text must never execute')
+    const marker = await readFile(join(payload, '.oh-dsh-install.env'), 'utf8')
+    assert.match(marker, /^OH_DSH_INSTALL_VERSION=0\.1\.8$/m)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('desktop idempotency is keyed by the requested destination', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeMacDesktopZip('0.1.8', 'arm64'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const appsA = join(home, 'ApplicationsA')
+    const appsB = join(home, 'ApplicationsB')
+    const first = await runInstaller(
+      ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', appsA],
+      env,
+    )
+    assert.equal(first.status, 0, first.stderr)
+
+    // The same release into a different destination must install, not skip.
+    const second = await runInstaller(
+      ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', appsB],
+      env,
+    )
+    assert.equal(second.status, 0, second.stderr)
+    assert.doesNotMatch(second.stdout, /already installed/)
+    assert.ok(await exists(join(appsB, 'Oh-DSH Desktop.app')))
+    assert.equal(github.downloadCount('v0.1.8', 'Oh-DSH-Desktop-0.1.8-arm64.zip'), 2)
+    const marker = await readFile(
+      join(home, '.local', 'share', 'oh-dsh', 'desktop', 'install.env'),
+      'utf8',
+    )
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${appsB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a missing launcher is repaired by an ordinary rerun', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'repaired'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    await rm(join(bin, 'ohdsh'))
+    const rerun = await runInstaller(args, env)
+    assert.equal(rerun.status, 0, rerun.stderr)
+    assert.doesNotMatch(rerun.stdout, /already installed/)
+    assert.ok(await exists(join(bin, 'ohdsh')), 'the launcher must be recreated without --force')
+    assert.equal(github.downloadCount('v0.1.8', 'oh-dsh-web-0.1.8-linux-x64.tar.gz'), 2)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('release parsing tolerates pretty-printed JSON responses', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  github.pretty = true
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'pretty'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /Verified sha256:/)
+    assert.match(await readFile(join(home, 'payload', 'bin', 'ohdsh'), 'utf8'), /pretty/)
   } finally {
     await github.stop()
   }

@@ -90,6 +90,80 @@ function Read-Marker {
     return $values
 }
 
+$LauncherEnv = Join-Path $DataHome 'launcher.env'
+
+function Write-LauncherEnv {
+    # Record this surface's payload destination; one dispatcher serves every
+    # installed surface, so the second surface never steals the first one's
+    # launcher.
+    $key = "$($Surface.ToUpperInvariant())_DEST"
+    if (-not (Test-Path -LiteralPath $DataHome)) {
+        New-Item -ItemType Directory -Path $DataHome -Force | Out-Null
+    }
+    $lines = @()
+    if (Test-Path -LiteralPath $LauncherEnv) {
+        $lines = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
+            $_ -notmatch "^$key="
+        })
+    }
+    $lines += "$key=$FinalDest"
+    Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding ASCII
+}
+
+function Remove-LauncherEnvKey {
+    # Returns $true when other surfaces still need the launcher.
+    if (-not (Test-Path -LiteralPath $LauncherEnv)) { return $false }
+    $key = "$($Surface.ToUpperInvariant())_DEST"
+    $remaining = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
+        $_ -notmatch "^$key="
+    })
+    if ($remaining.Count -gt 0) {
+        Set-Content -LiteralPath $LauncherEnv -Value $remaining -Encoding ASCII
+        return $true
+    }
+    Remove-Item -LiteralPath $LauncherEnv -Force
+    return $false
+}
+
+function Write-Dispatcher {
+    # $ShimPath: launcher location. The dispatcher resolves each surface's
+    # payload from launcher.env at run time.
+    param([string]$ShimPath)
+    $body = @(
+        '@echo off',
+        'SETLOCAL',
+        'SET "WEB_DEST="',
+        'SET "TUI_DEST="',
+        "IF EXIST `"$LauncherEnv`" (",
+        "  FOR /F `"usebackq tokens=1,* delims==`" %%A IN (`"$LauncherEnv`") DO (",
+        '    IF /I "%%A"=="WEB_DEST" SET "WEB_DEST=%%B"',
+        '    IF /I "%%A"=="TUI_DEST" SET "TUI_DEST=%%B"',
+        '  )',
+        ')',
+        'SET "SURFACE=%~1"',
+        'SET "ROOT="',
+        'IF /I "%SURFACE%"=="web" SET "ROOT=%WEB_DEST%"',
+        'IF /I "%SURFACE%"=="tui" SET "ROOT=%TUI_DEST%"',
+        'IF "%ROOT%"=="" IF NOT "%TUI_DEST%"=="" SET "ROOT=%TUI_DEST%"',
+        'IF "%ROOT%"=="" IF NOT "%WEB_DEST%"=="" SET "ROOT=%WEB_DEST%"',
+        'IF NOT "%ROOT%"=="" IF EXIST "%ROOT%\bin\ohdsh.cmd" GOTO run',
+        'IF /I "%SURFACE%"=="web" GOTO missingweb',
+        'IF /I "%SURFACE%"=="tui" GOTO missingtui',
+        'ECHO Oh-DSH is not installed. Re-run install.ps1 from the repository README. 1>&2',
+        'EXIT /B 2',
+        ':missingweb',
+        'ECHO Oh-DSH web is not installed. Re-run install.ps1 with -Surface web. 1>&2',
+        'EXIT /B 2',
+        ':missingtui',
+        'ECHO Oh-DSH tui is not installed. Re-run install.ps1 with -Surface tui. 1>&2',
+        'EXIT /B 2',
+        ':run',
+        'CALL "%ROOT%\bin\ohdsh.cmd" %*',
+        'EXIT /B %ERRORLEVEL%'
+    )
+    Set-Content -LiteralPath $ShimPath -Value ($body -join "`r`n") -Encoding ASCII
+}
+
 function Write-Marker {
     param([string]$Path)
     $dir = Split-Path -Parent $Path
@@ -141,8 +215,19 @@ function Remove-SurfaceInstall {
     $payload = Get-PayloadDest
     $binDir = Get-BinDir
     $shim = Join-Path $binDir 'ohdsh.cmd'
+    $marker = if ($payload -ne '') { Join-Path $payload '.oh-dsh-install.env' } else { $null }
     $removed = $false
     if ($payload -ne '' -and (Test-Path -LiteralPath $payload)) {
+        # A recursive delete must be gated on proof that this directory is an
+        # installer-owned payload for this surface.
+        $owned = $false
+        if ($null -ne $marker -and (Test-Path -LiteralPath $marker)) {
+            $values = Read-Marker -Path $marker
+            $owned = $values['OH_DSH_INSTALL_SURFACE'] -eq $Surface
+        }
+        if (-not $owned) {
+            Die "refusing to remove ${payload}: no $Surface installation marker found there; pass the exact -Dest used at install time"
+        }
         Remove-Item -LiteralPath $payload -Recurse -Force
         Write-Step "Removed $payload"
         $removed = $true
@@ -150,6 +235,18 @@ function Remove-SurfaceInstall {
     if (Test-Path -LiteralPath $shim) {
         $content = Get-Content -LiteralPath $shim -Raw
         if ($content -like "*$payload*") {
+            Remove-Item -LiteralPath $shim -Force
+            Write-Step "Removed launcher $shim"
+            $removed = $true
+        }
+    }
+    if (Remove-LauncherEnvKey) {
+        Write-Dispatcher -ShimPath $shim
+        Write-Step "Launcher $shim now serves the remaining installed surfaces"
+        $removed = $true
+    } elseif (-not (Test-Path -LiteralPath $LauncherEnv)) {
+        # No surfaces remain: remove the dispatcher when it is still ours.
+        if ((Test-Path -LiteralPath $shim) -and ((Get-Content -LiteralPath $shim -Raw) -like '*launcher.env*')) {
             Remove-Item -LiteralPath $shim -Force
             Write-Step "Removed launcher $shim"
             $removed = $true
@@ -297,7 +394,6 @@ try {
     $Staged = "$FinalDest.install-pending"
     if (Test-Path -LiteralPath $Staged) { Remove-Item -LiteralPath $Staged -Recurse -Force }
     Move-Item -LiteralPath $Payload -Destination $Staged
-    Write-Marker -Path (Join-Path $Staged '.oh-dsh-install.env')
 
     $HadPrevious = $false
     if (Test-Path -LiteralPath $FinalDest) {
@@ -327,8 +423,10 @@ try {
         New-Item -ItemType Directory -Path $FinalBinDir -Force | Out-Null
     }
     $ShimPath = Join-Path $FinalBinDir 'ohdsh.cmd'
-    $Shim = "@echo off`r`nSETLOCAL`r`nCALL `"$FinalDest\bin\ohdsh.cmd`" %*"
-    Set-Content -LiteralPath $ShimPath -Value $Shim -Encoding ASCII
+    Write-LauncherEnv
+    Write-Dispatcher -ShimPath $ShimPath
+    # The marker turns the install "current" only after the launcher exists.
+    Write-Marker -Path (Join-Path $FinalDest '.oh-dsh-install.env')
     Write-Step "Installed Oh-DSH $Surface $ReleaseVersion to $FinalDest"
     Write-Step "Launcher: $ShimPath"
 

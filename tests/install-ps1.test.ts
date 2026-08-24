@@ -128,7 +128,7 @@ const env = {}
     assert.match(marker, /^OH_DSH_INSTALL_SURFACE=tui$/m)
     assert.match(marker, /^OH_DSH_INSTALL_VERSION=0\.1\.8$/m)
     const shim = await readFile(join(bin, 'ohdsh.cmd'), 'utf8')
-    assert.ok(shim.includes(payload), `shim must call into the payload: ${shim}`)
+    assert.ok(shim.includes('launcher.env'), `shim must dispatch via launcher.env: ${shim}`)
     assert.match(result.stdout, /Verified sha256:/)
   } finally {
     await github.stop()

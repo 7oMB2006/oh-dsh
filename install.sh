@@ -26,6 +26,7 @@ APP_NAME='Oh-DSH Desktop'
 LEGACY_APP_NAME='Oh-DSH-Desktop.app'
 BUNDLE_ID='ai.deepseek.oh-dsh-desktop'
 LSREGISTER_DEFAULT='/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister'
+PLUTIL_DEFAULT='/usr/bin/plutil'
 
 usage() {
   cat <<'EOF'
@@ -254,6 +255,24 @@ timestamp() {
   date +%Y%m%d-%H%M%S
 }
 
+version_older() {
+  # True when dotted version $1 is strictly older than $2, mirroring the
+  # numeric compare in src/mac-bundle-migration.ts.
+  left=$1
+  right=$2
+  while :; do
+    left_part=${left%%.*}
+    right_part=${right%%.*}
+    case "$left_part" in ''|*[!0-9]*) left_part=0 ;; esac
+    case "$right_part" in ''|*[!0-9]*) right_part=0 ;; esac
+    if [ "$left_part" -lt "$right_part" ]; then return 0; fi
+    if [ "$left_part" -gt "$right_part" ]; then return 1; fi
+    case "$left" in *.*) left=${left#*.} ;; *) left=0 ;; esac
+    case "$right" in *.*) right=${right#*.} ;; *) right=0 ;; esac
+    if [ "$left" = 0 ] && [ "$right" = 0 ]; then return 1; fi
+  done
+}
+
 sha256_file() {
   if command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | cut -d' ' -f1
@@ -283,17 +302,24 @@ gh_curl() {
   fi
 }
 
+json_compact() {
+  # GitHub responses are normally compact, but tolerate pretty-printed JSON
+  # from proxies or future API changes: strip all whitespace before parsing.
+  # Neither the asset names nor the digests we match contain whitespace.
+  printf '%s' "$1" | tr -d ' \t\r\n'
+}
+
 json_tag() {
-  printf '%s\n' "$1" | tr ',' '\n' | sed -n 's/^"tag_name":"\([^"]*\)"$/\1/p' | head -n 1
+  json_compact "$1" | tr ',' '\n' | sed -n 's/^"tag_name":"\([^"]*\)"$/\1/p' | head -n 1
 }
 
 json_asset_digest() {
-  # GitHub asset objects contain a nested "uploader" object, so splitting on
+  # Asset objects contain a nested "uploader" object, so splitting on
   # '{' would break "name" and "digest" onto different lines. Asset objects
   # are separated by '},{', and nothing inside an asset (the flat uploader
   # object included) matches that sequence, so it isolates one asset per
   # line regardless of field order.
-  printf '%s\n' "$1" | awk '{ gsub(/\},\{/, "\n"); print }' \
+  json_compact "$1" | awk '{ gsub(/\},\{/, "\n"); print }' \
     | grep -F "\"name\":\"$2\"" \
     | grep -o '"digest":"sha256:[0-9a-f]*"' \
     | head -n 1 \
@@ -301,6 +327,13 @@ json_asset_digest() {
 }
 
 write_marker() {
+  # Release-derived values must stay inert text: only the closed token
+  # charset is accepted, and readers parse per line without evaluating.
+  for value in "$surface" "$tag" "$version" "$asset" "$os" "$arch"; do
+    case "$value" in
+      ''|*[!A-Za-z0-9._-]*) die "refusing to write marker with unsafe value: $value" ;;
+    esac
+  done
   printf 'OH_DSH_INSTALL_SURFACE=%s\n' "$surface" \
     > "$1"
   printf 'OH_DSH_INSTALL_TAG=%s\n' "$tag" >> "$1"
@@ -308,23 +341,130 @@ write_marker() {
   printf 'OH_DSH_INSTALL_ASSET=%s\n' "$asset" >> "$1"
   printf 'OH_DSH_INSTALL_OS=%s\n' "$os" >> "$1"
   printf 'OH_DSH_INSTALL_ARCH=%s\n' "$arch" >> "$1"
+  # Destinations may contain spaces; they are read back whole-line and are
+  # never evaluated, so no quoting is needed.
+  printf 'OH_DSH_INSTALL_DEST=%s\n' "$dest" >> "$1"
+}
+
+marker_field() {
+  # $1: marker path, $2: key. Prints the whole-line value or nothing; never
+  # interprets the file as shell code.
+  [ -f "$1" ] || return 0
+  sed -n "s/^$2=//p" "$1" | head -n 1
 }
 
 same_version_installed() {
-  # $1: marker path
+  # $1: marker path. Only reports "current" when the marker matches this
+  # release AND the artifacts it describes are still present, so a broken
+  # launcher or a moved destination is repaired by an ordinary rerun.
   [ -f "$1" ] || return 1
-  # shellcheck disable=SC1090
-  . "$1"
-  if [ "${OH_DSH_INSTALL_SURFACE:-}" = "$surface" ] \
-    && [ "${OH_DSH_INSTALL_VERSION:-}" = "$version" ] \
-    && [ "${OH_DSH_INSTALL_ASSET:-}" = "$asset" ]; then
-    result=0
-  else
-    result=1
+  [ "$(marker_field "$1" OH_DSH_INSTALL_SURFACE)" = "$surface" ] || return 1
+  [ "$(marker_field "$1" OH_DSH_INSTALL_VERSION)" = "$version" ] || return 1
+  [ "$(marker_field "$1" OH_DSH_INSTALL_ASSET)" = "$asset" ] || return 1
+  case "$surface" in
+    desktop)
+      [ "$(marker_field "$1" OH_DSH_INSTALL_DEST)" = "$dest" ] || return 1
+      if [ "$os" = darwin ]; then
+        [ -d "$dest/$APP_NAME.app" ] || return 1
+      else
+        [ -x "$dest/oh-dsh-desktop" ] || return 1
+      fi
+      ;;
+    web|tui)
+      [ -x "$dest/bin/ohdsh" ] || return 1
+      [ -e "$bin_dir/ohdsh" ] || return 1
+      ;;
+  esac
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Launcher dispatching (web and tui payloads each carry only their own
+# surface's dependencies, so one launcher must route each surface to the
+# payload that provides it)
+# ---------------------------------------------------------------------------
+
+launcher_env=$data_home/launcher.env
+
+surface_dest_key() {
+  printf '%s_DEST' "$(printf '%s' "$surface" | tr '[:lower:]' '[:upper:]')"
+}
+
+write_launcher_env() {
+  key=$(surface_dest_key)
+  mkdir -p "$data_home"
+  tmp="$launcher_env.tmp.$$"
+  {
+    [ -f "$launcher_env" ] && sed "/^$key=/d" "$launcher_env"
+    printf '%s=%s\n' "$key" "$dest"
+  } > "$tmp"
+  mv -f "$tmp" "$launcher_env"
+}
+
+# Remove one surface's destination record; returns 1 when no surfaces remain.
+remove_launcher_env_key() {
+  # $1: key
+  [ -f "$launcher_env" ] || return 1
+  tmp="$launcher_env.tmp.$$"
+  sed "/^$1=/d" "$launcher_env" > "$tmp"
+  if [ -s "$tmp" ]; then
+    mv -f "$tmp" "$launcher_env"
+    return 0
   fi
-  unset OH_DSH_INSTALL_SURFACE OH_DSH_INSTALL_TAG OH_DSH_INSTALL_VERSION \
-    OH_DSH_INSTALL_ASSET OH_DSH_INSTALL_OS OH_DSH_INSTALL_ARCH
-  return $result
+  rm -f "$tmp" "$launcher_env"
+  return 1
+}
+
+install_dispatcher() {
+  # $1: launcher path. The dispatcher resolves surfaces at run time from
+  # launcher.env, so one launcher serves every installed surface and the
+  # second surface never steals the first one's link.
+  target=$1
+  escaped_env=$(printf '%s' "$launcher_env" | sed "s/'/'\\\\''/g")
+  tmp="$target.new.$$"
+  rm -f "$tmp"
+  cat > "$tmp" <<EOF
+#!/bin/sh
+# Oh-DSH launcher installed by install.sh. Routes each surface to the
+# payload that provides it; destinations live in the launcher env file.
+set -eu
+
+ENV_FILE='$escaped_env'
+
+web_dest=''
+tui_dest=''
+if [ -f "\$ENV_FILE" ]; then
+  web_dest=\$(sed -n 's/^WEB_DEST=//p' "\$ENV_FILE" | head -n 1)
+  tui_dest=\$(sed -n 's/^TUI_DEST=//p' "\$ENV_FILE" | head -n 1)
+fi
+
+surface=\${1:-}
+root=''
+case "\$surface" in
+  web) root=\$web_dest ;;
+  tui) root=\$tui_dest ;;
+  *)
+    # desktop, gui, help, and update work from any installed payload.
+    if [ -n "\$tui_dest" ]; then root=\$tui_dest; else root=\$web_dest; fi
+    ;;
+esac
+
+if [ -z "\$root" ] || [ ! -x "\$root/bin/ohdsh" ]; then
+  case "\$surface" in
+    web|tui)
+      printf 'Oh-DSH %s is not installed. Re-run the install script with --surface %s.\\n' "\$surface" "\$surface" >&2
+      ;;
+    *)
+      printf 'Oh-DSH is not installed. Re-run the install script from the repository README.\\n' >&2
+      ;;
+  esac
+  exit 2
+fi
+
+exec "\$root/bin/ohdsh" "\$@"
+EOF
+  chmod 0755 "$tmp"
+  mv -f "$tmp" "$target"
 }
 
 # ---------------------------------------------------------------------------
@@ -371,22 +511,40 @@ remove_desktop_linux() {
 }
 
 remove_surface_payload() {
+  marker="$dest/.oh-dsh-install.env"
   removed=0
   if [ -d "$dest" ]; then
+    # A recursive delete must be gated on proof that this directory is an
+    # installer-owned payload for this surface.
+    if [ ! -f "$marker" ] || [ "$(marker_field "$marker" OH_DSH_INSTALL_SURFACE)" != "$surface" ]; then
+      die "refusing to remove $dest: no $surface installation marker found there; pass the exact --dest used at install time"
+    fi
     rm -rf "$dest"
     log "Removed $dest"
     removed=1
   fi
+
   link="$bin_dir/ohdsh"
+  # Retire legacy symlink launchers from earlier installer versions.
   if [ -L "$link" ]; then
     target=$(readlink "$link")
     case "$target" in
       "$dest"|"$dest"/*)
         rm -f "$link"
-        log "Removed launcher $link"
+        log "Removed legacy launcher symlink $link"
         removed=1
         ;;
     esac
+  fi
+
+  if remove_launcher_env_key "$(surface_dest_key)"; then
+    install_dispatcher "$link"
+    log "Launcher $link now serves the remaining installed surfaces"
+    removed=1
+  elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ]; then
+    rm -f "$link"
+    log "Removed launcher $link"
+    removed=1
   fi
   [ "$removed" = 1 ] || log "No $surface installation found at $dest; nothing to remove"
 }
@@ -509,7 +667,6 @@ install_payload_surface() {
     rm -rf "$staged"
     die "failed to stage the new $surface payload; the previous installation was left untouched"
   fi
-  write_marker "$staged/.oh-dsh-install.env"
 
   previous="$dest.previous-$(timestamp)"
   had_previous=0
@@ -528,7 +685,11 @@ install_payload_surface() {
   rm -rf "$dest.previous-"* "$dest.install-pending."*
 
   mkdir -p "$bin_dir"
-  ln -sfn "$dest/bin/ohdsh" "$bin_dir/ohdsh"
+  write_launcher_env
+  install_dispatcher "$bin_dir/ohdsh"
+  # The marker turns the install "current" only after the launcher exists,
+  # so a rerun repairs a launcher that failed to materialize.
+  write_marker "$dest/.oh-dsh-install.env"
 
   log "Installed Oh-DSH $surface $version to $dest"
   log "Launcher: $bin_dir/ohdsh"
@@ -591,6 +752,32 @@ install_desktop_linux() {
 # ---------------------------------------------------------------------------
 # Install: desktop on macOS (.app under /Applications)
 # ---------------------------------------------------------------------------
+
+retire_legacy_bundle() {
+  # Retire a same-named legacy bundle only when its Info.plist proves it is
+  # this application and strictly older than the release being installed.
+  # Unverifiable or newer bundles stay in place, matching the probes in
+  # src/mac-bundle-migration.ts.
+  legacy=$1
+  plist="$legacy/Contents/Info.plist"
+  plutil_bin=${OH_DSH_PLUTIL:-$PLUTIL_DEFAULT}
+  if [ ! -f "$plist" ] || [ ! -x "$plutil_bin" ]; then
+    printf 'install.sh: warning: leaving %s in place (bundle could not be verified)\n' "$legacy" >&2
+    return 0
+  fi
+  identifier=$("$plutil_bin" -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null || true)
+  if [ "$identifier" != "$BUNDLE_ID" ]; then
+    printf 'install.sh: warning: leaving %s in place (bundle identifier %s is not %s)\n' "$legacy" "${identifier:-unreadable}" "$BUNDLE_ID" >&2
+    return 0
+  fi
+  legacy_version=$("$plutil_bin" -extract CFBundleShortVersionString raw -o - "$plist" 2>/dev/null || true)
+  if [ -z "$legacy_version" ] || ! version_older "$legacy_version" "$version"; then
+    printf 'install.sh: warning: leaving %s in place (version %s is not older than %s)\n' "$legacy" "${legacy_version:-unknown}" "$version" >&2
+    return 0
+  fi
+  rm -rf "$legacy"
+  log "Removed legacy $legacy ($legacy_version)"
+}
 
 quit_running_app() {
   osascript -e "tell application id \"$BUNDLE_ID\" to quit" >/dev/null 2>&1 || true
@@ -694,8 +881,7 @@ install_desktop_mac() {
   fi
 
   if [ -d "$dest/$LEGACY_APP_NAME" ]; then
-    rm -rf "$dest/$LEGACY_APP_NAME"
-    log "Removed legacy $dest/$LEGACY_APP_NAME"
+    retire_legacy_bundle "$dest/$LEGACY_APP_NAME"
   fi
 
   # Purge stale bundles from earlier installs so Launch Services and Finder

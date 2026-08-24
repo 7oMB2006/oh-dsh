@@ -28,10 +28,25 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
   `.oh-dsh-install.env`、`~/.local/share/oh-dsh/desktop/install.env`）让
   相同版本的重复执行变成无操作，除非传入 `--force`；`--uninstall` 执行
   反向卸载。
+- web/tui 安装在 bin 目录放置调度式 `ohdsh` 启动器而不是符号链接：web 与
+  tui 的载荷各自只携带自己 surface 的依赖，一个共享符号链接会让第二次
+  安装破坏第一个 surface。启动器在安装器数据目录的 `launcher.env` 中记录
+  每个 surface 的载荷位置，把 `ohdsh web`/`ohdsh tui` 路由到提供该 surface
+  的载荷；卸载其中一个 surface 时会为剩余的 surface 刷新启动器。
+- 标记是惰性的 `KEY=value` 文本：写入时做字符集校验，读取时逐行解析
+  （绝不 source），并记录目标目录使 desktop 幂等以请求的位置为键；
+  "已安装"快速路径额外校验应用、镜像、载荷与启动器仍然存在，普通重跑
+  即可修复缺失。
+- web/tui 目标的卸载在任何递归删除之前都以匹配的 surface 标记为闸门；
+  遗留 `Oh-DSH-Desktop.app` 只有在 Info.plist 证明是本应用且版本严格更旧
+  时才清退（plutil 探测，镜像 `src/mac-bundle-migration.ts` 的行为）；
+  无法验证或更新的包保留并给出警告。
 - 升级采用原地替换：新安装验证通过后，旧的应用包、AppImage 或载荷会连同
   残留暂存目录一起删除，每个 surface 只保留一份安装。早期版本会把被替换
   的 macOS `.app` 移入 `~/.Trash`；加入升级清理后该行为被放弃，备份只在
   暂存到验证之间存在。
+- GitHub JSON 解析器在匹配前归一化所有空白，带缩进的响应与紧凑响应解析
+  结果一致。
 - macOS desktop 从 zip 产物安装（优先用 ditto 解压）而不是 DMG；只有当
   目标是默认 `/Applications` 路径时才会请求退出正在运行的应用，因此自定义
   目标与测试不会触碰真实会话。
