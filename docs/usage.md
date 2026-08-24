@@ -11,6 +11,128 @@ English | [中文](usage.zh.md)
 The full distribution includes all three surfaces, so one installation
 supports `desktop`, `web`, and `tui`.
 
+## Install with install.sh
+
+`install.sh`, at the repository root, installs the latest stable Release
+without cloning the repository on macOS and Linux. It needs `curl` and `tar`
+(`ditto` or `unzip` for the macOS desktop package), and it never requires
+root for user-local web/tui installs.
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface tui
+```
+
+On Windows, `install.ps1` is the counterpart and installs the same surfaces
+(the desktop through the NSIS installer's silent mode). It needs PowerShell
+5.1+ and `tar`, both bundled with Windows 10 1803+:
+
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
+Both scripts accept the same options; PowerShell uses `-Surface`, `-Version`,
+`-Dest`, `-BinDir`, `-Force`, and `-Uninstall` parameters instead of the
+lower-case flags.
+
+Surface matrix and default locations:
+
+| Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
+| --- | --- | --- | --- |
+| desktop (default) | `Oh-DSH Desktop.app` into `/Applications` with a Launch Services refresh | AppImage into `~/.local/bin/oh-dsh-desktop` | NSIS installer run silently (per-user) |
+| web | payload in `~/.local/share/oh-dsh/web` plus a dispatching `ohdsh` launcher in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\web` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` (added to the user PATH) |
+| tui | payload in `~/.local/share/oh-dsh/tui` plus a dispatching `ohdsh` launcher in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\tui` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` |
+
+Only the desktop surface creates a desktop application entry. web and tui
+never register with Launch Services or create `.app` bundles.
+
+The web and tui payloads each carry only their own surface's dependencies,
+so both can be installed side by side: the shared `ohdsh` launcher records
+each surface's payload and routes `ohdsh web` and `ohdsh tui` to the
+installation that provides them. Uninstalling one surface keeps the other
+usable through the same launcher.
+
+Options:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--surface` | `desktop` | `desktop`, `web`, or `tui`; each installs only its own files and launcher |
+| `--version` | latest stable | Pin a release tag such as `v0.1.8`. Prereleases are never selected implicitly; they install only when pinned explicitly |
+| `--dest` | see matrix above | Destination directory |
+| `--bin-dir` | `~/.local/bin` | Directory for the `ohdsh` launcher (web/tui) |
+| `--repo` | `hust-open-atom-club/oh-dsh` | Install from another fork |
+| `--force` | off | Reinstall when the same version is already present |
+| `--uninstall` | off | Remove the installed surface |
+| `--os`, `--arch` | detected | Override target selection (`darwin`/`linux`, `arm64`/`x64`) |
+
+Equivalent environment variables: `OH_DSH_SURFACE`, `OH_DSH_VERSION`,
+`OH_DSH_INSTALL_DIR`, `OH_DSH_BIN_DIR`, `OH_DSH_REPO`, `OH_DSH_OS`, and
+`OH_DSH_ARCH`; options win over the environment. `GH_TOKEN`/`GITHUB_TOKEN`
+authenticate the GitHub API request (useful behind rate limits), and
+`OH_DSH_API_BASE`/`OH_DSH_DOWNLOAD_BASE` override the endpoint bases for
+testing.
+
+Upgrade, verification, and uninstall behavior:
+
+- The installer reads the SHA-256 digest GitHub publishes for each Release
+  asset and verifies the download before touching the previous
+  installation. A failed download, checksum mismatch, or interrupted
+  extraction leaves the previous install usable and reports the failure;
+  partially staged files are cleaned up.
+- Re-running the installer with the same version is a no-op unless `--force`
+  is passed. A newer version replaces the payload and refreshes the `ohdsh`
+  launcher atomically.
+- Upgrades are replace-in-place: once the new installation is validated, the
+  previous app bundle, AppImage, or payload is deleted along with any stale
+  staging directories and pre-upgrade backups, so exactly one Oh-DSH
+  installation remains per surface.
+- On macOS the desktop surface refreshes Launch Services and retires a
+  stale `Oh-DSH-Desktop.app` bundle, so a single application entry shows.
+  An unnotarized build may still need the right-click **Open** approval
+  described below.
+- Uninstall with `sh install.sh --uninstall --surface <name>` (or
+  `install.ps1 -Uninstall` on Windows), honoring the same destination
+  overrides used at install time.
+
+## Automatic update checks
+
+Every surface checks for a newer stable Release once per launch:
+
+- **TUI** prints one notice line before the first frame, for example
+  `Oh-DSH 0.1.8 -> 0.2.0 is available. Run "ohdsh update" to upgrade.`
+- **Web** prints the same notice after the listening URL.
+- **Desktop** checks through its update window and shows a system
+  notification when a new version is found; clicking it opens the update
+  window. The desktop still installs updates through its own verified
+  updater, not the shell installer.
+
+`ohdsh update` (or `ohdsh update web` / `ohdsh update tui`) upgrades a
+packaged web/tui distribution on macOS, Linux, and Windows by re-running
+the matching installer script with the same verification and atomic
+replacement as a fresh install. The installation source is inferred the
+way Codex does it — from the running path, the payload's install marker,
+and the destinations recorded in `launcher.env` — never from a flag baked
+into the build, and the recorded `--dest`/`--bin-dir` are reconstructed so
+an update lands exactly where the install did. An installation at a
+location the installers do not own is refused with guidance. From a source
+checkout it asks you to use git instead.
+
+Updates are release-based only: every surface compares against published
+stable GitHub Releases with semver; there is no commit-level or rolling
+update channel.
+
+The checks use the public GitHub API, never block startup for more than
+about a second and a half, and fail silently offline. Set
+`OH_DSH_UPDATE_CHECK=0` to disable them everywhere. `ohdsh update`
+prefers the installer script bundled inside the package at
+`lib/oh-dsh/install.sh` (or `install.ps1`) and only downloads it from the
+repository's `main` branch over TLS when the bundle is absent;
+`OH_DSH_INSTALL_SCRIPT_URL` can point the download at a mirror or a local
+copy for testing. On Windows the update runs detached after the current
+process exits, because the running payload cannot be replaced while it
+executes.
+
 ## Install the full distribution
 
 ### macOS

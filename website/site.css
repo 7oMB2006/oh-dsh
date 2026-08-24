@@ -405,6 +405,97 @@ html:lang(zh-CN) .hero-title-surfaces {
     line-height: 1.35;
 }
 
+.install-command {
+    max-width: 460px;
+    margin-top: 18px;
+}
+
+.install-caption {
+    margin: 0 0 8px;
+    color: var(--quiet);
+    font-size: 12px;
+}
+
+.install-command-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px 11px 14px;
+    background: rgba(4, 16, 28, 0.78);
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+}
+
+.install-prompt {
+    flex-shrink: 0;
+    color: var(--accent-strong);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+        monospace;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.install-command-code {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    color: #d7e7ff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+        monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    white-space: nowrap;
+    scrollbar-width: none;
+}
+
+.install-command-code::-webkit-scrollbar {
+    display: none;
+}
+
+.install-copy {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    background: rgba(151, 196, 255, 0.08);
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+        background 160ms ease,
+        border-color 160ms ease,
+        color 160ms ease;
+}
+
+.install-copy:hover {
+    color: var(--text);
+    background: rgba(151, 196, 255, 0.16);
+    border-color: rgba(151, 196, 255, 0.32);
+}
+
+.install-copy:focus-visible {
+    outline: 2px solid var(--accent-strong);
+    outline-offset: 2px;
+}
+
+.install-copy svg {
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+}
+
+.install-copy.copied {
+    color: #7ee2a8;
+    background: rgba(126, 226, 168, 0.1);
+    border-color: rgba(126, 226, 168, 0.34);
+}
+
 .site-footer {
     display: flex;
     gap: 12px;

@@ -7,6 +7,7 @@ import {
   Menu,
   nativeTheme,
   net,
+  Notification,
   session,
   shell,
   type IpcMainInvokeEvent,
@@ -18,6 +19,7 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PluginMarketplaceManager } from '../plugins/plugin-marketplace/src/host/transaction-manager.ts'
+import { updateCheckEnabled } from './self-update.ts'
 import {
   MARKETPLACE_AGENT_TOKEN_ENV,
   MARKETPLACE_AGENT_URL_ENV,
@@ -441,7 +443,33 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
   })
   updateManager = manager
   manager.subscribe(sendUpdateState)
+  manager.subscribe(notifyAvailableUpdate)
   return manager
+}
+
+let startupUpdateNotified = false
+
+/** Announce an available update once per session after the startup check. */
+function notifyAvailableUpdate(state: DesktopUpdateState): void {
+  if (state.status !== 'available' || startupUpdateNotified) return
+  startupUpdateNotified = true
+  appendLog('desktop', `update available: ${state.latestVersion}`)
+  if (!Notification.isSupported()) return
+  const notification = new Notification({
+    title: 'Oh-DSH update available',
+    body: `Version ${state.latestVersion} is available. Click to review and install.`,
+  })
+  notification.on('click', () => { void openUpdateWindow() })
+  notification.show()
+}
+
+/** Check once per launch, without downloading anything. */
+function scheduleStartupUpdateCheck(): void {
+  if (updateManager === undefined) return
+  if (!app.isPackaged || !updateCheckEnabled(process.env)) return
+  updateManager.check().catch(() => {
+    // A failed startup check only means no notice this session.
+  })
 }
 
 function sendRuntimeUpdateState(state: RuntimeUpdateState): void {
@@ -1186,6 +1214,7 @@ async function bootstrap(): Promise<void> {
   appendLog('desktop', `${PRODUCT_NAME} ${info.version} starting (${process.arch})`)
   await retireDuplicateMacBundles()
   await getUpdateManager()
+  scheduleStartupUpdateCheck()
   marketplace = createPluginMarketplace()
   marketplaceAgentGateway = marketplace === undefined
     ? undefined

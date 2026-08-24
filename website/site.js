@@ -17,6 +17,10 @@ const translations = {
         downloadMac: "下载 macOS 版",
         downloadWindows: "下载 Windows 版",
         downloadLinux: "下载 Linux 版",
+        installCaptionTerminal: "终端安装（macOS / Linux）",
+        installCaptionPowerShell: "PowerShell 安装（Windows）",
+        copyCommand: "复制",
+        copiedCommand: "已复制",
         downloadReady: "准备下载",
         downloadTitle: "下载前，顺手点亮一颗 Star？",
         downloadDescription:
@@ -43,6 +47,10 @@ const translations = {
         downloadMac: "Download for macOS",
         downloadWindows: "Download for Windows",
         downloadLinux: "Download for Linux",
+        installCaptionTerminal: "Install from the terminal (macOS / Linux)",
+        installCaptionPowerShell: "Install with PowerShell (Windows)",
+        copyCommand: "Copy",
+        copiedCommand: "Copied",
         downloadReady: "Ready to download",
         downloadTitle: "Before you go, leave us a Star?",
         downloadDescription:
@@ -65,11 +73,20 @@ const elements = {
     dialogClose: document.querySelector("[data-dialog-close]"),
     directDownload: document.querySelector("[data-direct-download]"),
     downloadTrigger: document.querySelector("[data-download-trigger]"),
+    installCaption: document.querySelector("[data-install-caption]"),
+    installCommand: document.querySelector("[data-install-command]"),
+    installCopy: document.querySelector("[data-install-copy]"),
+    installCopyLabel: document.querySelector("[data-install-copy] [data-i18n]"),
     languageToggle: document.querySelector("[data-language-toggle]"),
     platformLabel: document.querySelector("[data-platform-label]"),
     particles: document.querySelector("[data-harness-particles]"),
     starCount: document.querySelector("[data-star-count]"),
     starDownload: document.querySelector("[data-star-download]"),
+};
+
+const installCommands = {
+    unix: "curl -fsSL https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh | bash",
+    windows: "irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex",
 };
 
 function installHarnessParticles(canvas) {
@@ -181,6 +198,8 @@ function installHarnessParticles(canvas) {
 const storageKey = "oh-dsh-site-language";
 const platform = detectPlatform(navigator);
 let architecture = detectArchitecture(navigator);
+let currentLanguage;
+let copyFeedbackTimer;
 
 function detectPlatform(browserNavigator) {
     const value = [
@@ -251,8 +270,22 @@ function preferredLanguage() {
     return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
+function applyInstallCommand(language) {
+    if (!elements.installCommand) return;
+    const windows = platform === "windows";
+    elements.installCommand.textContent = windows
+        ? installCommands.windows
+        : installCommands.unix;
+    if (elements.installCaption) {
+        elements.installCaption.textContent = windows
+            ? translations[language].installCaptionPowerShell
+            : translations[language].installCaptionTerminal;
+    }
+}
+
 function applyLanguage(language) {
     const copy = translations[language];
+    currentLanguage = language;
 
     document.documentElement.lang = language;
     document.querySelectorAll("[data-i18n]").forEach((element) => {
@@ -268,6 +301,7 @@ function applyLanguage(language) {
     document.title = copy.pageTitle;
     elements.downloadTrigger.textContent = copy[downloadCopyKey()];
     elements.platformLabel.textContent = platformName(language);
+    applyInstallCommand(language);
     elements.languageToggle.textContent = language === "zh-CN" ? "EN" : "中";
     elements.languageToggle.setAttribute(
         "aria-label",
@@ -310,6 +344,48 @@ function setDownloadUrl(url) {
     elements.starDownload.href = url;
 }
 
+function showCopyFeedback() {
+    elements.installCopyLabel.textContent = translations[currentLanguage].copiedCommand;
+    elements.installCopy.classList.add("copied");
+    window.clearTimeout(copyFeedbackTimer);
+    copyFeedbackTimer = window.setTimeout(() => {
+        elements.installCopyLabel.textContent = translations[currentLanguage].copyCommand;
+        elements.installCopy.classList.remove("copied");
+    }, 1800);
+}
+
+function copyWithExecCommand(command, onSuccess) {
+    const textarea = document.createElement("textarea");
+    textarea.value = command;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    let copied = false;
+    try {
+        copied = document.execCommand("copy");
+    } catch {
+        copied = false;
+    }
+    textarea.remove();
+    if (copied) onSuccess();
+}
+
+function copyInstallCommand() {
+    const command = elements.installCommand.textContent.trim();
+    if (!command) return;
+
+    if (navigator.clipboard?.writeText) {
+        navigator.clipboard
+            .writeText(command)
+            .then(showCopyFeedback)
+            .catch(() => copyWithExecCommand(command, showCopyFeedback));
+    } else {
+        copyWithExecCommand(command, showCopyFeedback);
+    }
+}
+
 elements.languageToggle.addEventListener("click", () => {
     const language =
         elements.languageToggle.dataset.language === "zh-CN" ? "en" : "zh-CN";
@@ -332,6 +408,10 @@ elements.dialogClose.addEventListener("click", () => elements.dialog.close());
 elements.dialog.addEventListener("click", (event) => {
     if (event.target === elements.dialog) elements.dialog.close();
 });
+
+if (elements.installCopy && elements.installCommand) {
+    elements.installCopy.addEventListener("click", copyInstallCommand);
+}
 
 elements.starDownload.addEventListener("click", () => {
     window.open(repositoryUrl, "_blank", "noopener,noreferrer");

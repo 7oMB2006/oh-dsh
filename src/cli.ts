@@ -6,7 +6,13 @@ import { posix, win32 } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { OH_DSH_HOME_ENV } from './data-root.ts'
 import { UsageError } from './errors.ts'
-import { main as runTui } from './tui.ts'
+import {
+  detectDistributionSurface,
+  installerOwnsRoot,
+  runSelfUpdate,
+  surfaceIsInstalled,
+} from './self-update.ts'
+import { main as runTui, resolveTuiRoot } from './tui.ts'
 import { main as runWeb } from './web.ts'
 
 const SURFACE_NAMES = ['desktop', 'web', 'tui'] as const
@@ -35,10 +41,16 @@ export function cliHelp(env: NodeJS.ProcessEnv = process.env): string {
 
 Usage:
   ohdsh <surface> [options]
+  ohdsh update [surface]
 
 Surfaces:
 ${surfaces.map(surface => `  ${surface.padEnd(9)} ${descriptions[surface]}`).join('\n')}
 ${aliases.length === 0 ? '' : `\nAliases:\n${aliases.map(([alias, surface]) => `  ${alias.padEnd(9)} ${descriptions[surface]}`).join('\n')}`}
+
+Commands:
+  update    Upgrade this installation with the latest stable release
+            installer (web/tui on every platform; the desktop application
+            updates itself through its update window)
 
 Run "ohdsh <surface> --help" for surface options.
 `
@@ -169,6 +181,48 @@ export async function launchDesktop(
   })
 }
 
+/** Run "ohdsh update": upgrade the running distribution via the installer. */
+export async function runUpdateCommand(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+  stdout: NodeJS.WriteStream,
+  stderr: NodeJS.WriteStream,
+): Promise<number> {
+  const [requested] = args
+  if (requested !== undefined && !SURFACE_NAMES.includes(requested as SurfaceName)) {
+    stderr.write(`Unknown surface: ${requested}\n\n${cliHelp(env)}`)
+    return 2
+  }
+  const root = resolveTuiRoot(env)
+  const distribution = detectDistributionSurface(root, env)
+  if (distribution === 'source') {
+    stderr.write('ohdsh update needs a packaged installation; update a source checkout with git instead.\n')
+    return 2
+  }
+  if (distribution === 'desktop' || requested === 'desktop') {
+    stdout.write('The desktop application updates itself: open Oh-DSH Desktop -> Check for Updates...\n')
+    return 0
+  }
+  const explicit = requested === 'web' || requested === 'tui'
+  const surface = explicit ? requested : distribution
+  // Ownership is inferred from install records and paths, never from a build
+  // flag: the detected payload's own root, or — for an explicitly requested
+  // surface — any installer-owned installation of that surface.
+  const owned = explicit
+    ? surfaceIsInstalled(surface, env)
+    : installerOwnsRoot(root, surface, env)
+  if (!owned) {
+    stderr.write(
+      `ohdsh update: no installer-owned ${surface} installation was found` +
+      (explicit ? '' : ` at ${root}`) +
+      '. Re-run install.sh (or install.ps1) with --dest matching the location, or reinstall to the default location.\n',
+    )
+    return 2
+  }
+  stdout.write(`Upgrading Oh-DSH ${surface} with the latest stable release installer...\n`)
+  return await runSelfUpdate(surface, env, process.platform, undefined, root)
+}
+
 /** Dispatch one surface command. */
 export async function main(
   argv: readonly string[],
@@ -187,6 +241,9 @@ export async function main(
   if (surface === undefined || surface === '--help' || surface === '-h') {
     stdout.write(help)
     return 0
+  }
+  if (selectedSurface === 'update') {
+    return await runUpdateCommand(args, env, stdout, stderr)
   }
   if (SURFACE_NAMES.includes(selectedSurface as SurfaceName)
     && !availableSurfaces(env).includes(selectedSurface as SurfaceName)) {

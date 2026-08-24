@@ -20,6 +20,7 @@ import {
   type RuntimeExit,
 } from './runtime.ts'
 import { bundledRuntimePaths, runtimeSearchPath, type BundledRuntimePaths } from './runtime-paths.ts'
+import { checkForUpdate, formatUpdateNotice, readLauncherRecord } from './self-update.ts'
 import { resolveProductVersion } from './version.ts'
 
 /** Default port matching the dsh-web-app bundle's own webserver default. */
@@ -294,6 +295,7 @@ export async function main(
   const marketplaceRestartPath = join(dataRoot, 'web', 'marketplace-restart')
   let stoppingPromise: Promise<void> | undefined
   let started = false
+  let updateNoticeStarted = false
   let browserOpened = false
   let restarts = 0
   let restartTimer: NodeJS.Timeout | null = null
@@ -325,6 +327,23 @@ export async function main(
     if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
+    // One non-blocking update check per launch, even across runtime
+    // restarts; the notice arrives as a single line and never blocks.
+    if (updateNoticeStarted === false) {
+      updateNoticeStarted = true
+      // Fork installs check their own recorded repository.
+      const record = readLauncherRecord(env)
+      void checkForUpdate(
+        version,
+        env,
+        fetch,
+        record.webRepo !== undefined && record.webRepo !== '' ? record.webRepo : undefined,
+      ).then(result => {
+        if (result?.updateAvailable === true) {
+          stdout.write(formatUpdateNotice(result))
+        }
+      }).catch(() => {})
+    }
     if (options.open && browserOpened === false) {
       browserOpened = true
       openBrowser(url.href, process.platform)

@@ -63,6 +63,8 @@ mkdirSync(join(packageDir, 'bin'), { recursive: true })
 mkdirSync(join(packageDir, 'lib', 'oh-dsh'), { recursive: true })
 
 copyFileSync(join(root, 'dist', 'ohdsh.js'), join(packageDir, 'lib', 'oh-dsh', 'cli.js'))
+copyFileSync(join(root, 'install.sh'), join(packageDir, 'lib', 'oh-dsh', 'install.sh'))
+copyFileSync(join(root, 'install.ps1'), join(packageDir, 'lib', 'oh-dsh', 'install.ps1'))
 copyFileSync(join(root, 'dist', 'release-package.json'), join(packageDir, 'package.json'))
 copyFileSync(join(root, 'LICENSE'), join(packageDir, 'LICENSE'))
 copyFileSync(join(root, 'THIRD_PARTY_NOTICES.md'), join(packageDir, 'THIRD_PARTY_NOTICES.md'))
