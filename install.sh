@@ -400,9 +400,10 @@ write_launcher_env() {
   mkdir -p "$record_home"
   tmp="$launcher_env.tmp.$$"
   {
-    [ -f "$launcher_env" ] && sed -e "/^$key=/d" -e '/^BIN_DIR=/d' "$launcher_env"
+    [ -f "$launcher_env" ] && sed -e "/^$key=/d" -e '/^BIN_DIR=/d' -e '/^REPO=/d' "$launcher_env"
     printf '%s=%s\n' "$key" "$dest"
     printf 'BIN_DIR=%s\n' "$bin_dir"
+    printf 'REPO=%s\n' "$repo"
   } > "$tmp"
   mv -f "$tmp" "$launcher_env"
 }
@@ -547,7 +548,8 @@ remove_surface_payload() {
     install_dispatcher "$link"
     log "Launcher $link now serves the remaining installed surfaces"
     removed=1
-  elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ]; then
+  elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ] \
+    && grep -q 'Oh-DSH launcher installed by install.sh' "$link" 2>/dev/null; then
     rm -f "$link"
     log "Removed launcher $link"
     removed=1

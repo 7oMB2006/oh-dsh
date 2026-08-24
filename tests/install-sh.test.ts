@@ -717,6 +717,35 @@ test('BIN_DIR survives while another surface remains installed', { skip: skipOnW
     const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
     assert.match(record, /^TUI_DEST=/m)
     assert.match(record, /^BIN_DIR=/m, 'BIN_DIR must survive for the remaining surface')
+    assert.match(record, /^REPO=hust-open-atom-club\/oh-dsh$/m)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('uninstall never deletes an unrelated launcher file', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'bye'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    await mkdir(bin, { recursive: true })
+    await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho not ours\n')
+    await chmod(join(bin, 'ohdsh'), 0o755)
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+    // The install replaced the foreign file with the dispatcher; now plant a
+    // foreign file again and uninstall: it must survive.
+    await rm(join(bin, 'ohdsh'))
+    await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho still not ours\n')
+    await chmod(join(bin, 'ohdsh'), 0o755)
+    assert.equal((await runInstaller(['--uninstall', ...args], env)).status, 0)
+    const survivor = await readFile(join(bin, 'ohdsh'), 'utf8')
+    assert.match(survivor, /still not ours/)
   } finally {
     await github.stop()
   }

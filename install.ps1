@@ -113,11 +113,12 @@ function Write-LauncherEnv {
     $lines = @()
     if (Test-Path -LiteralPath $LauncherEnv) {
         $lines = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-            $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR='
+            $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR=' -and $_ -notmatch '^REPO='
         })
     }
     $lines += "$key=$FinalDest"
     $lines += "BIN_DIR=$FinalBinDir"
+    $lines += "REPO=$Repo"
     Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding Default
 }
 

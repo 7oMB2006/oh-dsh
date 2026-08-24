@@ -291,6 +291,7 @@ export async function main(
   const marketplaceRestartPath = join(dataRoot, 'web', 'marketplace-restart')
   let stoppingPromise: Promise<void> | undefined
   let started = false
+  let updateNoticeStarted = false
   let browserOpened = false
   let restarts = 0
   let restartTimer: NodeJS.Timeout | null = null
@@ -322,13 +323,16 @@ export async function main(
     if (childPid !== undefined) runtimeLock?.setChildPids([childPid])
     started = true
     stdout.write(`Oh-DSH Web ${version} is running at ${url.href}\n`)
-    // One non-blocking startup update check; the notice arrives as a single
-    // line once resolved and never delays the server.
-    void checkForUpdate(version, env).then(result => {
-      if (result?.updateAvailable === true) {
-        stdout.write(formatUpdateNotice(result))
-      }
-    }).catch(() => {})
+    // One non-blocking update check per launch, even across runtime
+    // restarts; the notice arrives as a single line and never blocks.
+    if (updateNoticeStarted === false) {
+      updateNoticeStarted = true
+      void checkForUpdate(version, env).then(result => {
+        if (result?.updateAvailable === true) {
+          stdout.write(formatUpdateNotice(result))
+        }
+      }).catch(() => {})
+    }
     if (options.open && browserOpened === false) {
       browserOpened = true
       openBrowser(url.href, process.platform)

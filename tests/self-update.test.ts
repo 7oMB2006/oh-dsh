@@ -330,3 +330,25 @@ test('surfaceIsInstalled follows records and default payload paths', async () =>
   await writeFile(join(home, 'custom tui', 'bin', 'ohdsh'), '')
   assert.equal(surfaceIsInstalled('tui', env, 'linux'), true)
 })
+
+test('fork provenance flows from the record into the update plan', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-fork-'))
+  const recordHome = join(home, '.ohdsh', 'installer')
+  await mkdir(recordHome, { recursive: true })
+  await writeFile(
+    join(recordHome, 'launcher.env'),
+    'TUI_DEST=/custom/tui\nREPO=someone/oh-dsh-fork\n',
+  )
+  const env = { HOME: home }
+  const plan = selfUpdatePlan('tui', 'linux', 'hust-open-atom-club/oh-dsh', env)
+  assert.match(plan.scriptUrl, /someone\/oh-dsh-fork\/main\/install\.sh$/)
+  assert.deepEqual(plan.args, [
+    '<script>', '--surface', 'tui', '--dest', '/custom/tui', '--repo', 'someone/oh-dsh-fork',
+  ])
+
+  const winPlan = selfUpdatePlan('tui', 'win32', 'hust-open-atom-club/oh-dsh', {
+    HOME: home,
+    OH_DSH_HOME: join(home, '.ohdsh'),
+  })
+  assert.deepEqual(winPlan.args.slice(-2), ['-Repo', 'someone/oh-dsh-fork'])
+})
