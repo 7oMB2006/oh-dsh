@@ -101,7 +101,13 @@ async function makeMacDesktopZip(
   await writeFile(join(appDir, 'Contents', 'Resources', 'app.asar'), 'asar')
   await writeFile(
     join(appDir, 'Contents', 'Info.plist'),
-    `CFBundleIdentifier=ai.deepseek.oh-dsh-desktop\nCFBundleShortVersionString=${version}\n`,
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+      + '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+      + '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+      + '<plist version="1.0">\n<dict>\n'
+      + '<key>CFBundleIdentifier</key>\n<string>ai.deepseek.oh-dsh-desktop</string>\n'
+      + `<key>CFBundleShortVersionString</key>\n<string>${version}</string>\n`
+      + '</dict>\n</plist>\n',
   )
   const zipPath = join(staging, `Oh-DSH-Desktop-${version}-${arch}.zip`)
   if (process.platform === 'darwin') {
@@ -132,7 +138,11 @@ async function makePlutilSpy(
   await writeFile(
     bin,
     `#!/bin/sh\nprintf '%s\\n' "$*" >> ${JSON.stringify(logPath)}\n` +
-      `grep -F "$2=" "$6" | head -n 1 | cut -d= -f2-\n`,
+      'if grep -qF "$2=" "$6" 2>/dev/null; then\n' +
+      '  grep -F "$2=" "$6" | head -n 1 | cut -d= -f2-\n' +
+      'else\n' +
+      '  grep -A1 "<key>$2</key>" "$6" | tail -n 1 | sed "s/.*<string>\\(.*\\)<\\/string>.*/\\1/"\n' +
+      'fi\n',
   )
   await chmod(bin, 0o755)
   return { bin, logPath }
@@ -614,6 +624,8 @@ test('desktop idempotency is keyed by the requested destination', { skip: skipOn
       await makeMacDesktopZip('0.1.8', 'arm64'),
     ])
     const { home, env } = await makeSandbox(github)
+    const plutil = await makePlutilSpy(home)
+    env.OH_DSH_PLUTIL = plutil.bin
     const appsA = join(home, 'ApplicationsA')
     const appsB = join(home, 'ApplicationsB')
     const first = await runInstaller(
