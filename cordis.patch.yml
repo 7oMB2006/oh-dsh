@@ -9,6 +9,9 @@
 
 - id: web-runtime
   config:
+    # The Electron surface carves its own window; never hand the URL to the
+    # OS default browser (dsh-web-app would otherwise auto-open since rc.8).
+    openBrowser: false
     printUrl: true
     surfaceContext: false
     trustedHosts: []

@@ -367,6 +367,8 @@ oh-dsh-vision:
 
 Web 与 Desktop 可在设置页选择皮肤。TUI 输入 `/theme` 可选择相同的 Deep
 Current、Jade Circuit、Porcelain 和 Ember Dusk；选择立即生效并在重启后保留。
+皮肤激活期间，外观设置只更新“原始外观”使用的回退值；如需退出皮肤，请在
+皮肤列表中选择“原始外观”。
 
 ## 插件市场
 
