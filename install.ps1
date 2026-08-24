@@ -110,15 +110,16 @@ function Write-LauncherEnv {
     if (-not (Test-Path -LiteralPath $DataHome)) {
         New-Item -ItemType Directory -Path $DataHome -Force | Out-Null
     }
+    $repoKey = "$($Surface.ToUpperInvariant())_REPO"
     $lines = @()
     if (Test-Path -LiteralPath $LauncherEnv) {
         $lines = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-            $_ -notmatch "^$key=" -and $_ -notmatch '^BIN_DIR=' -and $_ -notmatch '^REPO='
+            $_ -notmatch "^$key=" -and $_ -notmatch "^$repoKey=" -and $_ -notmatch '^BIN_DIR='
         })
     }
     $lines += "$key=$FinalDest"
     $lines += "BIN_DIR=$FinalBinDir"
-    $lines += "REPO=$Repo"
+    $lines += "$repoKey=$Repo"
     Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding Default
 }
 
@@ -126,10 +127,14 @@ function Remove-LauncherEnvKey {
     # Returns $true when other surfaces still need the launcher.
     if (-not (Test-Path -LiteralPath $LauncherEnv)) { return $false }
     $key = "$($Surface.ToUpperInvariant())_DEST"
+    $repoKey = "$($Surface.ToUpperInvariant())_REPO"
     $remaining = @(Get-Content -LiteralPath $LauncherEnv | Where-Object {
-        $_ -notmatch "^$key="
+        $_ -notmatch "^$key=" -and $_ -notmatch "^$repoKey="
     })
-    if ($remaining.Count -gt 0) {
+    # Only surface destinations keep the launcher alive; leftover BIN_DIR or
+    # REPO bookkeeping does not.
+    $destLines = @($remaining | Where-Object { $_ -match '^(WEB|TUI)_DEST=' })
+    if ($destLines.Count -gt 0) {
         Set-Content -LiteralPath $LauncherEnv -Value $remaining -Encoding Default
         return $true
     }
@@ -456,7 +461,8 @@ try {
 
     $HadPrevious = $false
     if (Test-Path -LiteralPath $FinalDest) {
-        $owned = Test-Path -LiteralPath (Join-Path $FinalDest '.oh-dsh-install.env')
+        $markerValues = Read-Marker -Path (Join-Path $FinalDest '.oh-dsh-install.env')
+        $owned = $null -ne $markerValues -and $markerValues['OH_DSH_INSTALL_SURFACE'] -eq $Surface
         $empty = $null -eq (Get-ChildItem -LiteralPath $FinalDest -Force | Select-Object -First 1)
         if (-not $owned -and -not $empty) {
             Die "refusing to replace $FinalDest : it is not an Oh-DSH $Surface payload (no install marker) and is not empty"

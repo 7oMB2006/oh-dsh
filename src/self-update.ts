@@ -164,8 +164,9 @@ export interface LauncherRecord {
   webDest?: string
   tuiDest?: string
   binDir?: string
-  /** Repository the payloads were installed from (fork provenance). */
-  repo?: string
+  /** Per-surface fork provenance: repositories each payload came from. */
+  webRepo?: string
+  tuiRepo?: string
 }
 
 function readTextAt(path: string): string | undefined {
@@ -195,7 +196,8 @@ export function readLauncherRecord(
     if (line.startsWith('WEB_DEST=')) record.webDest = line.slice('WEB_DEST='.length)
     else if (line.startsWith('TUI_DEST=')) record.tuiDest = line.slice('TUI_DEST='.length)
     else if (line.startsWith('BIN_DIR=')) record.binDir = line.slice('BIN_DIR='.length)
-    else if (line.startsWith('REPO=')) record.repo = line.slice('REPO='.length)
+    else if (line.startsWith('WEB_REPO=')) record.webRepo = line.slice('WEB_REPO='.length)
+    else if (line.startsWith('TUI_REPO=')) record.tuiRepo = line.slice('TUI_REPO='.length)
   }
   return record
 }
@@ -276,15 +278,17 @@ export function selfUpdatePlan(
   env: NodeJS.ProcessEnv = {},
 ): SelfUpdatePlan {
   const record = readLauncherRecord(env, platform)
-  // Fork installs keep their provenance: the record decides which repository
-  // both the script download and the release resolution target.
-  const effectiveRepo = record.repo !== undefined && record.repo !== ''
-    ? record.repo
+  // Fork installs keep their provenance per surface: the record decides
+  // which repository both the script download and the release resolution
+  // target, so side-by-side installs from different forks stay separate.
+  const recordRepo = surface === 'web' ? record.webRepo : record.tuiRepo
+  const effectiveRepo = recordRepo !== undefined && recordRepo !== ''
+    ? recordRepo
     : repository
   const scriptUrl = installScriptUrl(platform, effectiveRepo, env)
   const dest = surface === 'web' ? record.webDest : record.tuiDest
-  const repoArgs = record.repo !== undefined && record.repo !== '' && record.repo !== repository
-    ? platform === 'win32' ? ['-Repo', record.repo] : ['--repo', record.repo]
+  const repoArgs = recordRepo !== undefined && recordRepo !== '' && recordRepo !== repository
+    ? platform === 'win32' ? ['-Repo', recordRepo] : ['--repo', recordRepo]
     : []
   if (platform === 'win32') {
     const args = [

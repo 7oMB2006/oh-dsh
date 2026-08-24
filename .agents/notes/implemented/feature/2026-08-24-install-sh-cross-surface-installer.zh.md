@@ -25,7 +25,7 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
 - 安装事务：解析最新稳定版（`releases/latest`，因此预发布不会被隐式选中；
   `--version` 固定标签时可以显式安装预发布），下载、校验、解压并在临时目录
   中验证，然后移开旧安装、原子换入新安装。标记文件（载荷内的
-  `.oh-dsh-install.env`、`~/.local/share/oh-dsh/desktop/install.env`）让
+  `.oh-dsh-install.env`、`<OH_DSH_HOME>/installer/desktop.env`）让
   相同版本的重复执行变成无操作，除非传入 `--force`；`--uninstall` 执行
   反向卸载。
 - web/tui 安装在 bin 目录放置调度式 `ohdsh` 启动器而不是符号链接：web 与

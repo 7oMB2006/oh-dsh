@@ -337,7 +337,7 @@ test('fork provenance flows from the record into the update plan', async () => {
   await mkdir(recordHome, { recursive: true })
   await writeFile(
     join(recordHome, 'launcher.env'),
-    'TUI_DEST=/custom/tui\nREPO=someone/oh-dsh-fork\n',
+    'TUI_DEST=/custom/tui\nTUI_REPO=someone/oh-dsh-fork\n',
   )
   const env = { HOME: home }
   const plan = selfUpdatePlan('tui', 'linux', 'hust-open-atom-club/oh-dsh', env)

@@ -115,6 +115,7 @@ const env = {}
         '-DownloadBase', github.downloadBase,
         '-Dest', payload,
         '-BinDir', bin,
+        '-DataHome', join(home, 'data'),
       ],
       env,
     )
@@ -151,6 +152,7 @@ const env = {}
       '-DownloadBase', github.downloadBase,
       '-Dest', payload,
       '-BinDir', bin,
+      '-DataHome', join(home, 'data'),
     ]
     assert.equal((await runInstaller(args, env)).status, 0)
 
@@ -186,6 +188,7 @@ const env = {}
       '-DownloadBase', github.downloadBase,
       '-Dest', payload,
       '-BinDir', bin,
+      '-DataHome', join(home, 'data'),
     ]
     const asset = 'oh-dsh-tui-0.1.8-win-x64.tar.gz'
     assert.equal((await runInstaller(args, env)).status, 0)

@@ -717,7 +717,7 @@ test('BIN_DIR survives while another surface remains installed', { skip: skipOnW
     const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
     assert.match(record, /^TUI_DEST=/m)
     assert.match(record, /^BIN_DIR=/m, 'BIN_DIR must survive for the remaining surface')
-    assert.match(record, /^REPO=hust-open-atom-club\/oh-dsh$/m)
+    assert.match(record, /^TUI_REPO=hust-open-atom-club\/oh-dsh$/m)
   } finally {
     await github.stop()
   }
@@ -746,6 +746,56 @@ test('uninstall never deletes an unrelated launcher file', { skip: skipOnWindows
     assert.equal((await runInstaller(['--uninstall', ...args], env)).status, 0)
     const survivor = await readFile(join(bin, 'ohdsh'), 'utf8')
     assert.match(survivor, /still not ours/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a destination owned by the other surface is never replaced', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'webmark'),
+      await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'tuimark'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const bin = join(home, 'bin')
+    const args = ['--surface', 'tui', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    // Installing web INTO the tui payload's directory must be refused even
+    // though a marker exists: it belongs to the other surface.
+    const cross = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(cross.status, 0)
+    assert.match(cross.stderr, /refusing to replace/)
+    assert.match(await readFile(join(payload, 'bin', 'ohdsh'), 'utf8'), /tuimark/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('the linux desktop refuses to replace an unowned executable', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const image = Buffer.from('#!/bin/sh\necho foreign tool\n', 'utf8')
+    github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: image }])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    await mkdir(bin, { recursive: true })
+    await writeFile(join(bin, 'oh-dsh-desktop'), 'unrelated tool\n')
+    const result = await runInstaller(
+      ['--surface', 'desktop', '--os', 'linux', '--arch', 'x64', '--dest', bin],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /refusing to replace/)
+    assert.equal(await readFile(join(bin, 'oh-dsh-desktop'), 'utf8'), 'unrelated tool\n')
   } finally {
     await github.stop()
   }

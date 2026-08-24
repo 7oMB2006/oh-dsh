@@ -398,12 +398,14 @@ write_launcher_env() {
   # update` can reconstruct the exact install locations.
   key=$(surface_dest_key)
   mkdir -p "$record_home"
+  surface_key=${key%_DEST}
   tmp="$launcher_env.tmp.$$"
   {
-    [ -f "$launcher_env" ] && sed -e "/^$key=/d" -e '/^BIN_DIR=/d' -e '/^REPO=/d' "$launcher_env"
+    [ -f "$launcher_env" ] \
+      && sed -e "/^$key=/d" -e "/^${surface_key}_REPO=/d" -e '/^BIN_DIR=/d' "$launcher_env"
     printf '%s=%s\n' "$key" "$dest"
     printf 'BIN_DIR=%s\n' "$bin_dir"
-    printf 'REPO=%s\n' "$repo"
+    printf '%s_REPO=%s\n' "$surface_key" "$repo"
   } > "$tmp"
   mv -f "$tmp" "$launcher_env"
 }
@@ -413,7 +415,7 @@ remove_launcher_env_key() {
   # $1: key. BIN_DIR stays while another surface still needs the launcher.
   [ -f "$launcher_env" ] || return 1
   tmp="$launcher_env.tmp.$$"
-  sed "/^$1=/d" "$launcher_env" > "$tmp"
+  sed -e "/^$1=/d" -e "/^${1%_DEST}_REPO=/d" "$launcher_env" > "$tmp"
   if grep -Eq '^(WEB|TUI)_DEST=' "$tmp"; then
     mv -f "$tmp" "$launcher_env"
     return 0
@@ -682,8 +684,9 @@ install_payload_surface() {
     # A pre-existing destination is only replaceable when it is an
     # installer-owned payload or an empty directory; unrelated data is never
     # recursively deleted because of a mistyped --dest.
-    if [ ! -f "$dest/.oh-dsh-install.env" ] && [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
-      die "refusing to replace $dest: it is not an Oh-DSH $surface payload (no install marker) and is not empty"
+    if [ "$(marker_field "$dest/.oh-dsh-install.env" OH_DSH_INSTALL_SURFACE)" != "$surface" ] \
+      && [ -n "$(ls -A "$dest" 2>/dev/null)" ]; then
+      die "refusing to replace $dest: it is not an Oh-DSH $surface payload (no matching install marker) and is not empty"
     fi
     mv -- "$dest" "$previous"
     had_previous=1
@@ -737,6 +740,11 @@ install_desktop_linux() {
   previous="$dest/.oh-dsh-desktop.previous-$(timestamp)"
   had_previous=0
   if [ -f "$image" ]; then
+    # Only replace a file the desktop marker proves this installer owns.
+    if [ ! -f "$desktop_marker" ] \
+      || [ "$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)" != "$dest" ]; then
+      die "refusing to replace $image: the desktop marker does not prove this destination is Oh-DSH-owned; remove the file manually first"
+    fi
     mv -- "$image" "$previous"
     had_previous=1
   fi
