@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-desktop-suppress-auto-browser-open.md
-2026-08-24-desktop-suppress-auto-browser-open.md: 31b9681248c152335b0454ad8d6dac0661589e70
-2026-08-24-desktop-suppress-auto-browser-open.zh.md: e6ba6080e520b81ca77545762863d6c91a2d16c6
+2026-08-24-desktop-suppress-auto-browser-open.md: 70362bad39a44d84548f88f02c46c8632c2a726b
+2026-08-24-desktop-suppress-auto-browser-open.zh.md: a276921b107b8ae1a40d1b8db6cd8fc6f50f8b56

@@ -230,6 +230,7 @@ test('web launcher resolves a relative data root before spawning the runtime', a
     )
     assert.equal(code, 1)
     assert.ok(runtime)
+    assert.equal(runtime.plan.args.includes('--no-open'), true)
     assert.equal(runtime.plan.cwd, join(dataRoot, 'state'))
     assert.equal(runtime.plan.env.DSH_HOME, join(dataRoot, 'state'))
     assert.equal(runtime.plan.env.DSH_OH_WEB_DATA, join(dataRoot, 'state'))
