@@ -554,7 +554,19 @@ try {
         New-Item -ItemType Directory -Path $Parent -Force | Out-Null
     }
     $Staged = "$FinalDest.install-pending"
-    if (Test-Path -LiteralPath $Staged) { Remove-Item -LiteralPath $Staged -Recurse -Force }
+    if (Test-Path -LiteralPath $Staged) {
+        # Only an installer-owned staging directory is cleaned up; a foreign
+        # sibling sharing the name survives.
+        $stagedMarker = Read-Marker -Path (Join-Path $Staged '.oh-dsh-install.env')
+        $stagedOurs = ($null -ne $stagedMarker -and $stagedMarker['OH_DSH_INSTALL_SURFACE'] -eq $Surface) `
+            -or ((Test-Path -LiteralPath (Join-Path $Staged 'bin\ohdsh.cmd')) `
+                -and (Test-Path -LiteralPath (Join-Path $Staged 'lib')))
+        if ($stagedOurs) {
+            Remove-Item -LiteralPath $Staged -Recurse -Force
+        } else {
+            Die "refusing to replace $Staged : it is not an Oh-DSH $Surface staging directory"
+        }
+    }
     Move-Item -LiteralPath $Payload -Destination $Staged
 
     $HadPrevious = $false

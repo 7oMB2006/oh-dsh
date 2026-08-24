@@ -10,6 +10,7 @@ import {
   readdir,
   readlink,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -921,6 +922,57 @@ test('relocating the linux desktop retires the previous AppImage', { skip: skipO
     assert.ok(await exists(join(binB, 'oh-dsh-desktop')))
     const marker = await readFile(join(home, '.ohdsh', 'installer', 'desktop.env'), 'utf8')
     assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${binB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a foreign launcher symlink is not silently replaced', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    const precious = join(home, 'precious-tool')
+    await mkdir(bin, { recursive: true })
+    await writeFile(precious, '#!/bin/sh\necho keep\n')
+    await chmod(precious, 0o755)
+    await symlink(precious, join(bin, 'ohdsh'))
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /refusing to replace/)
+    assert.equal(await readlink(join(bin, 'ohdsh')), precious)
+    assert.match(await readFile(precious, 'utf8'), /keep/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('linux desktop stale-file cleanup respects destination ownership', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const image = Buffer.from('appimage\n', 'utf8')
+    github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: image }])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    await mkdir(bin, { recursive: true })
+    // A foreign file sharing our hidden staging prefix, with no marker
+    // proving this destination is ours.
+    const foreign = join(bin, '.oh-dsh-desktop.previous-notours')
+    await writeFile(foreign, 'keep me')
+    const result = await runInstaller(
+      ['--surface', 'desktop', '--os', 'linux', '--arch', 'x64', '--dest', bin],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(await readFile(foreign, 'utf8'), 'keep me')
   } finally {
     await github.stop()
   }

@@ -356,12 +356,13 @@ export function surfaceIsInstalled(
   platform: NodeJS.Platform = process.platform,
   pathExists: (path: string) => boolean = existsSync,
 ): boolean {
+  const launcher = join('bin', platform === 'win32' ? 'ohdsh.cmd' : 'ohdsh')
   const record = readLauncherRecord(env, platform)
   const recorded = surface === 'web' ? record.webDest : record.tuiDest
   if (recorded !== undefined && recorded !== '') {
-    return pathExists(join(recorded, 'bin', 'ohdsh'))
+    return pathExists(join(recorded, launcher))
   }
-  return pathExists(join(installerPayloadHome(platform, env), surface, 'bin', 'ohdsh'))
+  return pathExists(join(installerPayloadHome(platform, env), surface, launcher))
 }
 
 /**

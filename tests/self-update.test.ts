@@ -400,3 +400,16 @@ test('OH_DSH_INSTALLER_HOME pins the record root for custom installs', () => {
     '/custom/records',
   )
 })
+
+test('surfaceIsInstalled probes the platform launcher name', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'oh-dsh-suffix-'))
+  const recordHome = join(home, '.ohdsh', 'installer')
+  const env = { HOME: home, OH_DSH_HOME: join(home, '.ohdsh') }
+  await mkdir(recordHome, { recursive: true })
+  const custom = join(home, 'custom tui')
+  await mkdir(join(custom, 'bin'), { recursive: true })
+  await writeFile(join(custom, 'bin', 'ohdsh.cmd'), '')
+  await writeFile(join(recordHome, 'launcher.env'), `TUI_DEST=${custom}\n`)
+  assert.equal(surfaceIsInstalled('tui', env, 'win32'), true)
+  assert.equal(surfaceIsInstalled('tui', env, 'linux'), false)
+})

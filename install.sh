@@ -468,11 +468,18 @@ remove_launcher_env_key() {
 }
 
 ensure_dispatcher_target_available() {
-  # $1: launcher path. An unrelated file at the target is never overwritten;
-  # a legacy symlink to one of our payloads, or a previously generated
-  # dispatcher, is.
+  # $1: launcher path. An unrelated file or symlink at the target is never
+  # overwritten; a legacy symlink to one of our payload launchers, or a
+  # previously generated dispatcher, is.
   target=$1
-  if [ -e "$target" ] && [ ! -L "$target" ] \
+  if [ -L "$target" ]; then
+    link_target=$(readlink "$target")
+    case "$link_target" in
+      */bin/ohdsh) return 0 ;;
+      *) die "refusing to replace $target: it links to $link_target, not an Oh-DSH payload launcher" ;;
+    esac
+  fi
+  if [ -e "$target" ] \
     && ! grep -q 'Oh-DSH launcher installed by install.sh' "$target" 2>/dev/null; then
     die "refusing to replace $target: it is not an Oh-DSH launcher; remove it or pass another --bin-dir"
   fi
@@ -494,6 +501,14 @@ install_dispatcher() {
 set -eu
 
 ENV_FILE='$escaped_env'
+
+# When the baked record root differs from what the runtime environment would
+# derive, export it so the launched payload reads the same records.
+default_env=\${OH_DSH_HOME:-\$HOME/.ohdsh}/installer/launcher.env
+if [ "\$ENV_FILE" != "\$default_env" ]; then
+  OH_DSH_INSTALLER_HOME=\$(dirname -- "\$ENV_FILE")
+  export OH_DSH_INSTALLER_HOME
+fi
 
 web_dest=''
 tui_dest=''
@@ -824,8 +839,12 @@ install_desktop_linux() {
     die "failed to move the staged AppImage into place; the previous installation was left untouched"
   fi
   rm -f "$previous"
-  # Purge staged leftovers from interrupted upgrades.
-  rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
+  # Purge staged leftovers from interrupted upgrades — only when the desktop
+  # marker proves this destination is ours; foreign files sharing the hidden
+  # prefix survive.
+  if [ "$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)" = "$dest" ]; then
+    rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
+  fi
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
