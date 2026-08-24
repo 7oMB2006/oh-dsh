@@ -572,7 +572,7 @@ try {
             $retireTargets = @(
                 (Join-Path $env:LOCALAPPDATA 'Programs\Oh-DSH Desktop'),
                 (Join-Path $env:LOCALAPPDATA 'Programs\oh-dsh-desktop')
-            )
+            ) | Where-Object { $_ -ine $Dest }
         }
         foreach ($retireDest in $retireTargets) {
             if (Test-Path -LiteralPath (Join-Path $retireDest 'Uninstall Oh-DSH Desktop.exe')) {
@@ -666,16 +666,6 @@ try {
         }
         Die "failed to move the staged $Surface payload into place; the previous installation was left untouched"
     }
-    if ($HadPrevious) {
-        Remove-Item -LiteralPath "$FinalDest.previous" -Recurse -Force
-    }
-    # Purge staged leftovers from interrupted upgrades.
-    foreach ($stale in @("$FinalDest.previous", "$FinalDest.install-pending")) {
-        if (Test-Path -LiteralPath $stale) {
-            Remove-Item -LiteralPath $stale -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-
     $FinalBinDir = Get-BinDir
     if (-not (Test-Path -LiteralPath $FinalBinDir)) {
         New-Item -ItemType Directory -Path $FinalBinDir -Force | Out-Null
@@ -686,6 +676,16 @@ try {
     Write-Dispatcher -ShimPath $ShimPath
     # The marker turns the install "current" only after the launcher exists.
     Write-Marker -Path (Join-Path $FinalDest '.oh-dsh-install.env')
+    # Deletions happen only once the records are committed: a failure above
+    # leaves the previous payload recoverable beside the new one.
+    if ($HadPrevious) {
+        Remove-Item -LiteralPath "$FinalDest.previous" -Recurse -Force
+    }
+    foreach ($stale in @("$FinalDest.previous", "$FinalDest.install-pending")) {
+        if (Test-Path -LiteralPath $stale) {
+            Remove-Item -LiteralPath $stale -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
     Write-Step "Installed Oh-DSH $Surface $ReleaseVersion to $FinalDest"
     Write-Step "Launcher: $ShimPath"
 

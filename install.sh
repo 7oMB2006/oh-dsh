@@ -249,14 +249,26 @@ esac
 # Records, markers, and dispatchers must carry absolute paths: a relative
 # --dest would otherwise resolve against whatever directory the launcher is
 # invoked from later.
-case "$dest" in
-  /*) ;;
-  *) dest=$PWD/$dest ;;
-esac
-case "$bin_dir" in
-  /*) ;;
-  *) bin_dir=$PWD/$bin_dir ;;
-esac
+# Records, markers, and dispatchers must carry canonical absolute paths:
+# `./apps`, `../apps`, and their absolute spelling must compare equal, or a
+# rerun would treat the same directory as a relocation and retire it.
+canonicalize_path() {
+  # $1: path. Existing components are resolved with pwd -P; a missing leaf
+  # keeps its parent's canonical form.
+  if [ -d "$1" ]; then
+    (cd "$1" && pwd -P)
+    return
+  fi
+  canon_dir=$(dirname -- "$1")
+  canon_base=$(basename -- "$1")
+  if [ -d "$canon_dir" ]; then
+    printf '%s/%s' "$(cd "$canon_dir" && pwd -P)" "$canon_base"
+  else
+    printf '%s' "$1"
+  fi
+}
+dest=$(canonicalize_path "$dest")
+bin_dir=$(canonicalize_path "$bin_dir")
 
 desktop_marker=$record_home/desktop.env
 
@@ -849,12 +861,6 @@ install_payload_surface() {
     fi
     die "failed to move the staged $surface payload into place; the previous installation was left untouched"
   fi
-  rm -rf "$previous"
-  # Purge staged leftovers from interrupted upgrades — only entries that
-  # still look like our own payloads; unrelated siblings sharing the prefix
-  # are left alone.
-  purge_our_payload_dirs "$dest.previous-"*
-  purge_our_payload_dirs "$dest.install-pending."*
 
   mkdir -p "$bin_dir"
   write_launcher_env
@@ -862,6 +868,14 @@ install_payload_surface() {
   # The marker turns the install "current" only after the launcher exists,
   # so a rerun repairs a launcher that failed to materialize.
   write_marker "$dest/.oh-dsh-install.env"
+  # Deletions happen only once the records are committed: a failure above
+  # leaves the previous payload recoverable beside the new one.
+  rm -rf "$previous"
+  # Purge staged leftovers from interrupted upgrades — only entries that
+  # still look like our own payloads; unrelated siblings sharing the prefix
+  # are left alone.
+  purge_our_payload_dirs "$dest.previous-"*
+  purge_our_payload_dirs "$dest.install-pending."*
 
   log "Installed Oh-DSH $surface $version to $dest"
   log "Launcher: $bin_dir/ohdsh"
@@ -910,17 +924,18 @@ install_desktop_linux() {
     fi
     die "failed to move the staged AppImage into place; the previous installation was left untouched"
   fi
-  rm -f "$previous"
-  # Purge staged leftovers from interrupted upgrades — only when the desktop
-  # marker proves this destination is ours; foreign files sharing the hidden
-  # prefix survive.
-  if [ "$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)" = "$dest" ]; then
-    rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
-  fi
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
   retire_relocated_desktop_dest
+  # Deletions happen only once the marker is committed.
+  rm -f "$previous"
+  # Only clean hidden staging names when the PRE-EXISTING marker proved this
+  # destination was ours before this run; a first install into a directory
+  # with foreign files never touches them.
+  if [ "$relocated_desktop_dest" = "$dest" ]; then
+    rm -f "$dest/.oh-dsh-desktop.previous-"* "$dest/.oh-dsh-desktop.pending."*
+  fi
 
   log "Installed Oh-DSH Desktop $version to $image"
   case ":${PATH:-}:" in

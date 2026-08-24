@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
+import { realpathSync } from 'node:fs'
 import {
   access,
   chmod,
@@ -230,7 +231,7 @@ test('web install resolves the latest stable release and installs only the web s
     assert.match(marker, /^OH_DSH_INSTALL_SURFACE=web$/m)
     assert.match(marker, /^OH_DSH_INSTALL_VERSION=0\.1\.8$/m)
     assert.match(marker, /^OH_DSH_INSTALL_ASSET=oh-dsh-web-0\.1\.8-linux-x64\.tar\.gz$/m)
-    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${payload.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${realpathSync(payload).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
     assert.match(result.stdout, /Installed Oh-DSH web 0\.1\.8/)
   } finally {
     await github.stop()
@@ -650,7 +651,7 @@ test('desktop idempotency is keyed by the requested destination', { skip: skipOn
       join(home, '.ohdsh', 'installer', 'desktop.env'),
       'utf8',
     )
-    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${appsB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${realpathSync(appsB).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
     await github.stop()
   }
@@ -848,7 +849,7 @@ test('relocating a surface retires the previous installation', { skip: skipOnWin
     assert.ok(!(await exists(first)), 'the previous payload must be retired')
     assert.match(await readFile(join(second, 'bin', 'ohdsh'), 'utf8'), /here/)
     const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
-    assert.match(record, new RegExp(`^WEB_DEST=${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+    assert.match(record, new RegExp(`^WEB_DEST=${realpathSync(second).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
     await github.stop()
   }
@@ -923,7 +924,7 @@ test('relocating the linux desktop retires the previous AppImage', { skip: skipO
     assert.ok(!(await exists(join(binA, 'oh-dsh-desktop'))), 'the previous AppImage must be retired')
     assert.ok(await exists(join(binB, 'oh-dsh-desktop')))
     const marker = await readFile(join(home, '.ohdsh', 'installer', 'desktop.env'), 'utf8')
-    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${binB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${realpathSync(binB).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
     await github.stop()
   }
@@ -1192,6 +1193,66 @@ test('relative destinations are recorded as absolute paths', { skip: skipOnWindo
     assert.match(record, /^WEB_DEST=\//m, 'records must carry absolute paths')
     assert.match(record, /^BIN_DIR=\//m)
     assert.ok(await exists(join(home, 'rel-payload', 'bin', 'ohdsh')), 'the relative dest resolves against the invocation directory')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('equivalent destination spellings do not count as relocation', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'same'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    assert.equal((await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', './payload', '--bin-dir', join(home, 'bin')],
+      env, home,
+    )).status, 0)
+    // The absolute spelling of the same directory must be a no-op upgrade,
+    // not a relocation that retires the payload.
+    const rerun = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(rerun.status, 0, rerun.stderr)
+    assert.match(rerun.stdout, /already installed/)
+    assert.match(await readFile(join(payload, 'bin', 'ohdsh'), 'utf8'), /same/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('a failed record commit keeps the previous payload recoverable', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'old'),
+    ])
+    const newer = await makeSurfaceArchive('web', '0.1.9', 'linux', 'x64', 'new')
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', join(home, 'bin')]
+    assert.equal((await runInstaller(args, env)).status, 0)
+
+    // Block the record root with a regular file so the upgrade dies after
+    // the payload swap but before any deletion.
+    await writeFile(join(home, '.ohdsh', 'installer', 'blocked'), '')
+    github.publish('v0.1.9', [newer])
+    github.setLatest('v0.1.9')
+    // Re-point the record root at the blocked path via the env knob.
+    const failing = await runInstaller(args, {
+      ...env,
+      OH_DSH_INSTALLER_HOME: join(home, '.ohdsh', 'installer', 'blocked'),
+    })
+    assert.notEqual(failing.status, 0)
+    const entries = await readdir(home)
+    const backup = entries.find(entry => entry.startsWith('payload.previous'))
+    assert.ok(backup !== undefined, 'the previous payload must remain recoverable')
+    assert.match(await readFile(join(home, backup, 'bin', 'ohdsh'), 'utf8'), /old|new/)
   } finally {
     await github.stop()
   }
