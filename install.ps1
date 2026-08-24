@@ -227,7 +227,8 @@ function Write-Marker {
         "OH_DSH_INSTALL_ASSET=$script:AssetName",
         "OH_DSH_INSTALL_OS=win",
         "OH_DSH_INSTALL_ARCH=$DetectedArch",
-        "OH_DSH_INSTALL_DEST=$script:EffectiveDest"
+        "OH_DSH_INSTALL_DEST=$script:EffectiveDest",
+        "OH_DSH_INSTALL_REPO=$Repo"
     )
     Set-Content -LiteralPath $Path -Value $lines -Encoding UTF8
 }
@@ -388,7 +389,8 @@ if (-not $Force) {
     if ($null -ne $Marker `
         -and $Marker['OH_DSH_INSTALL_SURFACE'] -eq $Surface `
         -and $Marker['OH_DSH_INSTALL_VERSION'] -eq $ReleaseVersion `
-        -and $Marker['OH_DSH_INSTALL_ASSET'] -eq $AssetName) {
+        -and $Marker['OH_DSH_INSTALL_ASSET'] -eq $AssetName `
+        -and $Marker['OH_DSH_INSTALL_REPO'] -eq $Repo) {
         $artifactsOk = $false
         if ($Surface -eq 'desktop') {
             $wantedDest = [string]$Marker['OH_DSH_INSTALL_DEST']

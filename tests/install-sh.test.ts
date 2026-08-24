@@ -277,9 +277,17 @@ test('tui installs are idempotent, --force reinstalls, and upgrades replace the 
     assert.match(rerun.stdout, /already installed/)
     assert.equal(github.downloadCount('v0.1.8', asset), 1)
 
-    // Staged leftovers from an interrupted upgrade must not survive a retry.
-    await mkdir(join(home, 'payload.previous-stale'), { recursive: true })
-    await mkdir(join(home, 'payload.install-pending.stale'), { recursive: true })
+    // Staged leftovers from an interrupted upgrade must not survive a retry,
+    // but a foreign sibling that merely shares the prefix must.
+    for (const stale of ['payload.previous-stale', 'payload.install-pending.stale']) {
+      await mkdir(join(home, stale, 'bin'), { recursive: true })
+      await mkdir(join(home, stale, 'lib'), { recursive: true })
+      await writeFile(join(home, stale, 'bin', 'ohdsh'), '#!/bin/sh\n')
+      await chmod(join(home, stale, 'bin', 'ohdsh'), 0o755)
+    }
+    const foreignSibling = join(home, 'payload.previous-unowned')
+    await mkdir(join(foreignSibling, 'keep'), { recursive: true })
+    await writeFile(join(foreignSibling, 'keep', 'mine.txt'), 'not yours')
 
     const forced = await runInstaller([...args, '--force'], env)
     assert.equal(forced.status, 0)
@@ -297,9 +305,10 @@ test('tui installs are idempotent, --force reinstalls, and upgrades replace the 
     const upgraded = runLauncher(join(bin, 'ohdsh'), ['tui'], env)
     assert.equal(upgraded.status, 0, upgraded.stderr)
     assert.match(upgraded.stdout, /new/)
+    assert.ok(await exists(join(foreignSibling, 'keep', 'mine.txt')), 'foreign siblings must survive')
     const parentEntries = await readdir(home)
-    assert.ok(!parentEntries.some(entry => entry.includes('previous')))
-    assert.ok(!parentEntries.some(entry => entry.includes('install-pending')))
+    assert.ok(!parentEntries.some(entry => entry.startsWith('payload.previous-stale')))
+    assert.ok(!parentEntries.some(entry => entry.startsWith('payload.install-pending')))
   } finally {
     await github.stop()
   }
@@ -739,13 +748,9 @@ test('uninstall never deletes an unrelated launcher file', { skip: skipOnWindows
     const { home, env } = await makeSandbox(github)
     const payload = join(home, 'payload')
     const bin = join(home, 'bin')
-    await mkdir(bin, { recursive: true })
-    await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho not ours\n')
-    await chmod(join(bin, 'ohdsh'), 0o755)
     const args = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin]
     assert.equal((await runInstaller(args, env)).status, 0)
-    // The install replaced the foreign file with the dispatcher; now plant a
-    // foreign file again and uninstall: it must survive.
+    // Plant an unrelated launcher and uninstall: it must survive.
     await rm(join(bin, 'ohdsh'))
     await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho still not ours\n')
     await chmod(join(bin, 'ohdsh'), 0o755)
@@ -826,6 +831,30 @@ test('relocating a surface retires the previous installation', { skip: skipOnWin
     assert.match(await readFile(join(second, 'bin', 'ohdsh'), 'utf8'), /here/)
     const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
     assert.match(record, new RegExp(`^WEB_DEST=${second.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
+  } finally {
+    await github.stop()
+  }
+})
+
+test('install refuses to overwrite an unowned launcher', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const bin = join(home, 'bin')
+    await mkdir(bin, { recursive: true })
+    await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho precious tool\n')
+    await chmod(join(bin, 'ohdsh'), 0o755)
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', bin],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /refusing to replace .*not an Oh-DSH launcher/)
+    assert.match(await readFile(join(bin, 'ohdsh'), 'utf8'), /precious tool/)
   } finally {
     await github.stop()
   }

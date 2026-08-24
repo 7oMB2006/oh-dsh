@@ -27,8 +27,10 @@ scripts performing the upgrade.
   `DesktopUpdateManager.check()` once per launch and shows a single system
   notification that opens the update window.
 - `ohdsh update` upgrades packaged web/tui distributions on all platforms
-  by downloading `install.sh`/`install.ps1` from the repository's main
-  branch and running it for the detected surface. Source inference follows
+  by running `install.sh`/`install.ps1` for the detected surface —
+  preferring the copy bundled with the running package at
+  `lib/oh-dsh/` and downloading from the repository's main branch only
+  when the bundle is absent. Source inference follows
   the Codex model — the running path, the payload's
   `.oh-dsh-install.env` marker, and the destinations recorded in
   `launcher.env` — rather than any flag baked into the build; the recorded

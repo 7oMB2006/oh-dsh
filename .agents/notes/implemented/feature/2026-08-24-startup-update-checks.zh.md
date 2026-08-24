@@ -21,8 +21,9 @@ Status: implemented
   滚回中可见）；Web 不阻塞地发起检查，在监听地址后打印提示；desktop 每次
   启动执行既有的 `DesktopUpdateManager.check()`，并在发现新版本时弹出一次
   系统通知，点击打开更新窗口。
-- `ohdsh update` 在所有平台升级已打包的 web/tui 发行版：从仓库 main 分支
-  下载 `install.sh`/`install.ps1`，并以检测到的 surface 运行。来源推断
+- `ohdsh update` 在所有平台升级已打包的 web/tui 发行版：以检测到的
+  surface 运行 `install.sh`/`install.ps1`——优先使用运行包内
+  `lib/oh-dsh/` 携带的副本，仅当包内没有时才从仓库 main 分支下载。来源推断
   采用 Codex 的模式——依据运行路径、载荷内的 `.oh-dsh-install.env` 标记
   以及 `launcher.env` 记录的目标位置——而不是任何构建时注入的标记；
   记录中的 `--dest`/`--bin-dir` 会被还原，使更新落在当初安装的位置，

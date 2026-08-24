@@ -332,9 +332,9 @@ json_asset_digest() {
 write_marker() {
   # Release-derived values must stay inert text: only the closed token
   # charset is accepted, and readers parse per line without evaluating.
-  for value in "$surface" "$tag" "$version" "$asset" "$os" "$arch"; do
+  for value in "$surface" "$tag" "$version" "$asset" "$os" "$arch" "$repo"; do
     case "$value" in
-      ''|*[!A-Za-z0-9._-]*) die "refusing to write marker with unsafe value: $value" ;;
+      ''|*[!A-Za-z0-9._/-]*) die "refusing to write marker with unsafe value: $value" ;;
     esac
   done
   printf 'OH_DSH_INSTALL_SURFACE=%s\n' "$surface" \
@@ -344,6 +344,7 @@ write_marker() {
   printf 'OH_DSH_INSTALL_ASSET=%s\n' "$asset" >> "$1"
   printf 'OH_DSH_INSTALL_OS=%s\n' "$os" >> "$1"
   printf 'OH_DSH_INSTALL_ARCH=%s\n' "$arch" >> "$1"
+  printf 'OH_DSH_INSTALL_REPO=%s\n' "$repo" >> "$1"
   # Destinations may contain spaces; they are read back whole-line and are
   # never evaluated, so no quoting is needed.
   printf 'OH_DSH_INSTALL_DEST=%s\n' "$dest" >> "$1"
@@ -364,6 +365,7 @@ same_version_installed() {
   [ "$(marker_field "$1" OH_DSH_INSTALL_SURFACE)" = "$surface" ] || return 1
   [ "$(marker_field "$1" OH_DSH_INSTALL_VERSION)" = "$version" ] || return 1
   [ "$(marker_field "$1" OH_DSH_INSTALL_ASSET)" = "$asset" ] || return 1
+  [ "$(marker_field "$1" OH_DSH_INSTALL_REPO)" = "$repo" ] || return 1
   case "$surface" in
     desktop)
       [ "$(marker_field "$1" OH_DSH_INSTALL_DEST)" = "$dest" ] || return 1
@@ -398,6 +400,19 @@ verify_replaceable_app() {
   if [ "$identifier" != "$BUNDLE_ID" ]; then
     die "refusing to replace $app: bundle identifier ${identifier:-unreadable} is not $BUNDLE_ID"
   fi
+}
+
+purge_our_payload_dirs() {
+  # Remove only directories that carry this surface's install marker or the
+  # payload shape this installer stages (bin/ohdsh + lib); never a foreign
+  # sibling that merely shares the staging prefix.
+  for entry in "$@"; do
+    [ -d "$entry" ] || continue
+    if [ "$(marker_field "$entry/.oh-dsh-install.env" OH_DSH_INSTALL_SURFACE)" = "$surface" ] \
+      || { [ -x "$entry/bin/ohdsh" ] && [ -d "$entry/lib" ]; }; then
+      rm -rf "$entry"
+    fi
+  done
 }
 
 # ---------------------------------------------------------------------------
@@ -454,8 +469,13 @@ remove_launcher_env_key() {
 install_dispatcher() {
   # $1: launcher path. The dispatcher resolves surfaces at run time from
   # launcher.env, so one launcher serves every installed surface and the
-  # second surface never steals the first one's link.
+  # second surface never steals the first one's link. An unrelated file at
+  # the target is never overwritten; a legacy symlink to a payload is.
   target=$1
+  if [ -e "$target" ] && [ ! -L "$target" ] \
+    && ! grep -q 'Oh-DSH launcher installed by install.sh' "$target" 2>/dev/null; then
+    die "refusing to replace $target: it is not an Oh-DSH launcher; remove it or pass another --bin-dir"
+  fi
   escaped_env=$(printf '%s' "$launcher_env" | sed "s/'/'\\\\''/g")
   tmp="$target.new.$$"
   rm -f "$tmp"
@@ -730,8 +750,11 @@ install_payload_surface() {
     die "failed to move the staged $surface payload into place; the previous installation was left untouched"
   fi
   rm -rf "$previous"
-  # Purge staged leftovers from interrupted upgrades.
-  rm -rf "$dest.previous-"* "$dest.install-pending."*
+  # Purge staged leftovers from interrupted upgrades — only entries that
+  # still look like our own payloads; unrelated siblings sharing the prefix
+  # are left alone.
+  purge_our_payload_dirs "$dest.previous-"*
+  purge_our_payload_dirs "$dest.install-pending."*
 
   mkdir -p "$bin_dir"
   write_launcher_env
@@ -949,7 +972,11 @@ install_desktop_mac() {
       rm -rf "$stale"
     fi
   done
-  rm -rf "$dest/.$APP_NAME.app.install."*
+  for stale in "$dest/.$APP_NAME.app.install."*; do
+    if [ -d "$stale" ] && [ -d "$stale/Contents" ]; then
+      rm -rf "$stale"
+    fi
+  done
 
   lsregister_bin=${OH_DSH_LSREGISTER:-$LSREGISTER_DEFAULT}
   if [ -x "$lsregister_bin" ]; then
