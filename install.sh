@@ -169,7 +169,14 @@ download_base=${OH_DSH_DOWNLOAD_BASE:-$DOWNLOAD_BASE_DEFAULT}
 # (launcher records and system-install markers) lives under the shared Oh-DSH
 # state root owned by src/data-root.ts, so one OH_DSH_HOME override moves it.
 data_home=${XDG_DATA_HOME:-$HOME/.local/share}/oh-dsh
-record_home=${OH_DSH_HOME:-$HOME/.ohdsh}/installer
+# OH_DSH_INSTALLER_HOME is the installers' explicit record-root knob (what
+# install.ps1's -DataHome and the generated dispatcher export); it wins over
+# deriving the root from OH_DSH_HOME so relocated records stay put.
+if [ -n "${OH_DSH_INSTALLER_HOME:-}" ]; then
+  record_home=$OH_DSH_INSTALLER_HOME
+else
+  record_home=${OH_DSH_HOME:-$HOME/.ohdsh}/installer
+fi
 
 # ---------------------------------------------------------------------------
 # Platform detection

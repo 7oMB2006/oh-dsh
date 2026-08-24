@@ -1121,3 +1121,26 @@ test('a corrupted mac app fails the same-version fast path', { skip: skipOnWindo
     await github.stop()
   }
 })
+
+test('OH_DSH_INSTALLER_HOME pins the posix record root', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    env.OH_DSH_INSTALLER_HOME = join(home, 'custom-records')
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const record = await readFile(join(home, 'custom-records', 'launcher.env'), 'utf8')
+    assert.match(record, /^WEB_DEST=/m)
+    const dispatcher = await readFile(join(home, 'bin', 'ohdsh'), 'utf8')
+    assert.match(dispatcher, new RegExp(join(home, 'custom-records', 'launcher.env').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  } finally {
+    await github.stop()
+  }
+})
