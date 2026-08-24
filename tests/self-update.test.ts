@@ -413,3 +413,19 @@ test('surfaceIsInstalled probes the platform launcher name', async () => {
   assert.equal(surfaceIsInstalled('tui', env, 'win32'), true)
   assert.equal(surfaceIsInstalled('tui', env, 'linux'), false)
 })
+
+test('update-check tokens stay on the GitHub origin', async () => {
+  const seen: Array<{ url: string; auth: string | undefined }> = []
+  const fetchImpl: UpdateFetcher = async (url, init) => {
+    seen.push({
+      url: String(url),
+      auth: (init?.headers as Record<string, string> | undefined)?.authorization,
+    })
+    return jsonResponse({ tag_name: 'v0.2.0' })
+  }
+  await checkForUpdate('0.1.8', { GH_TOKEN: 'ghp_secret', OH_DSH_UPDATE_API_BASE: 'http://127.0.0.1:9' }, fetchImpl)
+  assert.equal(seen[0]?.auth, undefined, 'custom API bases never receive the token')
+  await checkForUpdate('0.1.8', { GH_TOKEN: 'ghp_secret' }, fetchImpl)
+  assert.equal(seen[1]?.auth, 'Bearer ghp_secret')
+  assert.match(seen[1]?.url ?? '', /^https:\/\/api\.github\.com\//)
+})

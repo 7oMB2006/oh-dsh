@@ -1144,3 +1144,25 @@ test('OH_DSH_INSTALLER_HOME pins the posix record root', { skip: skipOnWindows }
     await github.stop()
   }
 })
+
+test('semver build metadata installs without stranding the payload', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v1.2.3+build.1', [
+      await makeSurfaceArchive('web', '1.2.3+build.1', 'linux', 'x64', 'meta'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const payload = join(home, 'payload')
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', join(home, 'bin')],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const marker = await readFile(join(payload, '.oh-dsh-install.env'), 'utf8')
+    assert.match(marker, /^OH_DSH_INSTALL_VERSION=1\.2\.3\+build\.1$/m)
+    assert.match(marker, /^OH_DSH_INSTALL_ASSET=oh-dsh-web-1\.2\.3\+build\.1-linux-x64\.tar\.gz$/m)
+  } finally {
+    await github.stop()
+  }
+})

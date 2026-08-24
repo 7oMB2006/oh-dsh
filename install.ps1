@@ -291,6 +291,9 @@ function Remove-SurfaceInstall {
             $recordedDest = $values['OH_DSH_INSTALL_DEST']
             if ($recordedDest) { $candidates = @($recordedDest) + $candidates }
         }
+        # An explicit -Dest selects exactly that target; recorded and default
+        # locations are only consulted when the destination is omitted.
+        if ($Dest -ne '') { $candidates = @($Dest) }
         $removed = $false
         $ownedDests = @()
         if (Test-Path -LiteralPath $marker) {

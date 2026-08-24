@@ -350,7 +350,7 @@ write_marker() {
   # charset is accepted, and readers parse per line without evaluating.
   for value in "$surface" "$tag" "$version" "$asset" "$os" "$arch" "$repo"; do
     case "$value" in
-      ''|*[!A-Za-z0-9._/-]*) die "refusing to write marker with unsafe value: $value" ;;
+      ''|*[!A-Za-z0-9._+/-]*) die "refusing to write marker with unsafe value: $value" ;;
     esac
   done
   printf 'OH_DSH_INSTALL_SURFACE=%s\n' "$surface" \
@@ -747,6 +747,14 @@ esac
 digest=$(json_asset_digest "$release_json" "$asset")
 [ -n "$digest" ] \
   || die "release $tag publishes no sha256 digest for $asset; verify the asset list at https://github.com/$repo/releases/tag/$tag"
+
+# Refuse un-markable values before anything is downloaded or replaced, so a
+# release identifier the marker cannot record never strands the install.
+for value in "$surface" "$tag" "$version" "$asset" "$os" "$arch" "$repo"; do
+  case "$value" in
+    ''|*[!A-Za-z0-9._+/-]*) die "refusing to install: marker-unsafe release value $value" ;;
+  esac
+done
 
 # ---------------------------------------------------------------------------
 # Idempotency

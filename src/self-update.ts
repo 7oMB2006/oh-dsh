@@ -54,11 +54,14 @@ export async function fetchLatestVersion(
     'user-agent': 'oh-dsh-update-check',
   }
   const token = env.GH_TOKEN ?? env.GITHUB_TOKEN
-  if (token !== undefined && token !== '') {
+  const targetUrl = latestReleaseApiUrl(env, repository)
+  // The token is a GitHub credential: it is only attached when the resolved
+  // endpoint is the GitHub API itself, never to a mirror or test override.
+  if (token !== undefined && token !== '' && targetUrl.startsWith('https://api.github.com/')) {
     headers.authorization = `Bearer ${token}`
   }
   try {
-    const response = await fetchImpl(latestReleaseApiUrl(env, repository), {
+    const response = await fetchImpl(targetUrl, {
       headers,
       signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS),
     })
