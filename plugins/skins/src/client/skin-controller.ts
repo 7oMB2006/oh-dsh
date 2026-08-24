@@ -100,7 +100,17 @@ export class DesktopSkinsController implements DesktopSkins {
     if (!this.started) return
     const skin = desktopSkin(snapshot.active.id)
     if (skin === undefined) {
-      this.remove(ACTIVE_SKIN_KEY)
+      const stored = this.read(ACTIVE_SKIN_KEY)
+      const selected = stored === null ? undefined : desktopSkin(stored)
+      if (selected !== undefined) {
+        if (builtinPreference(snapshot.preference)) {
+          this.write(FALLBACK_THEME_KEY, snapshot.preference)
+        }
+        this.theme.setTheme(selected.id)
+        this.adopt(this.theme.getTheme())
+        return
+      }
+      if (stored !== null) this.remove(ACTIVE_SKIN_KEY)
       if (builtinPreference(snapshot.preference)) {
         this.write(FALLBACK_THEME_KEY, snapshot.preference)
       }
