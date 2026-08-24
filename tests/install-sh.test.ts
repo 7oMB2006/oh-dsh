@@ -31,11 +31,13 @@ type InstallerResult = { status: number; stdout: string; stderr: string }
 async function runInstaller(
   args: string[],
   env: Record<string, string>,
+  cwd?: string,
 ): Promise<InstallerResult> {
   try {
     const { stdout, stderr } = await execFileAsync('sh', [installSh, ...args], {
       env: { ...process.env, ...env },
       maxBuffer: 16 * 1024 * 1024,
+      ...(cwd === undefined ? {} : { cwd }),
     })
     return { status: 0, stdout, stderr }
   } catch (error) {
@@ -1183,11 +1185,13 @@ test('relative destinations are recorded as absolute paths', { skip: skipOnWindo
     const result = await runInstaller(
       ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', 'rel-payload', '--bin-dir', 'rel-bin'],
       { ...env, HOME: home },
+      home,
     )
     assert.equal(result.status, 0, result.stderr)
     const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
     assert.match(record, /^WEB_DEST=\//m, 'records must carry absolute paths')
     assert.match(record, /^BIN_DIR=\//m)
+    assert.ok(await exists(join(home, 'rel-payload', 'bin', 'ohdsh')), 'the relative dest resolves against the invocation directory')
   } finally {
     await github.stop()
   }
