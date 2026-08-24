@@ -44,13 +44,14 @@ $PayloadHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
 $DefaultRecordRoot = ''
 if ($DataHome -eq '') {
     if ($env:OH_DSH_INSTALLER_HOME) {
-        # An env-derived root is still a custom location: the dispatcher must
-        # keep baking it instead of switching to the %USERPROFILE% branch.
         $DataHome = $env:OH_DSH_INSTALLER_HOME
+    } elseif ($env:OH_DSH_HOME) {
+        # Env-derived roots are still custom locations: the dispatcher must
+        # keep baking them instead of switching to the %USERPROFILE% branch.
+        $DataHome = Join-Path $env:OH_DSH_HOME 'installer'
     } else {
-        $stateRoot = if ($env:OH_DSH_HOME) { $env:OH_DSH_HOME } else { Join-Path $env:USERPROFILE '.ohdsh' }
-        $DataHome = Join-Path $stateRoot 'installer'
-        $DefaultRecordRoot = $DataHome
+        $DefaultRecordRoot = Join-Path (Join-Path $env:USERPROFILE '.ohdsh') 'installer'
+        $DataHome = $DefaultRecordRoot
     }
 }
 
@@ -136,7 +137,25 @@ function Write-LauncherEnv {
         "BIN_DIR=$FinalBinDir",
         "$repoKey=$Repo"
     )
+    $previousBin = ''
+    if (Test-Path -LiteralPath $LauncherEnv) {
+        foreach ($line in (Get-Content -LiteralPath $LauncherEnv)) {
+            if ($line -match '^BIN_DIR=(.+)$') { $previousBin = $Matches[1] }
+        }
+    }
     Set-Content -LiteralPath $LauncherEnv -Value $lines -Encoding UTF8
+    # Relocating the launcher directory retires the previous dispatcher when
+    # it is ours and no remaining record points at it.
+    if ($previousBin -and ($previousBin -ne $FinalBinDir)) {
+        $oldShim = Join-Path $previousBin 'ohdsh.cmd'
+        if (Test-Path -LiteralPath $oldShim) {
+            $oldContent = Get-Content -LiteralPath $oldShim -Raw
+            if (($oldContent -like '*OHRECORD*') -or ($oldContent -like '*launcher.env*')) {
+                Remove-Item -LiteralPath $oldShim -Force
+                Write-Step "Retired the previous launcher at $oldShim"
+            }
+        }
+    }
     # Relocating a surface retires the previous installer-owned payload so
     # exactly one installation remains.
     if ($previousDest -ne '' -and $previousDest -ne $FinalDest) {
@@ -555,13 +574,15 @@ try {
     }
     $Staged = "$FinalDest.install-pending"
     if (Test-Path -LiteralPath $Staged) {
-        # Only an installer-owned staging directory is cleaned up; a foreign
-        # sibling sharing the name survives.
+        # An empty staging name is trivially reusable; a non-empty one must
+        # carry this surface's marker or the staged payload shape, or the
+        # install refuses to touch it.
+        $stagedEmpty = $null -eq (Get-ChildItem -LiteralPath $Staged -Force | Select-Object -First 1)
         $stagedMarker = Read-Marker -Path (Join-Path $Staged '.oh-dsh-install.env')
         $stagedOurs = ($null -ne $stagedMarker -and $stagedMarker['OH_DSH_INSTALL_SURFACE'] -eq $Surface) `
             -or ((Test-Path -LiteralPath (Join-Path $Staged 'bin\ohdsh.cmd')) `
                 -and (Test-Path -LiteralPath (Join-Path $Staged 'lib')))
-        if ($stagedOurs) {
+        if ($stagedEmpty -or $stagedOurs) {
             Remove-Item -LiteralPath $Staged -Recurse -Force
         } else {
             Die "refusing to replace $Staged : it is not an Oh-DSH $Surface staging directory"

@@ -358,6 +358,18 @@ marker_field() {
   sed -n "s/^$2=//p" "$1" | head -n 1
 }
 
+launcher_current() {
+  # The requested launcher counts as present only when it is a working
+  # dispatcher we generated or a symlink straight into this payload.
+  target=$bin_dir/ohdsh
+  if [ -L "$target" ]; then
+    [ "$(readlink "$target")" = "$dest/bin/ohdsh" ]
+    return
+  fi
+  [ -f "$target" ] && [ -x "$target" ] \
+    && grep -q 'Oh-DSH launcher installed by install.sh' "$target" 2>/dev/null
+}
+
 same_version_installed() {
   # $1: marker path. Only reports "current" when the marker matches this
   # release AND the artifacts it describes are still present, so a broken
@@ -378,7 +390,7 @@ same_version_installed() {
       ;;
     web|tui)
       [ -x "$dest/bin/ohdsh" ] || return 1
-      [ -e "$bin_dir/ohdsh" ] || return 1
+      if ! launcher_current; then return 1; fi
       ;;
   esac
   return 0
@@ -437,6 +449,7 @@ write_launcher_env() {
   mkdir -p "$record_home"
   surface_key=${key%_DEST}
   relocated_previous=$(marker_field "$launcher_env" "$key")
+  relocated_previous_bin=$(marker_field "$launcher_env" BIN_DIR)
   tmp="$launcher_env.tmp.$$"
   {
     [ -f "$launcher_env" ] \
@@ -450,6 +463,14 @@ write_launcher_env() {
     && [ "$(marker_field "$relocated_previous/.oh-dsh-install.env" OH_DSH_INSTALL_SURFACE)" = "$surface" ]; then
     rm -rf "$relocated_previous"
     log "Retired the previous $surface installation at $relocated_previous"
+  fi
+  # Relocating the launcher directory retires the previous dispatcher when
+  # it is ours and no remaining record points at it.
+  if [ -n "$relocated_previous_bin" ] && [ "$relocated_previous_bin" != "$bin_dir" ] \
+    && [ -f "$relocated_previous_bin/ohdsh" ] && [ ! -L "$relocated_previous_bin/ohdsh" ] \
+    && grep -q 'Oh-DSH launcher installed by install.sh' "$relocated_previous_bin/ohdsh" 2>/dev/null; then
+    rm -f "$relocated_previous_bin/ohdsh"
+    log "Retired the previous launcher at $relocated_previous_bin/ohdsh"
   fi
 }
 
@@ -577,7 +598,7 @@ remove_desktop_mac() {
   if [ "$removed" = 1 ] && [ -x "$lsregister_bin" ]; then
     "$lsregister_bin" -u "$app" >/dev/null 2>&1 || true
   fi
-  if [ -f "$desktop_marker" ]; then
+  if [ "$removed" = 1 ] && [ -f "$desktop_marker" ]; then
     rm -f "$desktop_marker"
     log "Removed $desktop_marker"
   fi
@@ -593,12 +614,12 @@ remove_desktop_linux() {
     fi
     rm -f "$image"
     log "Removed $image"
+    if [ -f "$desktop_marker" ]; then
+      rm -f "$desktop_marker"
+      log "Removed $desktop_marker"
+    fi
   else
     log "No oh-dsh-desktop AppImage found under $dest; nothing to remove"
-  fi
-  if [ -f "$desktop_marker" ]; then
-    rm -f "$desktop_marker"
-    log "Removed $desktop_marker"
   fi
 }
 

@@ -1028,3 +1028,50 @@ test('a launcher symlink to an unrecorded payload is refused', { skip: skipOnWin
     await github.stop()
   }
 })
+
+test('relocating the bin directory retires the previous dispatcher', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'here'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const binA = join(home, 'binA')
+    const binB = join(home, 'binB')
+    const common = ['--surface', 'web', '--os', 'linux', '--arch', 'x64']
+    assert.equal((await runInstaller([...common, '--dest', join(home, 'payload'), '--bin-dir', binA], env)).status, 0)
+    assert.equal((await runInstaller([...common, '--dest', join(home, 'payload'), '--bin-dir', binB], env)).status, 0)
+
+    assert.ok(!(await exists(join(binA, 'ohdsh'))), 'the old dispatcher must be retired')
+    assert.ok(await exists(join(binB, 'ohdsh')))
+    const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
+    assert.match(record, /^BIN_DIR=/m)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('desktop uninstalls keep the marker for other destinations', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const image = Buffer.from('appimage\n', 'utf8')
+    github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: image }])
+    const { home, env } = await makeSandbox(github)
+    const binA = join(home, 'binA')
+    const wrong = join(home, 'wrong-dest')
+    assert.equal((await runInstaller(['--surface', 'desktop', '--os', 'linux', '--arch', 'x64', '--dest', binA], env)).status, 0)
+
+    const typo = await runInstaller(
+      ['--uninstall', '--surface', 'desktop', '--os', 'linux', '--arch', 'x64', '--dest', wrong],
+      env,
+    )
+    assert.equal(typo.status, 0, typo.stderr)
+    const marker = await readFile(join(home, '.ohdsh', 'installer', 'desktop.env'), 'utf8')
+    assert.match(marker, /^OH_DSH_INSTALL_DEST=/m, 'the real marker must survive a mistyped uninstall')
+    assert.ok(await exists(join(binA, 'oh-dsh-desktop')))
+  } finally {
+    await github.stop()
+  }
+})
