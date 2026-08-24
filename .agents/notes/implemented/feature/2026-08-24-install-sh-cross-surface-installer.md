@@ -33,13 +33,22 @@ installed the latest stable release for any surface.
   aside. Marker files (payload `.oh-dsh-install.env`,
   `~/.local/share/oh-dsh/desktop/install.env`) make same-version re-runs a
   no-op unless `--force` is passed, and `--uninstall` reverses an install.
+- Upgrades are replace-in-place: once the new installation is validated the
+  previous app bundle, AppImage, or payload is deleted along with stale
+  staging directories, so one surface keeps exactly one installation. The
+  earlier behavior of moving the replaced macOS `.app` to `~/.Trash` was
+  dropped when upgrade cleanup was added; backups now exist only between
+  staging and validation.
 - macOS desktop installs use the zip artifact (ditto-preferred extraction)
   rather than the DMG; the running app is asked to quit only when the
   destination is the default `/Applications` path, so custom destinations
   and tests never touch the live session.
-- Keep the script Unix/macOS only. On Windows (including Git Bash, which
-  the script detects and refuses), the documented path is the `.exe`
-  installer or the portable `win-x64` archives.
+- Windows installs through `install.ps1` (PowerShell 5.1+): the same
+  resolution, digest verification, and staged swap for web/tui payloads
+  under `%LOCALAPPDATA%\oh-dsh`, an `ohdsh.cmd` shim plus user-PATH
+  management for the installer-owned default bin directory, and the NSIS
+  installer's silent `/S` mode for the desktop. `install.sh` refuses
+  Windows shells with a pointer to `install.ps1`.
 - Tests (`tests/install-sh.test.ts`) drive the script against a local mock
   of the GitHub API and download endpoints via `OH_DSH_API_BASE` /
   `OH_DSH_DOWNLOAD_BASE`, a recording `lsregister` stub via
@@ -64,10 +73,11 @@ sha512, while the API digest covers all surfaces uniformly.
 `--surface` with `desktop` as the flagship default keeps the one-liner
 deterministic.
 
-**A Windows PowerShell counterpart.** Rejected for this change: the NSIS
-`.exe` already covers Windows desktop, and web/tui `win-x64` archives are
-self-contained; the script refuses Windows shells with an actionable
-pointer instead.
+**A Windows PowerShell counterpart.** Rejected initially to keep the first
+installer Unix-only while the NSIS `.exe` covered Windows desktop; reversed
+by an explicit follow-up request once web/tui `win-x64` payloads needed the
+same one-command install and `ohdsh update` needed a Windows upgrade path.
+Shipped as `install.ps1`.
 
 **Installing the macOS desktop from the DMG via `hdiutil`.** Rejected: the
 zip artifact carries the same bundle without mount/attach lifecycle or
@@ -94,5 +104,8 @@ complements it for first install and scripted setup.
 - Installer bookkeeping lives under `~/.local/share/oh-dsh` and inside the
   payload; `~/.ohdsh` remains exclusively the shared application data root
   owned by `src/data-root.ts`.
-- The test suite for the installer runs on macOS and Linux hosts only
-  (Windows skips); CI covers it on three matrix legs.
+- `tests/install-sh.test.ts` runs on macOS and Linux hosts and
+  `tests/install-ps1.test.ts` on Windows (both against the shared mock
+  GitHub server); each suite skips on the other platforms. The macOS
+  desktop surface has no Windows counterpart test because a fake NSIS
+  executable cannot be executed.

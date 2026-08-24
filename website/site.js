@@ -17,7 +17,8 @@ const translations = {
         downloadMac: "下载 macOS 版",
         downloadWindows: "下载 Windows 版",
         downloadLinux: "下载 Linux 版",
-        installCaption: "终端安装（macOS / Linux）",
+        installCaptionTerminal: "终端安装（macOS / Linux）",
+        installCaptionPowerShell: "PowerShell 安装（Windows）",
         copyCommand: "复制",
         copiedCommand: "已复制",
         downloadReady: "准备下载",
@@ -46,7 +47,8 @@ const translations = {
         downloadMac: "Download for macOS",
         downloadWindows: "Download for Windows",
         downloadLinux: "Download for Linux",
-        installCaption: "Install from the terminal (macOS / Linux)",
+        installCaptionTerminal: "Install from the terminal (macOS / Linux)",
+        installCaptionPowerShell: "Install with PowerShell (Windows)",
         copyCommand: "Copy",
         copiedCommand: "Copied",
         downloadReady: "Ready to download",
@@ -71,6 +73,7 @@ const elements = {
     dialogClose: document.querySelector("[data-dialog-close]"),
     directDownload: document.querySelector("[data-direct-download]"),
     downloadTrigger: document.querySelector("[data-download-trigger]"),
+    installCaption: document.querySelector("[data-install-caption]"),
     installCommand: document.querySelector("[data-install-command]"),
     installCopy: document.querySelector("[data-install-copy]"),
     installCopyLabel: document.querySelector("[data-install-copy] [data-i18n]"),
@@ -79,6 +82,11 @@ const elements = {
     particles: document.querySelector("[data-harness-particles]"),
     starCount: document.querySelector("[data-star-count]"),
     starDownload: document.querySelector("[data-star-download]"),
+};
+
+const installCommands = {
+    unix: "curl -fsSL https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh | bash",
+    windows: "irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex",
 };
 
 function installHarnessParticles(canvas) {
@@ -262,6 +270,19 @@ function preferredLanguage() {
     return navigator.language.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
 }
 
+function applyInstallCommand(language) {
+    if (!elements.installCommand) return;
+    const windows = platform === "windows";
+    elements.installCommand.textContent = windows
+        ? installCommands.windows
+        : installCommands.unix;
+    if (elements.installCaption) {
+        elements.installCaption.textContent = windows
+            ? translations[language].installCaptionPowerShell
+            : translations[language].installCaptionTerminal;
+    }
+}
+
 function applyLanguage(language) {
     const copy = translations[language];
     currentLanguage = language;
@@ -280,6 +301,7 @@ function applyLanguage(language) {
     document.title = copy.pageTitle;
     elements.downloadTrigger.textContent = copy[downloadCopyKey()];
     elements.platformLabel.textContent = platformName(language);
+    applyInstallCommand(language);
     elements.languageToggle.textContent = language === "zh-CN" ? "EN" : "中";
     elements.languageToggle.setAttribute(
         "aria-label",

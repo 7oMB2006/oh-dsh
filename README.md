@@ -84,7 +84,8 @@ Git Review、浏览器、文件、会话与插件状态由本地工作台统一�
 - **Windows：**运行安装包，或解压便携版后启动。
 - **Linux：**直接运行 AppImage，或使用 `apt` 安装 deb。
 
-macOS 与 Linux 也可以用仓库根目录的 `install.sh` 一键安装最新稳定版：
+macOS 与 Linux 可以用仓库根目录的 `install.sh` 一键安装最新稳定版；
+Windows 使用 `install.ps1`：
 
 ```sh
 curl -fsSL \
@@ -92,11 +93,17 @@ curl -fsSL \
   | bash -s -- --surface desktop
 ```
 
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
 `--surface` 可选 `desktop`（默认）、`web` 或 `tui`，每个 surface 只安装
-自己的文件与启动器。脚本在校验发布的 SHA-256 摘要之前不会触碰旧安装，
-下载失败、摘要不匹配或解压中断都保持原安装可用。重复执行同一命令即为
-原地升级，`--uninstall` 按 surface 卸载。Windows 请继续使用安装包。完整
-选项、环境变量与 surface 矩阵见
+自己的文件与启动器。安装器在校验发布的 SHA-256 摘要之前不会触碰旧安装，
+下载失败、摘要不匹配或解压中断都保持原安装可用；升级成功后会删除旧安装，
+不会累积副本。重复执行同一命令即为原地升级，`--uninstall` 按 surface
+卸载。每个 surface 还会在每次启动时检查一次更新的稳定版：TUI 与 Web
+打印提示并通过 `ohdsh update` 升级，desktop 通过更新窗口通知。完整选项、
+环境变量与 surface 矩阵见
 [安装说明](./docs/usage.zh.md#使用-installsh-安装)。
 
 Web-only 与 TUI-only 包解压后即可运行：

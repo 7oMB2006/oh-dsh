@@ -28,11 +28,18 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
   `.oh-dsh-install.env`、`~/.local/share/oh-dsh/desktop/install.env`）让
   相同版本的重复执行变成无操作，除非传入 `--force`；`--uninstall` 执行
   反向卸载。
+- 升级采用原地替换：新安装验证通过后，旧的应用包、AppImage 或载荷会连同
+  残留暂存目录一起删除，每个 surface 只保留一份安装。早期版本会把被替换
+  的 macOS `.app` 移入 `~/.Trash`；加入升级清理后该行为被放弃，备份只在
+  暂存到验证之间存在。
 - macOS desktop 从 zip 产物安装（优先用 ditto 解压）而不是 DMG；只有当
   目标是默认 `/Applications` 路径时才会请求退出正在运行的应用，因此自定义
   目标与测试不会触碰真实会话。
-- 脚本只支持 Unix/macOS。Windows（包括被脚本检测并拒绝的 Git Bash）的
-  受支持路径是 `.exe` 安装包或 `win-x64` 便携包。
+- Windows 通过 `install.ps1`（PowerShell 5.1+）安装：对 web/tui 使用相同的
+  版本解析、摘要校验与暂存替换，载荷位于 `%LOCALAPPDATA%\oh-dsh`，并在
+  安装器自有的默认 bin 目录创建 `ohdsh.cmd` 并管理用户 PATH；desktop 通过
+  NSIS 安装器的静默 `/S` 模式完成。`install.sh` 检测到 Windows shell 时
+  拒绝执行并指向 `install.ps1`。
 - 测试（`tests/install-sh.test.ts`）通过 `OH_DSH_API_BASE` /
   `OH_DSH_DOWNLOAD_BASE` 把脚本指向本地 mock 的 GitHub API 与下载端点，
   用 `OH_DSH_LSREGISTER` 提供记录调用的 lsregister 桩，并以 `--os`/
@@ -52,9 +59,10 @@ web/tui tar 包），且只有 runtime 包附带 `.sha256` 旁车文件，因此
 **默认使用交互式 surface 选择器。** 不采纳：`curl | bash` 天然非交互；
 显式、有文档的 `--surface` 加旗舰默认值 `desktop` 让一行命令保持确定性。
 
-**配套一个 Windows PowerShell 安装器。** 本次不做：NSIS `.exe` 已覆盖
-Windows desktop，web/tui 的 `win-x64` 包自包含；脚本以可操作的提示拒绝
-Windows shell。
+**配套一个 Windows PowerShell 安装器。** 最初不采纳，让首个安装器保持
+Unix-only，由 NSIS `.exe` 覆盖 Windows desktop；后续因 web/tui 的 `win-x64`
+载荷同样需要一行命令安装、`ohdsh update` 需要 Windows 升级路径而被明确
+要求，决策反转，以 `install.ps1` 交付。
 
 **通过 `hdiutil` 从 DMG 安装 macOS desktop。** 不采纳：zip 产物携带相同的
 bundle，没有挂载/卸载生命周期与清理风险。
@@ -76,5 +84,7 @@ desktop 自更新；shell 安装器补足首次安装与脚本化场景。
   的 `GH_TOKEN`/`GITHUB_TOKEN`。
 - 安装器的簿记位于 `~/.local/share/oh-dsh` 与载荷内部；`~/.ohdsh` 仍然
   完全是由 `src/data-root.ts` 拥有的共享应用数据根。
-- 安装器测试只在 macOS 与 Linux 主机运行（Windows 跳过）；CI 的三个
-  matrix 节点覆盖它。
+- `tests/install-sh.test.ts` 在 macOS 与 Linux 主机运行，
+  `tests/install-ps1.test.ts` 在 Windows 运行（共用同一个 mock GitHub
+  服务器）；两个套件在对方平台跳过。macOS desktop 场景没有 Windows 对应
+  测试，因为伪造的 NSIS 可执行文件无法真正运行。

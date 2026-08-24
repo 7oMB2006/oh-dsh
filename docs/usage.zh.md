@@ -12,9 +12,9 @@
 
 ## 使用 install.sh 安装
 
-仓库根目录的 `install.sh` 可以在不克隆仓库的情况下安装最新稳定 Release。
-它需要 `curl` 和 `tar`（macOS desktop 包还需要 `ditto` 或 `unzip`），
-web/tui 的用户级安装不需要 root。
+仓库根目录的 `install.sh` 可以在不克隆仓库的情况下，在 macOS 与 Linux 安装
+最新稳定 Release。它需要 `curl` 和 `tar`（macOS desktop 包还需要 `ditto` 或
+`unzip`），web/tui 的用户级安装不需要 root。
 
 ```sh
 curl -fsSL \
@@ -22,13 +22,24 @@ curl -fsSL \
   | bash -s -- --surface tui
 ```
 
+Windows 使用对应的 `install.ps1`，安装相同的 surface（desktop 通过 NSIS
+安装器的静默模式完成）。它需要 PowerShell 5.1+ 和 `tar`，两者都内置于
+Windows 10 1803+：
+
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
+两个脚本接受相同的选项；PowerShell 使用 `-Surface`、`-Version`、`-Dest`、
+`-BinDir`、`-Force`、`-Uninstall` 参数，对应小写旗标。
+
 Surface 矩阵与默认位置：
 
-| Surface | macOS (arm64/x64) | Linux (x64) | Windows |
+| Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
 | --- | --- | --- | --- |
-| desktop（默认） | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services | AppImage 安装到 `~/.local/bin/oh-dsh-desktop` | 使用 `.exe` 安装包，不经过 install.sh |
-| web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 手动解压 `win-x64` 便携包 |
-| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 手动解压 `win-x64` 便携包 |
+| desktop（默认） | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services | AppImage 安装到 `~/.local/bin/oh-dsh-desktop` | 静默运行 NSIS 安装器（用户级） |
+| web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\web`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd`（自动加入用户 PATH） |
+| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建 `ohdsh` 链接 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\tui`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd` |
 
 只有 desktop 会创建桌面应用入口；web 和 tui 不会注册 Launch Services，
 也不会生成 `.app` 包。
@@ -58,14 +69,34 @@ Surface 矩阵与默认位置：
   报告错误；未完成的暂存文件会被清理。
 - 重复执行且版本不变时为无操作，除非传入 `--force`。新版本会原子替换载荷
   并刷新 `ohdsh` 链接。
-- 在 macOS 上，旧的 `.app` 会移入 `~/.Trash`，残留的 `Oh-DSH-Desktop.app`
-  会被清退，Launch Services 只保留一个应用入口。未公证构建仍可能需要下文
-  的右键 **打开** 首次放行。
-- 卸载使用 `sh install.sh --uninstall --surface <name>`，并沿用安装时使用
-  的 `--dest`/`--bin-dir` 覆盖。
+- 升级采用原地替换：新安装验证通过后，旧的应用包、AppImage 或载荷会连同
+  残留的暂存目录与升级前备份一起删除，每个 surface 只保留一份 Oh-DSH
+  安装。
+- 在 macOS 上，desktop 会刷新 Launch Services 并清退残留的
+  `Oh-DSH-Desktop.app`，只显示一个应用入口。未公证构建仍可能需要下文的
+  右键 **打开** 首次放行。
+- 卸载使用 `sh install.sh --uninstall --surface <name>`（Windows 用
+  `install.ps1 -Uninstall`），并沿用安装时的目标目录覆盖。
 
-install.sh 只支持 macOS 和 Linux。Windows 请运行 `.exe` 安装桌面版，或手动
-解压 web/tui 的 `win-x64` 便携包。
+## 启动时自动更新检查
+
+每个 surface 在每次启动时检查一次是否有更新的稳定 Release：
+
+- **TUI** 在第一帧之前打印一行提示，例如
+  `Oh-DSH 0.1.8 -> 0.2.0 is available. Run "ohdsh update" to upgrade.`
+- **Web** 在监听地址之后打印同样的提示。
+- **Desktop** 通过更新窗口检查，发现新版本时弹出系统通知，点击即可打开
+  更新窗口。desktop 仍通过自带的校验更新器安装更新，而不是 shell 安装器。
+
+`ohdsh update`（或 `ohdsh update web` / `ohdsh update tui`）在 macOS、
+Linux 与 Windows 上升级已打包的 web/tui 发行版：它重新运行对应平台的
+安装脚本，走与全新安装相同的校验与原子替换流程。在源码检出中执行时会
+提示改用 git。
+
+更新检查使用公开的 GitHub API，最多阻塞启动约 1.5 秒，离线时静默失败。
+设置 `OH_DSH_UPDATE_CHECK=0` 可在所有 surface 上关闭检查。`ohdsh update`
+通过 TLS 从仓库 `main` 分支下载安装脚本；`OH_DSH_INSTALL_SCRIPT_URL`
+可将其指向镜像或本地副本以便测试。
 
 ## 安装完整版
 

@@ -14,9 +14,9 @@ supports `desktop`, `web`, and `tui`.
 ## Install with install.sh
 
 `install.sh`, at the repository root, installs the latest stable Release
-without cloning the repository. It needs `curl` and `tar` (`ditto` or
-`unzip` for the macOS desktop package), and it never requires root for
-user-local web/tui installs.
+without cloning the repository on macOS and Linux. It needs `curl` and `tar`
+(`ditto` or `unzip` for the macOS desktop package), and it never requires
+root for user-local web/tui installs.
 
 ```sh
 curl -fsSL \
@@ -24,13 +24,25 @@ curl -fsSL \
   | bash -s -- --surface tui
 ```
 
+On Windows, `install.ps1` is the counterpart and installs the same surfaces
+(the desktop through the NSIS installer's silent mode). It needs PowerShell
+5.1+ and `tar`, both bundled with Windows 10 1803+:
+
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
+Both scripts accept the same options; PowerShell uses `-Surface`, `-Version`,
+`-Dest`, `-BinDir`, `-Force`, and `-Uninstall` parameters instead of the
+lower-case flags.
+
 Surface matrix and default locations:
 
-| Surface | macOS (arm64/x64) | Linux (x64) | Windows |
+| Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
 | --- | --- | --- | --- |
-| desktop (default) | `Oh-DSH Desktop.app` into `/Applications` with a Launch Services refresh | AppImage into `~/.local/bin/oh-dsh-desktop` | use the `.exe` installer, not install.sh |
-| web | payload in `~/.local/share/oh-dsh/web` plus an `ohdsh` symlink in `~/.local/bin` | same | extract the portable `win-x64` archive |
-| tui | payload in `~/.local/share/oh-dsh/tui` plus an `ohdsh` symlink in `~/.local/bin` | same | extract the portable `win-x64` archive |
+| desktop (default) | `Oh-DSH Desktop.app` into `/Applications` with a Launch Services refresh | AppImage into `~/.local/bin/oh-dsh-desktop` | NSIS installer run silently (per-user) |
+| web | payload in `~/.local/share/oh-dsh/web` plus an `ohdsh` symlink in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\web` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` (added to the user PATH) |
+| tui | payload in `~/.local/share/oh-dsh/tui` plus an `ohdsh` symlink in `~/.local/bin` | same | payload in `%LOCALAPPDATA%\oh-dsh\tui` plus an `ohdsh.cmd` shim in `%LOCALAPPDATA%\oh-dsh\bin` |
 
 Only the desktop surface creates a desktop application entry. web and tui
 never register with Launch Services or create `.app` bundles.
@@ -64,16 +76,43 @@ Upgrade, verification, and uninstall behavior:
   partially staged files are cleaned up.
 - Re-running the installer with the same version is a no-op unless `--force`
   is passed. A newer version replaces the payload and refreshes the `ohdsh`
-  symlink atomically.
-- On macOS the previous `.app` is moved to `~/.Trash` and a stale
-  `Oh-DSH-Desktop.app` bundle is retired, so Launch Services shows a single
-  application entry. An unnotarized build may still need the right-click
-  **Open** approval described below.
-- Uninstall with `sh install.sh --uninstall --surface <name>`, honoring the
-  same `--dest`/`--bin-dir` overrides used at install time.
+  launcher atomically.
+- Upgrades are replace-in-place: once the new installation is validated, the
+  previous app bundle, AppImage, or payload is deleted along with any stale
+  staging directories and pre-upgrade backups, so exactly one Oh-DSH
+  installation remains per surface.
+- On macOS the desktop surface refreshes Launch Services and retires a
+  stale `Oh-DSH-Desktop.app` bundle, so a single application entry shows.
+  An unnotarized build may still need the right-click **Open** approval
+  described below.
+- Uninstall with `sh install.sh --uninstall --surface <name>` (or
+  `install.ps1 -Uninstall` on Windows), honoring the same destination
+  overrides used at install time.
 
-install.sh is macOS and Linux only. On Windows, run the `.exe` installer for
-the desktop or extract the portable `win-x64` archives for web/tui.
+## Automatic update checks
+
+Every surface checks for a newer stable Release once per launch:
+
+- **TUI** prints one notice line before the first frame, for example
+  `Oh-DSH 0.1.8 -> 0.2.0 is available. Run "ohdsh update" to upgrade.`
+- **Web** prints the same notice after the listening URL.
+- **Desktop** checks through its update window and shows a system
+  notification when a new version is found; clicking it opens the update
+  window. The desktop still installs updates through its own verified
+  updater, not the shell installer.
+
+`ohdsh update` (or `ohdsh update web` / `ohdsh update tui`) upgrades a
+packaged web/tui distribution on macOS, Linux, and Windows by re-running
+the matching installer script with the same verification and atomic
+replacement as a fresh install. From a source checkout it asks you to use
+git instead.
+
+The checks use the public GitHub API, never block startup for more than
+about a second and a half, and fail silently offline. Set
+`OH_DSH_UPDATE_CHECK=0` to disable them everywhere. `ohdsh update`
+downloads the installer script from the repository's `main` branch over
+TLS; `OH_DSH_INSTALL_SCRIPT_URL` can point it at a mirror or a local copy
+for testing.
 
 ## Install the full distribution
 
