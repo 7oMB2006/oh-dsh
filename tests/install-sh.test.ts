@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
-import { realpathSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import {
   access,
   chmod,
@@ -195,6 +195,54 @@ async function makeSandbox(
 const skipOnWindows = process.platform === 'win32'
   ? 'install.sh targets macOS and Linux'
   : false
+
+test('command-line installers default to TUI', () => {
+  assert.match(readFileSync(installSh, 'utf8'), /surface=\$\{OH_DSH_SURFACE:-tui\}/)
+  assert.match(readFileSync(join(root, 'install.ps1'), 'utf8'), /\[string\]\$Surface = 'tui'/)
+})
+
+test('default Unix installation provides the TUI dispatcher', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'default-tui')])
+    const { home, env } = await makeSandbox(github)
+    const result = await runInstaller(['--os', 'linux', '--arch', 'x64'], env)
+    assert.equal(result.status, 0, result.stderr)
+    const launcher = join(home, '.local', 'bin', 'ohdsh')
+    assert.ok(await exists(launcher))
+    assert.match(await readFile(join(home, '.profile'), 'utf8'), /Oh-DSH launcher path/)
+    const launched = runLauncher(launcher, ['tui'], env)
+    assert.equal(launched.status, 0, launched.stderr)
+    assert.match(launched.stdout, /default-tui/)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('desktop install registers the unified launcher', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [await makeMacDesktopZip('0.1.8', 'arm64')])
+    const { home, env } = await makeSandbox(github)
+    const plutil = await makePlutilSpy(home)
+    env.OH_DSH_PLUTIL = plutil.bin
+    const apps = join(home, 'Applications')
+    const result = await runInstaller(
+      ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const launcher = join(home, '.local', 'bin', 'ohdsh')
+    const launched = runLauncher(launcher, ['desktop'], env)
+    assert.equal(launched.status, 0, launched.stderr)
+    assert.match(launched.stdout, /desktop-0\.1\.8/)
+    assert.match(await readFile(join(home, '.profile'), 'utf8'), /Oh-DSH launcher path/)
+  } finally {
+    await github.stop()
+  }
+})
 
 test('web install resolves the latest stable release and installs only the web surface', { skip: skipOnWindows }, async () => {
   const github = new MockGitHub()
@@ -912,7 +960,7 @@ test('relocating the linux desktop retires the previous AppImage', { skip: skipO
   const github = new MockGitHub()
   await github.start()
   try {
-    const image = Buffer.from('appimage-bytes\n', 'utf8')
+    const image = Buffer.from('#!/bin/sh\necho linux-desktop\n', 'utf8')
     github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: image }])
     const { home, env } = await makeSandbox(github)
     const binA = join(home, 'binA')
@@ -923,6 +971,9 @@ test('relocating the linux desktop retires the previous AppImage', { skip: skipO
 
     assert.ok(!(await exists(join(binA, 'oh-dsh-desktop'))), 'the previous AppImage must be retired')
     assert.ok(await exists(join(binB, 'oh-dsh-desktop')))
+    const launched = runLauncher(join(home, '.local', 'bin', 'ohdsh'), ['desktop'], env)
+    assert.equal(launched.status, 0, launched.stderr)
+    assert.match(launched.stdout, /linux-desktop/)
     const marker = await readFile(join(home, '.ohdsh', 'installer', 'desktop.env'), 'utf8')
     assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${realpathSync(binB).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
