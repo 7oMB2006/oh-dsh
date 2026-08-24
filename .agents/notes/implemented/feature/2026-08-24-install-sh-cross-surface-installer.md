@@ -32,8 +32,8 @@ installed the latest stable release for any surface.
   can install one explicitly), download, verify, extract and validate in a
   temp directory, then swap into place with the previous installation moved
   aside. Marker files (payload `.oh-dsh-install.env`,
-  `~/.local/share/oh-dsh/desktop/install.env`) make same-version re-runs a
-  no-op unless `--force` is passed, and `--uninstall` reverses an install.
+  `<OH_DSH_HOME>/installer/desktop.env`) make same-version re-runs a no-op
+  unless `--force` is passed, and `--uninstall` reverses an install.
 - web/tui installs place a dispatching `ohdsh` launcher in the bin
   directory rather than a symlink: the web and tui payloads each carry only
   their own surface's dependencies, so one shared symlink would make the

@@ -357,16 +357,28 @@ function Remove-SurfaceInstall {
             $removed = $true
         }
     }
-    if (Remove-LauncherEnvKey) {
-        Write-Dispatcher -ShimPath $shim
-        Write-Step "Launcher $shim now serves the remaining installed surfaces"
-        $removed = $true
-    } elseif (-not (Test-Path -LiteralPath $LauncherEnv)) {
-        # No surfaces remain: remove the dispatcher when it is still ours.
-        if ((Test-Path -LiteralPath $shim) -and ((Get-Content -LiteralPath $shim -Raw) -like '*launcher.env*')) {
-            Remove-Item -LiteralPath $shim -Force
-            Write-Step "Removed launcher $shim"
+    # Records and the dispatcher only change when this destination's payload
+    # (or its recorded destination) was actually removed; a mistyped -Dest
+    # leaves the real installation's records intact.
+    $destKey = "$($Surface.ToUpperInvariant())_DEST"
+    $recordedDest = ''
+    if (Test-Path -LiteralPath $LauncherEnv) {
+        foreach ($line in (Get-Content -LiteralPath $LauncherEnv)) {
+            if ($line -match "^$destKey=(.*)$") { $recordedDest = $Matches[1] }
+        }
+    }
+    if ($removed -or ($recordedDest -ne '' -and $recordedDest -eq $payload)) {
+        if (Remove-LauncherEnvKey) {
+            Write-Dispatcher -ShimPath $shim
+            Write-Step "Launcher $shim now serves the remaining installed surfaces"
             $removed = $true
+        } elseif (-not (Test-Path -LiteralPath $LauncherEnv)) {
+        # No surfaces remain: remove the dispatcher when it is still ours.
+            if ((Test-Path -LiteralPath $shim) -and ((Get-Content -LiteralPath $shim -Raw) -like '*launcher.env*')) {
+                Remove-Item -LiteralPath $shim -Force
+                Write-Step "Removed launcher $shim"
+                $removed = $true
+            }
         }
     }
     if (-not $removed) { Write-Step "No $Surface installation found; nothing to remove" }
@@ -463,8 +475,14 @@ if (-not $Force) {
                 }
             }
         } else {
-            $artifactsOk = (Test-Path -LiteralPath (Join-Path (Get-PayloadDest) 'bin\ohdsh.cmd')) `
-                -and (Test-Path -LiteralPath (Join-Path (Get-BinDir) 'ohdsh.cmd'))
+            $shimPath = Join-Path (Get-BinDir) 'ohdsh.cmd'
+            $shimOk = $false
+            if (Test-Path -LiteralPath $shimPath) {
+                $shimContent = Get-Content -LiteralPath $shimPath -Raw
+                $shimOk = ($shimContent -like '*OHRECORD*') -or ($shimContent -like '*launcher.env*') `
+                    -or (($shimContent -like '*CALL*') -and ($shimContent -like '*\bin\ohdsh.cmd*'))
+            }
+            $artifactsOk = (Test-Path -LiteralPath (Join-Path (Get-PayloadDest) 'bin\ohdsh.cmd')) -and $shimOk
         }
         if ($artifactsOk) {
             Write-Step "$Surface $ReleaseVersion ($AssetName) is already installed; pass -Force to reinstall"
