@@ -650,9 +650,13 @@ try {
         if ($desktopExecutable -eq '') {
             Die 'the desktop installer succeeded but its executable could not be located; rerun with -Dest or inspect the installation'
         }
+        $desktopBinDir = Get-BinDir
+        if (-not (Test-Path -LiteralPath $desktopBinDir)) {
+            New-Item -ItemType Directory -Path $desktopBinDir -Force | Out-Null
+        }
         Write-DesktopLauncherEnv -Executable $desktopExecutable
-        Write-Dispatcher -ShimPath (Join-Path (Get-BinDir) 'ohdsh.cmd')
-        Ensure-UserPath -Directory (Get-BinDir)
+        Write-Dispatcher -ShimPath (Join-Path $desktopBinDir 'ohdsh.cmd')
+        Ensure-UserPath -Directory $desktopBinDir
         # An empty recorded destination means the default install; retiring a
         # relocation then covers the default Programs candidates too.
         $retireTargets = @()
