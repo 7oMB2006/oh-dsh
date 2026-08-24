@@ -538,6 +538,7 @@ remove_desktop_mac() {
   fi
   legacy="$dest/$LEGACY_APP_NAME"
   if [ -d "$legacy" ]; then
+    verify_replaceable_app "$legacy"
     rm -rf "$legacy"
     log "Removed legacy $legacy"
     removed=1

@@ -386,3 +386,17 @@ test('windows record roots follow USERPROFILE, not a Git-Bash HOME', () => {
     join('C:\\Users\\runner', 'AppData', 'Local', 'oh-dsh'),
   )
 })
+
+test('OH_DSH_INSTALLER_HOME pins the record root for custom installs', () => {
+  assert.equal(
+    installerRecordHome('win32', { OH_DSH_INSTALLER_HOME: 'D:\\custom-records' }),
+    'D:\\custom-records',
+  )
+  assert.equal(
+    installerRecordHome('linux', {
+      OH_DSH_INSTALLER_HOME: '/custom/records',
+      OH_DSH_HOME: '/ignored',
+    }),
+    '/custom/records',
+  )
+})

@@ -43,8 +43,12 @@ $ExecutableName = 'oh-dsh-desktop'
 $PayloadHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
 $DefaultRecordRoot = ''
 if ($DataHome -eq '') {
-    $stateRoot = if ($env:OH_DSH_HOME) { $env:OH_DSH_HOME } else { Join-Path $env:USERPROFILE '.ohdsh' }
-    $DataHome = Join-Path $stateRoot 'installer'
+    if ($env:OH_DSH_INSTALLER_HOME) {
+        $DataHome = $env:OH_DSH_INSTALLER_HOME
+    } else {
+        $stateRoot = if ($env:OH_DSH_HOME) { $env:OH_DSH_HOME } else { Join-Path $env:USERPROFILE '.ohdsh' }
+        $DataHome = Join-Path $stateRoot 'installer'
+    }
     $DefaultRecordRoot = $DataHome
 }
 
@@ -176,7 +180,10 @@ function Write-Dispatcher {
             'IF DEFINED OH_DSH_HOME SET "OHRECORD=%OH_DSH_HOME%\installer\launcher.env"'
         )
     } else {
-        @("SET `"OHRECORD=$LauncherEnv`"")
+        @(
+            "SET `"OHRECORD=$LauncherEnv`"",
+            "SET `"OH_DSH_INSTALLER_HOME=$DataHome`""
+        )
     }
     $body = @(
         '@echo off',
@@ -253,8 +260,13 @@ function Remove-SurfaceInstall {
         }
         foreach ($installDir in $candidates) {
             if (-not (Test-Path -LiteralPath $installDir)) { continue }
-            if ($ownedDests.Count -gt 0 -and $ownedDests -notcontains $installDir) {
-                Die "refusing to remove $installDir : the desktop marker does not prove this destination is Oh-DSH-owned"
+            # Positive ownership only: the recorded destination, or our own
+            # uninstaller inside the directory. An absent marker never
+            # disables the guard.
+            $owned = ($ownedDests.Count -gt 0 -and $ownedDests -contains $installDir) `
+                -or (Test-Path -LiteralPath (Join-Path $installDir 'Uninstall Oh-DSH Desktop.exe'))
+            if (-not $owned) {
+                Die "refusing to remove $installDir : no Oh-DSH ownership evidence (not the recorded destination, no Oh-DSH uninstaller)"
             }
             $uninstaller = Join-Path $installDir 'Uninstall Oh-DSH Desktop.exe'
             if (Test-Path -LiteralPath $uninstaller) {
@@ -395,6 +407,22 @@ if (-not $Force) {
         if ($Surface -eq 'desktop') {
             $wantedDest = [string]$Marker['OH_DSH_INSTALL_DEST']
             $artifactsOk = ($wantedDest -eq $Dest)
+            if ($artifactsOk) {
+                if ($Dest -ne '') {
+                    $artifactsOk = Test-Path -LiteralPath $Dest
+                } else {
+                    foreach ($probe in @(
+                        (Join-Path $env:LOCALAPPDATA 'Programs\Oh-DSH Desktop'),
+                        (Join-Path $env:LOCALAPPDATA 'Programs\oh-dsh-desktop')
+                    )) {
+                        $hasApp = (Test-Path -LiteralPath (Join-Path $probe 'Oh-DSH Desktop.exe')) `
+                            -or (Test-Path -LiteralPath (Join-Path $probe 'oh-dsh-desktop.exe')) `
+                            -or (Test-Path -LiteralPath (Join-Path $probe 'Uninstall Oh-DSH Desktop.exe'))
+                        if ($hasApp) { break }
+                    }
+                    $artifactsOk = $hasApp
+                }
+            }
         } else {
             $artifactsOk = (Test-Path -LiteralPath (Join-Path (Get-PayloadDest) 'bin\ohdsh.cmd')) `
                 -and (Test-Path -LiteralPath (Join-Path (Get-BinDir) 'ohdsh.cmd'))

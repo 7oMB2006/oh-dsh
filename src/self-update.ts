@@ -136,6 +136,12 @@ export function installerRecordHome(
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
+  // OH_DSH_INSTALLER_HOME is the installers' own record-root override (the
+  // -DataHome parameter); the dispatcher exports it so a payload launched
+  // from a custom record root reads the same records as its installer.
+  if (env.OH_DSH_INSTALLER_HOME !== undefined && env.OH_DSH_INSTALLER_HOME !== '') {
+    return env.OH_DSH_INSTALLER_HOME
+  }
   // install.ps1 derives the default state root from USERPROFILE; follow the
   // same variable so a HOME set by Git Bash cannot split the two roots.
   const userHome = platform === 'win32'

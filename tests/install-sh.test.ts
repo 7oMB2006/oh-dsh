@@ -859,3 +859,26 @@ test('install refuses to overwrite an unowned launcher', { skip: skipOnWindows }
     await github.stop()
   }
 })
+
+test('desktop uninstall verifies the legacy bundle identity too', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [])
+    const { home, env } = await makeSandbox(github)
+    const plutil = await makePlutilSpy(home)
+    env.OH_DSH_PLUTIL = plutil.bin
+    const apps = join(home, 'Applications')
+    const foreign = join(apps, 'Oh-DSH-Desktop.app')
+    await makeFakePlist(foreign, 'someone.elses.app', '0.1.0')
+    const result = await runInstaller(
+      ['--uninstall', '--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps],
+      env,
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /refusing to replace/)
+    assert.ok(await exists(foreign), 'the foreign legacy bundle must survive')
+  } finally {
+    await github.stop()
+  }
+})
