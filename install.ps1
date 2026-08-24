@@ -40,6 +40,10 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $AppName = 'Oh-DSH Desktop'
 $ExecutableName = 'oh-dsh-desktop'
+# Records, markers, and dispatchers must carry absolute paths: a relative
+# -Dest/-BinDir would otherwise resolve against the launcher's later cwd.
+if ($Dest -ne '') { $Dest = [System.IO.Path]::GetFullPath($Dest) }
+if ($BinDir -ne '') { $BinDir = [System.IO.Path]::GetFullPath($BinDir) }
 $PayloadHome = Join-Path $env:LOCALAPPDATA 'oh-dsh'
 $DefaultRecordRoot = ''
 if ($DataHome -eq '') {
@@ -324,7 +328,7 @@ function Remove-SurfaceInstall {
             $removed = $true
         }
         $marker = Join-Path $DataHome 'desktop.env'
-        if (Test-Path -LiteralPath $marker) {
+        if ($removed -and (Test-Path -LiteralPath $marker)) {
             Remove-Item -LiteralPath $marker -Force
             Write-Step "Removed $marker"
         }
@@ -400,8 +404,13 @@ $Headers = @{
     'Accept' = 'application/vnd.github+json'
     'User-Agent' = 'oh-dsh-install'
 }
-$Token = $env:GH_TOKEN
-if ([string]::IsNullOrEmpty($Token)) { $Token = $env:GITHUB_TOKEN }
+# The token is a GitHub credential: it is attached only when the API base is
+# the GitHub API itself, never to a mirror or test override.
+$Token = ''
+if ($ApiBase -eq 'https://api.github.com') {
+    $Token = $env:GH_TOKEN
+    if ([string]::IsNullOrEmpty($Token)) { $Token = $env:GITHUB_TOKEN }
+}
 if (-not [string]::IsNullOrEmpty($Token)) {
     $Headers['Authorization'] = "Bearer $Token"
 }
@@ -554,10 +563,21 @@ try {
             $priorDest = [string]$priorValues['OH_DSH_INSTALL_DEST']
         }
         Write-Marker -Path $MarkerPath
+        # An empty recorded destination means the default install; retiring a
+        # relocation then covers the default Programs candidates too.
+        $retireTargets = @()
         if ($priorDest -and ($priorDest -ne $Dest)) {
-            if (Test-Path -LiteralPath (Join-Path $priorDest 'Uninstall Oh-DSH Desktop.exe')) {
-                Write-Step "Retiring the previous desktop installation at $priorDest"
-                $priorProcess = Start-Process -FilePath (Join-Path $priorDest 'Uninstall Oh-DSH Desktop.exe') -ArgumentList '/S' -Wait -PassThru
+            $retireTargets = @($priorDest)
+        } elseif (-not $priorDest -and ($Dest -ne '')) {
+            $retireTargets = @(
+                (Join-Path $env:LOCALAPPDATA 'Programs\Oh-DSH Desktop'),
+                (Join-Path $env:LOCALAPPDATA 'Programs\oh-dsh-desktop')
+            )
+        }
+        foreach ($retireDest in $retireTargets) {
+            if (Test-Path -LiteralPath (Join-Path $retireDest 'Uninstall Oh-DSH Desktop.exe')) {
+                Write-Step "Retiring the previous desktop installation at $retireDest"
+                $priorProcess = Start-Process -FilePath (Join-Path $retireDest 'Uninstall Oh-DSH Desktop.exe') -ArgumentList '/S' -Wait -PassThru
                 if ($priorProcess.ExitCode -notin @(0, $null)) {
                     Write-Step "warning: the previous desktop uninstaller exited with $($priorProcess.ExitCode)"
                 }

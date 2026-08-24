@@ -246,6 +246,17 @@ esac
 case "$dest" in
   */) dest=${dest%/} ;;
 esac
+# Records, markers, and dispatchers must carry absolute paths: a relative
+# --dest would otherwise resolve against whatever directory the launcher is
+# invoked from later.
+case "$dest" in
+  /*) ;;
+  *) dest=$PWD/$dest ;;
+esac
+case "$bin_dir" in
+  /*) ;;
+  *) bin_dir=$PWD/$bin_dir ;;
+esac
 
 desktop_marker=$record_home/desktop.env
 
@@ -295,10 +306,11 @@ sha256_file() {
 }
 
 gh_curl() {
-  # The token is for the GitHub API only; it must never leak to a custom
-  # download mirror through OH_DSH_DOWNLOAD_BASE.
+  # The token is a GitHub credential: it is attached only when the API base
+  # is the GitHub API itself, never to a mirror or test override.
   auth=''
-  if [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; then
+  if { [ -n "${GH_TOKEN:-}" ] || [ -n "${GITHUB_TOKEN:-}" ]; } \
+    && [ "$api_base" = "$API_BASE_DEFAULT" ]; then
     auth="Authorization: Bearer ${GH_TOKEN:-$GITHUB_TOKEN}"
   fi
   if [ -n "$auth" ]; then

@@ -15,6 +15,7 @@ export class MockGitHub {
   private readonly downloads = new Map<string, number>()
   private readonly requests: string[] = []
   private authorizedDownloads = 0
+  private authorizedApiRequests = 0
   private latestTag = ''
   private server: Server | undefined
   apiBase = ''
@@ -32,6 +33,7 @@ export class MockGitHub {
       }
       const tagMatch = url.pathname.match(/\/releases\/tags\/([^/]+)$/)
       if (url.pathname.endsWith('/releases/latest') && this.latestTag) {
+        if (req.headers.authorization !== undefined) this.authorizedApiRequests += 1
         send(200, this.releaseJson(this.latestTag), 'application/json')
         return
       }
@@ -120,6 +122,11 @@ export class MockGitHub {
       })),
     }
     return JSON.stringify(payload, null, this.pretty ? 2 : undefined)
+  }
+
+  /** API requests that carried an Authorization header (zero for custom bases). */
+  authorizedApiRequestCount(): number {
+    return this.authorizedApiRequests
   }
 
   /** Downloads that carried an Authorization header (must stay zero). */

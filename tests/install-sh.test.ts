@@ -1090,6 +1090,11 @@ test('downloads never carry the GitHub token to the download base', { skip: skip
     )
     assert.equal(result.status, 0, result.stderr)
     assert.equal(github.downloadsWithAuthorization(), 0, 'the token must never reach the download base')
+    assert.equal(
+      github.authorizedApiRequestCount(),
+      0,
+      'the token must never reach a custom API base',
+    )
   } finally {
     await github.stop()
   }
@@ -1162,6 +1167,27 @@ test('semver build metadata installs without stranding the payload', { skip: ski
     const marker = await readFile(join(payload, '.oh-dsh-install.env'), 'utf8')
     assert.match(marker, /^OH_DSH_INSTALL_VERSION=1\.2\.3\+build\.1$/m)
     assert.match(marker, /^OH_DSH_INSTALL_ASSET=oh-dsh-web-1\.2\.3\+build\.1-linux-x64\.tar\.gz$/m)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('relative destinations are recorded as absolute paths', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [
+      await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'abs'),
+    ])
+    const { home, env } = await makeSandbox(github)
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', 'rel-payload', '--bin-dir', 'rel-bin'],
+      { ...env, HOME: home },
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const record = await readFile(join(home, '.ohdsh', 'installer', 'launcher.env'), 'utf8')
+    assert.match(record, /^WEB_DEST=\//m, 'records must carry absolute paths')
+    assert.match(record, /^BIN_DIR=\//m)
   } finally {
     await github.stop()
   }
