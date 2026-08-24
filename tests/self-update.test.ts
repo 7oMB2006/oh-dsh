@@ -226,17 +226,17 @@ test('installer ownership follows markers, defaults, and records', async () => {
   const defaultPayload = join(dataHome, 'web')
   await mkdir(defaultPayload, { recursive: true })
   await writeFile(join(defaultPayload, '.oh-dsh-install.env'), 'OH_DSH_INSTALL_SURFACE=web\n')
-  assert.equal(installerOwnsRoot(defaultPayload, 'web', env), true)
-  assert.equal(installerOwnsRoot(defaultPayload, 'tui', env), false)
+  assert.equal(installerOwnsRoot(defaultPayload, 'web', env, 'linux'), true)
+  assert.equal(installerOwnsRoot(defaultPayload, 'tui', env, 'linux'), false)
 
   const foreign = join(home, 'elsewhere')
   await mkdir(join(foreign, 'lib'), { recursive: true })
-  assert.equal(installerOwnsRoot(foreign, 'web', env), false)
+  assert.equal(installerOwnsRoot(foreign, 'web', env, 'linux'), false)
 
   const custom = join(home, 'custom tui')
   await mkdir(join(dataHome), { recursive: true })
   await writeFile(join(dataHome, 'launcher.env'), `TUI_DEST=${custom}\nBIN_DIR=${join(home, 'bin')}\n`)
-  assert.equal(installerOwnsRoot(custom, 'tui', env), true)
+  assert.equal(installerOwnsRoot(custom, 'tui', env, 'linux'), true)
 })
 
 test('detection prefers the payload marker and app path over layout probes', async () => {
@@ -264,14 +264,14 @@ test('detection prefers the payload marker and app path over layout probes', asy
   // The installer's default payload path is recognized without a marker.
   const defaultWeb = join(dataHome, 'web')
   await mkdir(defaultWeb, { recursive: true })
-  assert.equal(detectDistributionSurface(defaultWeb, env, () => false), 'web')
+  assert.equal(detectDistributionSurface(defaultWeb, env, () => false, 'linux'), 'web')
 
   // Recorded custom destinations are recognized via launcher.env.
   const customTui = join(home, 'custom tui')
   await mkdir(dataHome, { recursive: true })
   await writeFile(join(dataHome, 'launcher.env'), `TUI_DEST=${customTui}\n`)
   await mkdir(customTui, { recursive: true })
-  assert.equal(detectDistributionSurface(customTui, env, () => false), 'tui')
+  assert.equal(detectDistributionSurface(customTui, env, () => false, 'linux'), 'tui')
 
   // Manual archives fall back to the payload layout.
   const manual = join(home, 'extracted')
