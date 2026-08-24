@@ -242,6 +242,7 @@ esac
 
 desktop_marker=$record_home/desktop.env
 
+relocated_desktop_dest=''
 workdir=''
 cleanup() {
   if [ -n "$workdir" ] && [ -d "$workdir" ]; then
@@ -948,6 +949,7 @@ install_desktop_mac() {
     die "$dest is not writable; pass --dest DIR (for example ~/Applications) or rerun with sufficient privileges"
   fi
 
+  relocated_desktop_dest=$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)
   app_dest="$dest/$APP_NAME.app"
   # Only the default /Applications destination is treated as owned by the
   # installer; custom destinations never touch the running session.
