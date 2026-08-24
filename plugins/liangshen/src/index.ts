@@ -89,9 +89,12 @@ export function installLiangshenPreset(
   return 'installed'
 }
 
-export function apply(ctx: HostContext): void {
+export function apply(ctx: HostContext, options: LiangshenInstallOptions = {}): void {
+  // A read-only viewer shares the data root with an active surface; installing
+  // here would replace preset state that surface owns.
+  if (process.env.OH_DSH_READ_ONLY === '1') return
   try {
-    const status = installLiangshenPreset()
+    const status = installLiangshenPreset(options)
     if (status === 'conflict') {
       ctx.logger.warn(
         `oh-dsh-liangshen: preset "${PRESET_ID}" was not installed because an unmanaged preset already uses that id`,

@@ -23,6 +23,11 @@ development.
 - Keep the pinned DSH runtime and its required host dependencies shared; the
   optimization removes unrelated Oh-DSH surface packages, not core runtime
   capabilities required by the selected profile.
+- The Makefile `upstream` target runs `git submodule update --init` on every
+  build so checkouts follow the recorded gitlinks, and recompiles dsh-TUI only
+  when its checked-out revision differs from the stamp under `.stage/`; an
+  incremental checkout can no longer stage a stale compiled renderer as the
+  new pin.
 
 ## Alternatives considered
 

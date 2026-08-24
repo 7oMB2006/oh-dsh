@@ -16,6 +16,12 @@ not contain that composition.
 - Add an Oh-DSH `@oh-dsh/liangshen` Host plugin to the Web and Desktop bundle
   patches. The plugin installs the pinned `presets/liangshen` composition into
   the shared user preset root before sessions are created.
+- Skip the install when the surface starts as a read-only viewer
+  (`OH_DSH_READ_ONLY=1`): the viewer shares the data root with an active
+  surface, and installing would replace preset state that surface owns.
+- Register the plugin in the Nix `full` and `web` assemblies through
+  `nix/register-plugins.py`, staging the preset beside `dist/` from the
+  pinned TUI release; the Nix TUI closure stays on the upstream preset.
 - Do not mount that plugin in TUI; the pinned dsh-TUI renderer already installs
   and exposes its own Liangshen preset.
 - Keep the preset source in the pinned dsh-TUI checkout so its tool-bootstrap,
@@ -43,5 +49,8 @@ backward compatible.
   plugin, while TUI continues to use dsh-TUI's native implementation.
 - Surface-local staging includes the plugin only for Web and Desktop; TUI does
   not receive a duplicate Liangshen runtime package.
+- Nix Desktop/Web resolve the plugin package and its preset exactly like the
+  staged (non-Nix) deployment, guarded by
+  `tests/nix-register-plugins.test.ts`.
 - A dsh-TUI upgrade must revalidate the preset composition and its cross-surface
   staged copy.

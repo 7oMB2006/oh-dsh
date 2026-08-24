@@ -15,6 +15,11 @@ deployment 没有这份 composition。
 - 增加 Oh-DSH 内置 `@oh-dsh/liangshen` Host plugin，并在 Web/Desktop bundle
   patch 中挂载；plugin 在会话创建前把 pinned `presets/liangshen` composition
   安装到共享用户 preset 根目录。
+- 以只读 viewer 启动（`OH_DSH_READ_ONLY=1`）时跳过安装：viewer 与活跃
+  surface 共享 data root，此时安装会覆盖那个 surface 拥有的 preset 状态。
+- 在 Nix 的 `full` 与 `web` 装配中通过 `nix/register-plugins.py` 注册该
+  plugin，并从 pinned TUI release 把 preset 复制到 `dist/` 旁；Nix 的 TUI
+  闭包继续使用上游 preset。
 - TUI 不挂载这个 plugin；pinned dsh-TUI renderer 已经自带并暴露梁神模式。
 - preset 源码继续放在 pinned dsh-TUI checkout 中，使 tool-bootstrap、压缩和子
   Agent 行为随其上游 owner 一起升级。
@@ -37,4 +42,6 @@ asset，而不是产品要求的、明确限定在 Web/Desktop 的内置 plugin�
   原生实现。
 - 按交互端的本地 staging 只在 Web/Desktop 包含该 plugin；TUI 不会收到重复的
   Liangshen runtime package。
+- Nix 的 Desktop/Web 与 staged（非 Nix）部署以相同方式解析 plugin package 及
+  其 preset，由 `tests/nix-register-plugins.test.ts` 守护。
 - 每次 dsh-TUI 升级都需要重新验证 preset composition 以及三端 staged copy。

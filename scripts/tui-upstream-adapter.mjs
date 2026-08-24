@@ -56,22 +56,11 @@ const VERSION = (() => {
 function capitalize(text) {
     return text.length === 0 ? text : text[0].toUpperCase() + text.slice(1);
 }
-function codexPermissionLabel() {
-    const mode = process.env.DSH_PERMISSION_MODE
-        ?? (process.platform === 'win32' ? 'danger-full-access' : 'workspace-write');
-    if (mode === 'danger-full-access')
-        return 'YOLO mode';
-    if (mode === 'read-only')
-        return 'Read-only';
-    if (mode === 'workspace-write')
-        return 'Workspace write';
-    return mode.replace(/-/g, ' ');
-}
 function CodexStartupOverlay({ model, effort, cwd }) {
     const title = process.env.OH_DSH_TUI_TITLE ?? 'Oh-DSH TUI';
     const version = process.env.DSH_OH_TUI_VERSION ?? VERSION;
     const effortLabel = effort === undefined ? '' : ' ' + capitalize(effort);
-    return _jsxs(Box, { alignSelf: "flex-start", borderColor: "permission", borderStyle: "round", flexDirection: "column", marginTop: 1, maxWidth: "100%", paddingX: 1, flexShrink: 0, children: [_jsxs(Text, { color: "permission", bold: true, wrap: "truncate-end", children: [">_ ", title, " (v", version, ")"] }), _jsx(Text, { children: " " }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "model:       " }), model, effortLabel, _jsx(Text, { color: "permission", dimColor: true, children: "   /model to change" })] }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "directory:   " }), cwd] }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "permissions: " }), _jsx(Text, { color: "permission", children: codexPermissionLabel() })] })] });
+    return _jsxs(Box, { alignSelf: "flex-start", borderColor: "permission", borderStyle: "round", flexDirection: "column", marginTop: 1, maxWidth: "100%", paddingX: 1, flexShrink: 0, children: [_jsxs(Text, { color: "permission", bold: true, wrap: "truncate-end", children: [">_ ", title, " (v", version, ")"] }), _jsx(Text, { children: " " }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "model:       " }), model, effortLabel, _jsx(Text, { color: "permission", dimColor: true, children: "   /model to change" })] }), _jsxs(Text, { wrap: "truncate-end", children: [_jsx(Text, { dimColor: true, children: "directory:   " }), cwd] })] });
 }
 
 export function LogoV2({ model, effort, cwd }) {

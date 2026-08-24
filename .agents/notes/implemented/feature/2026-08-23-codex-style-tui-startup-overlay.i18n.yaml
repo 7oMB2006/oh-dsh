@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-codex-style-tui-startup-overlay.md
-2026-08-23-codex-style-tui-startup-overlay.md: b84c9247a9e6f1a01ef7efab8694e744de4093e8
-2026-08-23-codex-style-tui-startup-overlay.zh.md: 7933618221041316480b25d44a562d75844db0d3
+2026-08-23-codex-style-tui-startup-overlay.md: 8befdb8dc39dca0d906e94fdb64a7e5869c82aeb
+2026-08-23-codex-style-tui-startup-overlay.zh.md: d3a3cd9df7646e9a76fda9b86183c811a1faea33

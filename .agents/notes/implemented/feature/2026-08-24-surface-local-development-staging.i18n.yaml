@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-surface-local-development-staging.md
-2026-08-24-surface-local-development-staging.md: 1f5aedc316cb5b1baca1f2ce55d82ab44edc2372
-2026-08-24-surface-local-development-staging.zh.md: 7f43d04e078f0b543fad2c9e7005312862fe309e
+2026-08-24-surface-local-development-staging.md: 1b49ba5205708c60c52f1b4f81e08fe7255d4614
+2026-08-24-surface-local-development-staging.zh.md: ccefab26f7e47b307efa52a9818c4e0953ced258

@@ -20,6 +20,10 @@ package，导致 `make tui` 和 `make web` 也要承担无关交互形态的启�
   继续执行完整共享 staging。
 - 保留选中 Profile 所需的 pinned DSH runtime 与 host dependency；优化移除的是
   无关的 Oh-DSH 交互层 package，不削弱当前形态所需的核心能力。
+- Makefile 的 `upstream` target 每次构建都执行 `git submodule update --init`，
+  使 checkout 始终跟随记录的 gitlink；只有当 dsh-TUI 检出的修订号与 `.stage/`
+  下的 stamp 不一致时才重新编译，增量 checkout 不会再把过期的编译产物当作
+  新 pin 暂存。
 
 ## Alternatives considered
 

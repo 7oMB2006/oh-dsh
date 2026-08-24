@@ -7,7 +7,7 @@ OH_DSH_HOME ?= $(HOME)/.ohdsh
 
 export OH_DSH_HOME
 
-TUI_ENTRY := upstream/dsh-TUI/lib/types/index.js
+TUI_COMPILE_STAMP := .stage/tui-compile.stamp
 
 .DEFAULT_GOAL := build
 .PHONY: build upstream stage stage-desktop stage-web stage-tui tui web desktop
@@ -15,14 +15,17 @@ TUI_ENTRY := upstream/dsh-TUI/lib/types/index.js
 build: upstream
 	$(PNPM) run build
 
+# Submodule checkouts follow the recorded gitlinks on every build, and dsh-TUI
+# recompiles only when its checked-out revision differs from the stamp, so an
+# incremental checkout never stages a stale renderer build as the new pin.
 upstream:
-	@if [ ! -f "upstream/DSH-better-sidebar/src/index.ts" ] \
-		|| [ ! -f "upstream/dsh-TUI/package.json" ]; then \
-		git submodule update --init --recursive upstream/DSH-better-sidebar upstream/dsh-TUI; \
-	fi
-	@if [ ! -f "$(TUI_ENTRY)" ]; then \
+	git submodule update --init --recursive upstream/DSH-better-sidebar upstream/dsh-TUI
+	@if [ ! -f "$(TUI_COMPILE_STAMP)" ] \
+		|| [ "$$(git -C upstream/dsh-TUI rev-parse HEAD)" != "$$(cat $(TUI_COMPILE_STAMP) 2>/dev/null)" ]; then \
 		$(PNPM) --dir upstream/dsh-TUI install --frozen-lockfile --ignore-scripts; \
 		$(PNPM) --dir upstream/dsh-TUI run compile; \
+		mkdir -p $(dir $(TUI_COMPILE_STAMP)); \
+		git -C upstream/dsh-TUI rev-parse HEAD > $(TUI_COMPILE_STAMP); \
 	fi
 
 stage: build
