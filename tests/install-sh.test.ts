@@ -332,7 +332,9 @@ test('macOS desktop installs register the app bundle and retire verified stale b
     const legacy = join(apps, 'Oh-DSH-Desktop.app')
     await makeFakePlist(legacy, 'ai.deepseek.oh-dsh-desktop', '0.1.7')
     const staleBackup = join(apps, 'Oh-DSH Desktop-before-20200101-000000.app')
-    await mkdir(join(staleBackup, 'Contents'), { recursive: true })
+    await makeFakePlist(staleBackup, 'ai.deepseek.oh-dsh-desktop', '0.1.6')
+    const foreignBackup = join(apps, 'Oh-DSH Desktop-before-19990101-000000.app')
+    await makeFakePlist(foreignBackup, 'someone.elses.app', '1.0')
 
     const result = await runInstaller(
       ['--surface', 'desktop', '--os', 'darwin', '--arch', 'arm64', '--dest', apps],
@@ -343,7 +345,8 @@ test('macOS desktop installs register the app bundle and retire verified stale b
     const installedApp = join(apps, 'Oh-DSH Desktop.app')
     assert.ok(await exists(join(installedApp, 'Contents', 'MacOS', 'Oh-DSH Desktop')))
     assert.ok(!(await exists(legacy)), 'verified older legacy bundles must be retired')
-    assert.ok(!(await exists(staleBackup)), 'stale pre-upgrade backups must be removed')
+    assert.ok(!(await exists(staleBackup)), 'verified pre-upgrade backups must be removed')
+    assert.ok(await exists(foreignBackup), 'foreign look-alike backups must survive')
     const lsregisterLog = await readFile(spy.logPath, 'utf8')
     assert.match(lsregisterLog, new RegExp(`-f .*${'Oh-DSH Desktop.app'}`))
     const markerPath = join(home, '.ohdsh', 'installer', 'desktop.env')
@@ -848,13 +851,19 @@ test('install refuses to overwrite an unowned launcher', { skip: skipOnWindows }
     await mkdir(bin, { recursive: true })
     await writeFile(join(bin, 'ohdsh'), '#!/bin/sh\necho precious tool\n')
     await chmod(join(bin, 'ohdsh'), 0o755)
+    const payload = join(home, 'payload')
     const result = await runInstaller(
-      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', join(home, 'payload'), '--bin-dir', bin],
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload, '--bin-dir', bin],
       env,
     )
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /refusing to replace .*not an Oh-DSH launcher/)
     assert.match(await readFile(join(bin, 'ohdsh'), 'utf8'), /precious tool/)
+    assert.ok(!(await exists(payload)), 'a refused install must not stage a payload')
+    assert.ok(
+      !(await exists(join(home, '.ohdsh', 'installer', 'launcher.env'))),
+      'a refused install must not write records',
+    )
   } finally {
     await github.stop()
   }
@@ -878,6 +887,28 @@ test('desktop uninstall verifies the legacy bundle identity too', { skip: skipOn
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /refusing to replace/)
     assert.ok(await exists(foreign), 'the foreign legacy bundle must survive')
+  } finally {
+    await github.stop()
+  }
+})
+
+test('relocating the linux desktop retires the previous AppImage', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    const image = Buffer.from('appimage-bytes\n', 'utf8')
+    github.publish('v0.1.8', [{ name: 'Oh-DSH-Desktop-0.1.8-x86_64.AppImage', bytes: image }])
+    const { home, env } = await makeSandbox(github)
+    const binA = join(home, 'binA')
+    const binB = join(home, 'binB')
+    const args = ['--surface', 'desktop', '--os', 'linux', '--arch', 'x64']
+    assert.equal((await runInstaller([...args, '--dest', binA], env)).status, 0)
+    assert.equal((await runInstaller([...args, '--dest', binB], env)).status, 0)
+
+    assert.ok(!(await exists(join(binA, 'oh-dsh-desktop'))), 'the previous AppImage must be retired')
+    assert.ok(await exists(join(binB, 'oh-dsh-desktop')))
+    const marker = await readFile(join(home, '.ohdsh', 'installer', 'desktop.env'), 'utf8')
+    assert.match(marker, new RegExp(`^OH_DSH_INSTALL_DEST=${binB.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'))
   } finally {
     await github.stop()
   }

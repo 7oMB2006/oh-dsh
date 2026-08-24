@@ -170,6 +170,14 @@ function Remove-LauncherEnvKey {
     return $false
 }
 
+function Assert-DispatcherTarget {
+    # $ShimPath: launcher location. An unrelated file at the target is never
+    # overwritten; checked BEFORE the payload swap so a refusal cannot strand
+    # a half-migrated installation.
+    param([string]$ShimPath)
+    Assert-DispatcherTarget -ShimPath $ShimPath
+}
+
 function Write-Dispatcher {
     # $ShimPath: launcher location. The dispatcher resolves each surface's
     # payload from launcher.env at run time. With the default record root the
@@ -177,15 +185,7 @@ function Write-Dispatcher {
     # run time, so localized profile paths never need to be embedded. An
     # unrelated file at the target is never overwritten.
     param([string]$ShimPath)
-    if (Test-Path -LiteralPath $ShimPath) {
-        $existing = Get-Content -LiteralPath $ShimPath -Raw
-        $ours = ($existing -like '*OHRECORD*') `
-            -or ($existing -like '*launcher.env*') `
-            -or (($existing -like '*CALL*') -and ($existing -like '*\bin\ohdsh.cmd*'))
-        if (-not $ours) {
-            Die "refusing to replace $ShimPath : it is not an Oh-DSH launcher; remove it or pass another -BinDir"
-        }
-    }
+    Assert-DispatcherTarget -ShimPath $ShimPath
     $recordSetup = if ($DefaultRecordRoot -ne '' -and $DataHome -eq $DefaultRecordRoot) {
         @(
             'SET "OHRECORD=%USERPROFILE%\.ohdsh\installer\launcher.env"',
@@ -496,7 +496,22 @@ try {
         if ($process.ExitCode -notin @(0, $null)) {
             Die "the desktop installer exited with $($process.ExitCode); the previous installation was left untouched"
         }
+        # Retire the installer-owned installation at the previously recorded
+        # destination when relocating, so one desktop installation remains.
+        if (Test-Path -LiteralPath $MarkerPath) {
+            $priorValues = Read-Marker -Path $MarkerPath
+            $priorDest = [string]$priorValues['OH_DSH_INSTALL_DEST']
+        }
         Write-Marker -Path $MarkerPath
+        if ($priorDest -and ($priorDest -ne $Dest)) {
+            if (Test-Path -LiteralPath (Join-Path $priorDest 'Uninstall Oh-DSH Desktop.exe')) {
+                Write-Step "Retiring the previous desktop installation at $priorDest"
+                $priorProcess = Start-Process -FilePath (Join-Path $priorDest 'Uninstall Oh-DSH Desktop.exe') -ArgumentList '/S' -Wait -PassThru
+                if ($priorProcess.ExitCode -notin @(0, $null)) {
+                    Write-Step "warning: the previous desktop uninstaller exited with $($priorProcess.ExitCode)"
+                }
+            }
+        }
         Write-Step "Installed Oh-DSH Desktop $ReleaseVersion$(if ($Dest) { " to $Dest" })"
         exit 0
     }
@@ -523,6 +538,9 @@ try {
     }
 
     $FinalDest = Get-PayloadDest
+    # The launcher collision check runs before any payload or record is
+    # touched, so a refusal cannot strand a half-migrated installation.
+    Assert-DispatcherTarget -ShimPath (Join-Path (Get-BinDir) 'ohdsh.cmd')
     $Parent = Split-Path -Parent $FinalDest
     if (-not (Test-Path -LiteralPath $Parent)) {
         New-Item -ItemType Directory -Path $Parent -Force | Out-Null

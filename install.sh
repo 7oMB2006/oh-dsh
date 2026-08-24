@@ -466,16 +466,23 @@ remove_launcher_env_key() {
   return 1
 }
 
-install_dispatcher() {
-  # $1: launcher path. The dispatcher resolves surfaces at run time from
-  # launcher.env, so one launcher serves every installed surface and the
-  # second surface never steals the first one's link. An unrelated file at
-  # the target is never overwritten; a legacy symlink to a payload is.
+ensure_dispatcher_target_available() {
+  # $1: launcher path. An unrelated file at the target is never overwritten;
+  # a legacy symlink to one of our payloads, or a previously generated
+  # dispatcher, is.
   target=$1
   if [ -e "$target" ] && [ ! -L "$target" ] \
     && ! grep -q 'Oh-DSH launcher installed by install.sh' "$target" 2>/dev/null; then
     die "refusing to replace $target: it is not an Oh-DSH launcher; remove it or pass another --bin-dir"
   fi
+}
+
+install_dispatcher() {
+  # $1: launcher path. The dispatcher resolves surfaces at run time from
+  # launcher.env, so one launcher serves every installed surface and the
+  # second surface never steals the first one's link.
+  target=$1
+  ensure_dispatcher_target_available "$target"
   escaped_env=$(printf '%s' "$launcher_env" | sed "s/'/'\\\\''/g")
   tmp="$target.new.$$"
   rm -f "$tmp"
@@ -722,6 +729,10 @@ install_payload_surface() {
     die "$asset does not contain a runnable $surface payload; the previous installation was left untouched"
   fi
 
+  # The launcher collision check runs before any payload or record is
+  # touched, so a refusal cannot strand a half-migrated installation.
+  ensure_dispatcher_target_available "$bin_dir/ohdsh"
+
   parent=$(dirname -- "$dest")
   mkdir -p "$parent"
   staged="$dest.install-pending.$$"
@@ -792,6 +803,7 @@ install_desktop_linux() {
   fi
   chmod 0755 "$staged"
 
+  relocated_desktop_dest=$(marker_field "$desktop_marker" OH_DSH_INSTALL_DEST)
   image="$dest/oh-dsh-desktop"
   previous="$dest/.oh-dsh-desktop.previous-$(timestamp)"
   had_previous=0
@@ -816,6 +828,7 @@ install_desktop_linux() {
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
+  retire_relocated_desktop_dest
 
   log "Installed Oh-DSH Desktop $version to $image"
   case ":${PATH:-}:" in
@@ -855,6 +868,39 @@ retire_legacy_bundle() {
   fi
   rm -rf "$legacy"
   log "Removed legacy $legacy ($legacy_version)"
+}
+
+retire_relocated_desktop_dest() {
+  # Remove the installer-owned installation at the previously recorded
+  # desktop destination when relocating with a different --dest, so exactly
+  # one desktop installation remains.
+  [ -n "$relocated_desktop_dest" ] || return 0
+  [ "$relocated_desktop_dest" != "$dest" ] || return 0
+  if [ "$os" = darwin ]; then
+    old_app="$relocated_desktop_dest/$APP_NAME.app"
+    if [ -d "$old_app" ]; then
+      verify_replaceable_app "$old_app"
+      rm -rf "$old_app"
+      log "Retired the previous desktop installation at $old_app"
+    fi
+  else
+    old_image="$relocated_desktop_dest/oh-dsh-desktop"
+    if [ -f "$old_image" ]; then
+      rm -f "$old_image"
+      log "Retired the previous desktop installation at $old_image"
+    fi
+  fi
+}
+
+stale_bundle_is_ours() {
+  # $1: candidate backup bundle. True only when the Info.plist carries this
+  # bundle identifier; unverifiable candidates are never deleted.
+  stale=$1
+  plist="$stale/Contents/Info.plist"
+  plutil_bin=${OH_DSH_PLUTIL:-$PLUTIL_DEFAULT}
+  [ -f "$plist" ] && [ -x "$plutil_bin" ] || return 1
+  identifier=$("$plutil_bin" -extract CFBundleIdentifier raw -o - "$plist" 2>/dev/null || true)
+  [ "$identifier" = "$BUNDLE_ID" ]
 }
 
 quit_running_app() {
@@ -966,11 +1012,16 @@ install_desktop_mac() {
     retire_legacy_bundle "$dest/$LEGACY_APP_NAME"
   fi
 
-  # Purge stale bundles from earlier installs so Launch Services and Finder
-  # show exactly one Oh-DSH Desktop.
+  # Purge stale pre-upgrade backups so Launch Services and Finder show
+  # exactly one Oh-DSH Desktop — but only bundles whose Info.plist proves
+  # they are ours; a user-created directory sharing the name survives.
   for stale in "$dest/$APP_NAME-before-"*.app "$dest/Oh-DSH-Desktop-before-"*.app; do
     if [ -e "$stale" ]; then
-      rm -rf "$stale"
+      if stale_bundle_is_ours "$stale"; then
+        rm -rf "$stale"
+      else
+        printf 'install.sh: warning: leaving %s in place (unverifiable bundle)\n' "$stale" >&2
+      fi
     fi
   done
   for stale in "$dest/.$APP_NAME.app.install."*; do
@@ -987,6 +1038,7 @@ install_desktop_mac() {
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
+  retire_relocated_desktop_dest
 
   log "Installed $app_dest"
   if [ "$had_previous" = 1 ]; then
