@@ -22,7 +22,11 @@ download suggests.
   records. The generated `ohdsh desktop` command launches that executable,
   while the direct `oh-dsh-desktop` entry remains available.
 - Register the installer bin directory for new shells on Unix-like systems and
-  new user terminals on Windows. Existing shells are not mutated in place.
+  new user terminals on Windows. Bash receives the entry in both
+  `.bash_profile` and `.bashrc`; Zsh receives it in `.zprofile` and `.zshrc`;
+  other shells use `.profile`. Existing shells are not mutated in place.
+  Reinstalling with a new bin directory replaces the managed stanza, and its
+  shell literal escapes apostrophes in valid paths.
 - After native PTY compilation, stage only the runtime files needed to launch:
   strip non-Windows Node symbols, remove Node headers/share/npm tooling, and
   remove DSH runtime TypeScript sources, declarations, and source maps.
@@ -51,6 +55,9 @@ is the single place that can keep all distribution surfaces consistent.
 - A plain command-line install starts with `ohdsh tui`; `ohdsh web` and
   `ohdsh desktop` become available after their surfaces are installed.
 - The dispatcher owns routing but does not replace the native Desktop entry.
+- Idempotent Desktop installs verify both the native app and generated
+  dispatcher, including when an explicit destination is used, so a missing
+  launcher is repaired by an ordinary rerun.
 - Runtime smoke and Web smoke must continue to run after pruning; startup-time
   optimization remains outside this decision.
 

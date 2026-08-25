@@ -20,7 +20,10 @@ Status: implemented
   生成的 `ohdsh desktop` 会启动该可执行文件，同时保留直接的
   `oh-dsh-desktop` 入口。
 - Unix 类系统会把安装器的 bin 目录注册给新 shell，Windows 会把它注册给
-  新用户终端；现有 shell 不会被原地修改。
+  新用户终端。Bash 同时写入 `.bash_profile` 与 `.bashrc`；Zsh 同时写入
+  `.zprofile` 与 `.zshrc`；其它 shell 使用 `.profile`。现有 shell 不会被
+  原地修改。使用新的 bin 目录重装时会替换受管 stanza，合法路径中的单引号
+  也会在 shell 字面量中正确转义。
 - 原生 PTY 编译完成后，只暂存启动所需的运行时文件：非 Windows 平台去除
   Node 符号，删除 Node 头文件、share 与 npm 工具，并删除 DSH 运行时中的
   TypeScript 源文件、声明和 source map。
@@ -45,6 +48,8 @@ Desktop、Web 与 TUI 包，staging 边界才是保持三种发行形态一致�
 - 直接执行命令行安装后使用 `ohdsh tui`；安装其它 surface 后再使用
   `ohdsh web` 与 `ohdsh desktop`。
 - dispatcher 负责路由，但不会取代原生 Desktop 入口。
+- 幂等的 Desktop 安装会同时校验原生应用与生成的 dispatcher，包括显式指定
+  目标目录的情况；启动器缺失时，普通重跑会修复它。
 - 裁剪后必须继续通过 runtime 与 Web 冒烟测试；启动速度优化不属于本次决策。
 
 ## 验证
