@@ -69,7 +69,10 @@ failure to load it degrades to text and controls rather than blocking recovery.
 **Automatically repair proxy settings.** The updater cannot safely infer or
 mutate system proxy policy, credentials, or enterprise configuration. It
 identifies the failure and offers retry plus manual release access, leaving
-network remediation to the user or administrator.
+network remediation to the user or administrator. What this rejects is
+touching system proxy policy; a later, session-local direct retry for the
+updater's own session shipped separately and owns that behavior — see
+[direct proxy fallback](2026-08-24-desktop-update-direct-proxy-fallback.md).
 
 ## Consequences
 
@@ -85,13 +88,18 @@ Adding `brandIconDataUrl()` expands the update preload contract, so every
 implementation of `DesktopUpdateBridge` must provide it. The image request is
 best effort and does not become a prerequisite for recovery.
 
-This decision improves recovery presentation but does not fix the underlying
-proxy connection failure reported in issue #113.
+This decision improves recovery presentation. The underlying proxy connection
+failure reported in issue #113 is now addressed by the separate
+[direct proxy fallback](2026-08-24-desktop-update-direct-proxy-fallback.md)
+decision, which retries the check or download once with the updater's proxy
+bypassed; the error-presentation contract above stays current either way.
 
 ## Testing
 
 `tests/update-manager.test.ts` covers a Chromium proxy code embedded only in
 the error message, the redacted user guidance, retryability, the official
-Releases fallback, and opening that fallback. Existing updater tests continue
-to cover structured proxy-authentication errors and unknown retryable failures.
-The update failure window was also checked at its packaged 720 by 620 viewport.
+Releases fallback, and opening that fallback. Coverage of the direct retry
+itself lives with the direct-proxy-fallback note. Existing updater tests
+continue to cover structured proxy-authentication errors and unknown
+retryable failures. The update failure window was also checked at its
+packaged 720 by 620 viewport.

@@ -417,10 +417,30 @@ function sendUpdateState(state: DesktopUpdateState): void {
   updateWindow.webContents.send('desktop:update:state', state)
 }
 
+let updaterProxyBypassed = false
+
+function updaterSession() {
+  return session.fromPartition('electron-updater', { cache: false })
+}
+
 async function syncUpdaterProxy(): Promise<void> {
-  const updaterSession = session.fromPartition('electron-updater', { cache: false })
+  // Once the configured proxy proved unreachable, keep the updater direct:
+  // re-copying the OS proxy rules would reintroduce the broken proxy.
+  if (updaterProxyBypassed) {
+    await updaterSession().setProxy({ mode: 'direct' })
+    return
+  }
   const proxyRules = await session.defaultSession.resolveProxy('https://github.com')
-  await updaterSession.setProxy({ proxyRules })
+  await updaterSession().setProxy({ proxyRules })
+}
+
+async function bypassUpdaterProxy(): Promise<void> {
+  updaterProxyBypassed = true
+  const target = updaterSession()
+  await target.setProxy({ mode: 'direct' })
+  // Sockets pooled through the dead proxy survive the proxy change and would
+  // keep failing; close them so the retry goes direct.
+  await target.closeAllConnections()
 }
 
 async function getUpdateManager(): Promise<DesktopUpdateManager> {
@@ -434,6 +454,7 @@ async function getUpdateManager(): Promise<DesktopUpdateManager> {
     packageType,
     ...(app.isPackaged ? { updater: autoUpdater } : {}),
     syncProxy: syncUpdaterProxy,
+    bypassProxy: bypassUpdaterProxy,
     onOpenRelease: async url => { await shell.openExternal(url) },
     onOpenInstaller: async path => {
       const error = await shell.openPath(path)

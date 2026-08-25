@@ -33,6 +33,7 @@ export interface UpdateManagerOptions {
   packageType?: 'appimage' | 'deb' | 'unsupported'
   updater?: UpdateEventSource
   syncProxy?: () => Promise<void>
+  bypassProxy?: () => Promise<void>
   onOpenRelease?: (url: string) => Promise<void> | void
   onOpenInstaller?: (path: string) => Promise<void> | void
   onLog?: (message: string) => void
@@ -152,6 +153,12 @@ function isVerificationFailure(error: unknown): boolean {
   return code.includes('signature') || code.includes('checksum') || message.includes('checksum') || message.includes('signature')
 }
 
+const PROXY_FAILURE_CODES = new Set(['ERR_PROXY_CONNECTION_FAILED', 'ERR_TUNNEL_CONNECTION_FAILED', 'ERR_PROXY_AUTH_UNSUPPORTED'])
+
+function isProxyFailure(code: string): boolean {
+  return PROXY_FAILURE_CODES.has(code)
+}
+
 function isRetryable(error: unknown, stage: Operation): boolean {
   if (stage === 'verify' || stage === 'install') return false
   const code = errorCode(error)
@@ -176,6 +183,7 @@ export class DesktopUpdateManager {
   private readonly arch: string
   private readonly updater: UpdateEventSource | undefined
   private readonly syncProxy: (() => Promise<void>) | undefined
+  private readonly bypassProxy: (() => Promise<void>) | undefined
   private readonly onOpenRelease: ((url: string) => Promise<void> | void) | undefined
   private readonly onOpenInstaller: ((path: string) => Promise<void> | void) | undefined
   private readonly onLog: ((message: string) => void) | undefined
@@ -184,6 +192,7 @@ export class DesktopUpdateManager {
   private token: CancellationToken | undefined
   private operation: Operation = 'check'
   private lastCheck: Promise<DesktopUpdateState> | undefined
+  private proxyBypassed = false
   private installOnQuitRequested = false
   private readonly listeners = new Set<(state: DesktopUpdateState) => void>()
   private readonly eventListeners: Array<[string, (...args: any[]) => void]> = []
@@ -194,6 +203,7 @@ export class DesktopUpdateManager {
     this.platform = platformFor(options)
     this.updater = options.updater
     this.syncProxy = options.syncProxy
+    this.bypassProxy = options.bypassProxy
     this.onOpenRelease = options.onOpenRelease
     this.onOpenInstaller = options.onOpenInstaller
     this.onLog = options.onLog
@@ -237,8 +247,27 @@ export class DesktopUpdateManager {
     return await this.lastCheck
   }
 
+  /**
+   * An unreachable configured proxy is not a verdict on the update feed: the
+   * OS proxy often points at a local client that has since stopped. Retry the
+   * operation once with the updater's proxy bypassed before surfacing an
+   * error, and remember the bypass so later operations stay direct.
+   */
+  private async runWithProxyFallback<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation()
+    } catch (error) {
+      if (this.proxyBypassed || this.bypassProxy === undefined || !isProxyFailure(errorCode(error))) throw error
+      this.proxyBypassed = true
+      this.onLog?.('configured proxy unreachable; retrying update without the proxy')
+      await this.bypassProxy()
+      return await operation()
+    }
+  }
+
   private async performCheck(): Promise<DesktopUpdateState> {
-    if (this.platform === 'unsupported' || this.updater === undefined) {
+    const updater = this.updater
+    if (this.platform === 'unsupported' || updater === undefined) {
       return this.publish({
         status: 'unsupported',
         currentVersion: this.currentVersion,
@@ -251,7 +280,7 @@ export class DesktopUpdateManager {
     this.publish({ status: 'checking', currentVersion: this.currentVersion })
     try {
       await this.syncProxy?.()
-      const result = await this.updater.checkForUpdates()
+      const result = await this.runWithProxyFallback(() => updater.checkForUpdates())
       if (result === null) {
         return this.publish({
           status: 'unsupported',
@@ -314,12 +343,14 @@ export class DesktopUpdateManager {
   }
 
   async download(): Promise<DesktopUpdateState> {
-    if (this.metadata === undefined || this.updater === undefined) return this.state
+    const updater = this.updater
+    if (this.metadata === undefined || updater === undefined) return this.state
     this.operation = 'download'
     this.token = new CancellationToken()
+    const token = this.token
     try {
       await this.syncProxy?.()
-      const paths = await this.updater.downloadUpdate(this.token)
+      const paths = await this.runWithProxyFallback(() => updater.downloadUpdate(token))
       if (this.metadata.installerPath === null) this.metadata.installerPath = paths[0] ?? null
       if (this.state.status !== 'downloaded') this.publishDownloaded()
       return this.state
@@ -448,6 +479,9 @@ export class DesktopUpdateManager {
     })
     bind('error', (error: unknown) => {
       if (this.token?.cancelled) return
+      // A proxy failure is retried without the proxy by the awaiting
+      // operation; publishing here would flash a dead-end error first.
+      if (!this.proxyBypassed && this.bypassProxy !== undefined && isProxyFailure(errorCode(error))) return
       this.fail(error, isVerificationFailure(error) ? 'verify' : this.operation)
     })
   }
