@@ -33,6 +33,7 @@ export interface WorkspaceChange {
   oldPath: string | null
   status: WorkspaceChangeStatus
   staged: boolean
+  unstaged: boolean
 }
 
 export interface WorkspaceFacts {

@@ -208,3 +208,21 @@ test('desktop sidebar preferences migrate from the pre-rename durable file', asy
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+
+test('workspace review uses one SVG icon language', async () => {
+  const sourceText = await readFile(join(process.cwd(), 'plugins/sidebar/src/client/plugin.tsx'), 'utf8')
+  assert.match(sourceText, /function WorkspaceIcon\(/)
+  for (const glyph of ['▣', '◷', '▱', '⑂', '—◯—', '›_']) {
+    assert.doesNotMatch(sourceText, new RegExp(glyph))
+  }
+  assert.match(sourceText, /<WorkspaceIcon name="changes" \/>/)
+  assert.match(sourceText, /const \[changesOpen, setChangesOpen\] = useState\(false\)/)
+  assert.match(sourceText, /aria-expanded=\{changesOpen\}/)
+  assert.match(sourceText, /from '\.\/diff-stats\.ts'/)
+  assert.match(sourceText, /const \[changeStats, setChangeStats\]/)
+  assert.match(sourceText, /prepareDiffSummaryRefresh/)
+  assert.match(sourceText, /<WorkspaceIcon name="chevron" \/>/)
+  assert.match(sourceText, /<WorkspaceIcon name="branch" \/>/)
+  assert.match(sourceText, /<WorkspaceIcon name="commit" \/>/)
+})

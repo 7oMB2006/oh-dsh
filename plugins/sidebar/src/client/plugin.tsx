@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   useSyncExternalStore,
 } from 'react'
 import { defineStore } from '@deepseek-ai/dsh-client-runtime/client'
@@ -11,6 +12,7 @@ import type { DesktopBridge } from '../../../../src/contracts.ts'
 import type { DesktopPanels } from '../../../panel-controls/src/client.ts'
 import type { PinnedSummary } from '../../../pinned-summary/src/client.ts'
 import type {
+  WorkspaceChange,
   WorkspaceFacts,
   WorkspaceHostMutationResponse,
   WorkspaceMutation,
@@ -54,6 +56,13 @@ import {
   type ComposerHistoryInputTriggers,
 } from './composer-history-bridge.ts'
 import { HttpSidebarPreferencesStorage } from './sidebar-storage.ts'
+import {
+  addDiffStats,
+  diffStats,
+  prepareDiffSummaryRefresh,
+  textLineCount,
+  type DiffStats,
+} from './diff-stats.ts'
 import {
   betterSidebarApi,
   type BetterSidebarGitLogEntry,
@@ -260,6 +269,133 @@ function statusLabel(status: WorkspaceSnapshot['changes'][number]['status']): st
   }[status]
 }
 
+interface WorkspaceDiffSummaryState {
+  loading: boolean
+  summary: DiffStats | null
+}
+
+async function readChangeDiffStats(
+  scope: BetterSidebarScope,
+  change: WorkspaceChange,
+  signal: AbortSignal,
+): Promise<DiffStats> {
+  const responses = await Promise.all([
+    betterSidebarApi.gitDiff(scope, change.path, change.staged, signal),
+    ...(change.staged && change.unstaged
+      ? [betterSidebarApi.gitDiff(scope, change.path, false, signal)]
+      : []),
+  ])
+  const trackedStats = responses.map(response => diffStats(response.diff))
+  if (change.status !== 'untracked' || responses.some(response => response.diff !== '')) {
+    return addDiffStats(...trackedStats)
+  }
+  const file = await betterSidebarApi.fsRead(scope, change.path, signal)
+  return file.kind === 'text'
+    ? addDiffStats(...trackedStats, { additions: textLineCount(file.content), deletions: 0 })
+    : addDiffStats(...trackedStats)
+}
+
+async function readWorkspaceDiffSummary(
+  scope: BetterSidebarScope,
+  changes: readonly WorkspaceChange[],
+  signal: AbortSignal,
+): Promise<DiffStats> {
+  const [worktree, index] = await Promise.all([
+    betterSidebarApi.gitDiff(scope, undefined, false, signal),
+    betterSidebarApi.gitDiff(scope, undefined, true, signal),
+  ])
+  const untrackedStats = await Promise.all(
+    changes.filter(change => change.status === 'untracked').slice(0, 200).map(async change => {
+      const file = await betterSidebarApi.fsRead(scope, change.path, signal)
+      return file.kind === 'text'
+        ? { additions: textLineCount(file.content), deletions: 0 }
+        : { additions: 0, deletions: 0 }
+    }),
+  )
+  return addDiffStats(diffStats(worktree.diff), diffStats(index.diff), ...untrackedStats)
+}
+
+function useWorkspaceDiffSummary(
+  sessionId: string | undefined,
+  cwd: string | undefined,
+  enabled: boolean,
+): WorkspaceDiffSummaryState {
+  const [summary, setSummary] = useState<DiffStats | null>(null)
+  const [loading, setLoading] = useState(false)
+  const activeController = useRef<AbortController | null>(null)
+  const hasSummary = useRef(false)
+  const summaryScope = useRef<string | null>(null)
+  const refresh = useCallback(async (): Promise<void> => {
+    activeController.current?.abort()
+    const nextScope = sessionId === undefined || cwd === undefined
+      ? null
+      : `${sessionId}\u0000${cwd}`
+    const refreshPlan = prepareDiffSummaryRefresh(
+      { scopeKey: summaryScope.current, hasSummary: hasSummary.current },
+      nextScope,
+      enabled,
+    )
+    summaryScope.current = refreshPlan.state.scopeKey
+    hasSummary.current = refreshPlan.state.hasSummary
+    if (refreshPlan.clearSummary) setSummary(null)
+    if (!enabled || sessionId === undefined || cwd === undefined) {
+      setLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    activeController.current = controller
+    setLoading(refreshPlan.loading)
+    try {
+      const scope = { sessionId, cwd }
+      const status = await betterSidebarApi.gitStatus(scope, controller.signal)
+      if (!status.isRepo) {
+        if (!controller.signal.aborted) {
+          setSummary(null)
+          hasSummary.current = false
+        }
+        return
+      }
+      const changes = workspaceChangesFromBetterSidebar(status.entries)
+      const next = await readWorkspaceDiffSummary(scope, changes, controller.signal)
+      if (!controller.signal.aborted) {
+        setSummary(next)
+        hasSummary.current = true
+      }
+    } catch {
+      if (!controller.signal.aborted && !hasSummary.current) setSummary(null)
+    } finally {
+      if (activeController.current === controller) {
+        activeController.current = null
+        setLoading(false)
+      }
+    }
+  }, [cwd, enabled, sessionId])
+
+  useEffect(() => {
+    if (!enabled) {
+      activeController.current?.abort()
+      setSummary(null)
+      hasSummary.current = false
+      setLoading(false)
+      return
+    }
+    void refresh()
+    const timer = window.setInterval(() => { void refresh() }, 4_000)
+    const onFocus = (): void => { void refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      activeController.current?.abort()
+    }
+  }, [enabled, refresh])
+
+  return { loading, summary }
+}
+
+function changeKey(change: WorkspaceSnapshot['changes'][number]): string {
+  return change.path + ':' + (change.oldPath ?? '') + ':' + change.status + ':' + String(change.staged) + ':' + String(change.unstaged)
+}
 type ReviewCommentTarget = {
   kind: 'commit'
 } | {
@@ -563,6 +699,50 @@ function PanelIcon({ kind }: { kind: 'expand' | 'summary' | 'terminal' | 'side' 
   return <svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="2.5" /><path d="M12.5 3.5v13" /></svg>
 }
 
+
+type WorkspaceIconName =
+  | 'add'
+  | 'back'
+  | 'branch'
+  | 'changes'
+  | 'chevron'
+  | 'close'
+  | 'commit'
+  | 'environment'
+  | 'history'
+  | 'process'
+  | 'refresh'
+
+/** Render the workspace panel's shared 20px line icon language. */
+function WorkspaceIcon({ name }: { name: WorkspaceIconName }): JSX.Element {
+  const common = {
+    'aria-hidden': true,
+    className: 'oh-dsh-workspace-icon',
+    viewBox: '0 0 20 20',
+  } as const
+  if (name === 'add') return <svg {...common}><path d="M10 4v12M4 10h12" /></svg>
+  if (name === 'back') return <svg {...common}><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></svg>
+  if (name === 'branch') {
+    return <svg {...common}><circle cx="6" cy="4.5" r="2" /><circle cx="14" cy="15.5" r="2" /><path d="M6 6.5v3a6 6 0 0 0 6 6h0M6 9.5a4 4 0 0 1 4-4h2" /></svg>
+  }
+  if (name === 'changes') {
+    return <svg {...common}><rect x="3.5" y="3" width="10.5" height="14" rx="2" /><path d="M7 7h3M7 10h3M7 13h3M13.5 6.5h3v7" /></svg>
+  }
+  if (name === 'chevron') return <svg {...common}><path d="m6.5 8 3.5 4 3.5-4" /></svg>
+  if (name === 'close') return <svg {...common}><path d="m5 5 10 10M15 5 5 15" /></svg>
+  if (name === 'commit') {
+    return <svg {...common}><circle cx="5" cy="10" r="2" /><circle cx="15" cy="5" r="2" /><circle cx="15" cy="15" r="2" /><path d="M7 10h4a4 4 0 0 0 4-4V7M11 10a4 4 0 0 1 4 4v-1" /></svg>
+  }
+  if (name === 'environment') {
+    return <svg {...common}><rect x="3" y="4" width="14" height="10" rx="2" /><path d="M7 17h6M10 14v3" /></svg>
+  }
+  if (name === 'history') {
+    return <svg {...common}><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5v4l2.5 1.5M3.5 10H2" /></svg>
+  }
+  if (name === 'process') return <svg {...common}><path d="m4 6 4 4-4 4M10 14h6" /></svg>
+  return <svg {...common}><path d="M16 7.5A6 6 0 1 0 16.5 12" /><path d="M16 4.5v3.5h-3.5" /></svg>
+}
+
 function DesktopPanelToolbar({
   service,
   panels,
@@ -651,6 +831,11 @@ function WorkspacePanel({
   const sessionList = useSyncExternalStore(sessions.list.subscribe, sessions.list.getSnapshot)
   const sessionId = sessionList.current
   const cwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
+  const reviewSummary = useWorkspaceDiffSummary(
+    sessionId,
+    cwd,
+    panelState.open && panelState.view === 'review',
+  )
   const conversation = useActiveConversation(sessions, sessionId)
   const processes = useMemo(
     () => flattenRunningCalls(conversation.runningCalls ?? []),
@@ -661,6 +846,9 @@ function WorkspacePanel({
   const [busy, setBusy] = useState(false)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [diff, setDiff] = useState('')
+  const [changesOpen, setChangesOpen] = useState(false)
+  const [changeStats, setChangeStats] = useState<Record<string, DiffStats>>({})
+
   const [commitOpen, setCommitOpen] = useState(false)
   const [commitMessage, setCommitMessage] = useState('')
   const [newBranch, setNewBranch] = useState('')
@@ -674,7 +862,14 @@ function WorkspacePanel({
     reviewComments.subscribe,
     reviewComments.getSnapshot,
   )
-  const visibleChanges = snapshot?.changes.slice(0, 200) ?? []
+  const visibleChanges = useMemo(
+    () => snapshot?.changes.slice(0, 200) ?? [],
+    [snapshot],
+  )
+  const changeSignature = useMemo(
+    () => visibleChanges.map(changeKey).join('\u0000'),
+    [visibleChanges],
+  )
   const scope = useMemo<BetterSidebarScope | undefined>(
     () => sessionId === undefined || cwd === undefined
       ? undefined
@@ -751,12 +946,37 @@ function WorkspacePanel({
   useEffect(() => {
     setSelectedPath(null)
     setDiff('')
+    setChangesOpen(false)
+    setChangeStats({})
+
     setHistory([])
     setSelectedCommit(null)
     setCommentTarget(null)
     setCommentBody('')
     setCommentNotice('')
   }, [cwd])
+
+  useEffect(() => {
+    if (!changesOpen || scope === undefined || visibleChanges.length === 0) {
+      setChangeStats({})
+      return
+    }
+    const controller = new AbortController()
+    void Promise.all(visibleChanges.map(async change => {
+      const key = changeKey(change)
+      try {
+        return [key, await readChangeDiffStats(scope, change, controller.signal)] as const
+      } catch {
+        return null
+      }
+    })).then(entries => {
+      if (controller.signal.aborted) return
+      setChangeStats(Object.fromEntries(
+        entries.filter((entry): entry is readonly [string, DiffStats] => entry !== null),
+      ))
+    })
+    return () => { controller.abort() }
+  }, [changeSignature, changesOpen, scope, snapshot])
 
   useEffect(() => {
     if (cwd === undefined || branch === null) return
@@ -874,15 +1094,15 @@ function WorkspacePanel({
     <div className="oh-dsh-review-view" aria-label={t('workspace.changes')}>
       <header className="oh-dsh-workspace-header">
         <div>
-          <button type="button" aria-label={t('side.back')} onClick={() => { service.openMenu() }}>‹</button>
+          <button type="button" aria-label={t('side.back')} onClick={() => { service.openMenu() }}><WorkspaceIcon name="back" /></button>
           <strong>{snapshot?.name ?? (cwd?.split(/[\\/]/).filter(Boolean).pop() || t('workspace.title'))}</strong>
         </div>
         <div>
-          <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}>↻</button>
+          <button type="button" onClick={() => { void refresh() }} aria-label={t('workspace.refresh')} title={t('workspace.refresh')}><WorkspaceIcon name="refresh" /></button>
           {window.dshDesktop?.chooseWorkspace !== undefined && (
-            <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}>+</button>
+            <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')} title={t('workspace.add')}><WorkspaceIcon name="add" /></button>
           )}
-          <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}>×</button>
+          <button type="button" onClick={() => { service.setOpen(false) }} aria-label={t('workspace.close-review')} title={t('workspace.close-review')}><WorkspaceIcon name="close" /></button>
         </div>
       </header>
 
@@ -892,12 +1112,32 @@ function WorkspacePanel({
           <div className="oh-dsh-workspace-content">
             {error !== '' && <div className="oh-dsh-workspace-error" role="alert">{error}</div>}
             <section>
-              <div className="oh-dsh-workspace-section-title">
-                <span className="oh-dsh-workspace-section-icon">▣</span>
+              <button
+                type="button"
+                className="oh-dsh-workspace-section-toggle"
+                aria-expanded={changesOpen}
+                onClick={() => { setChangesOpen(value => !value) }}
+              >
+                <span className="oh-dsh-workspace-section-icon"><WorkspaceIcon name="changes" /></span>
                 <strong>{t('workspace.changes')}</strong>
+                {(reviewSummary.loading || reviewSummary.summary !== null) && (
+                  <span className="oh-dsh-change-stats" aria-label="diff summary">
+                    {reviewSummary.loading
+                      ? <span className="oh-dsh-change-stats-loading">…</span>
+                      : (
+                        <>
+                          <span className="oh-dsh-change-stat-add">+{reviewSummary.summary?.additions ?? 0}</span>
+                          <span className="oh-dsh-change-stat-delete">-{reviewSummary.summary?.deletions ?? 0}</span>
+                        </>
+                      )}
+                  </span>
+                )}
                 <span className="oh-dsh-workspace-count">{snapshot?.changes.length ?? 0}</span>
-              </div>
-              <div className="oh-dsh-change-list">
+                <span className={`oh-dsh-workspace-section-chevron${changesOpen ? ' is-open' : ''}`}>
+                  <WorkspaceIcon name="chevron" />
+                </span>
+              </button>
+              {changesOpen && <div className="oh-dsh-change-list">
                 {visibleChanges.map(change => (
                   <div key={`${change.path}:${change.oldPath ?? ''}`}>
                     <button
@@ -907,6 +1147,12 @@ function WorkspacePanel({
                       onClick={() => { void showDiff(change) }}
                     >
                       <span className={`oh-dsh-change-status is-${change.status}`}>{statusLabel(change.status)}</span>
+                      {changeStats[changeKey(change)] !== undefined && (
+                        <span className="oh-dsh-change-row-stats">
+                          <span className="oh-dsh-change-stat-add">+{changeStats[changeKey(change)]?.additions}</span>
+                          <span className="oh-dsh-change-stat-delete">-{changeStats[changeKey(change)]?.deletions}</span>
+                        </span>
+                      )}
                       <span title={change.path}>{change.path}</span>
                       {change.staged && <small>{t('workspace.staged')}</small>}
                     </button>
@@ -926,13 +1172,14 @@ function WorkspacePanel({
                 {snapshot?.kind === 'directory' && (
                   <div className="oh-dsh-workspace-muted">{t('workspace.not-git')}</div>
                 )}
-              </div>
+              </div>}
             </section>
+
 
             {snapshot?.kind === 'repository' && (
               <section className="oh-dsh-review-history">
                 <div className="oh-dsh-workspace-section-title">
-                  <span className="oh-dsh-workspace-section-icon">◷</span>
+                  <span className="oh-dsh-workspace-section-icon"><WorkspaceIcon name="history" /></span>
                   <strong>{t('workspace.review-history')}</strong>
                   <span className="oh-dsh-workspace-count">{history.length}</span>
                 </div>
@@ -1088,24 +1335,31 @@ function WorkspacePanel({
             )}
 
             <section className="oh-dsh-workspace-facts">
+
               <label className="oh-dsh-workspace-fact">
-                <span className="oh-dsh-workspace-fact-icon">▱</span>
-                <select aria-label={t('workspace.execution-environment')} value="local" onChange={() => {}}>
-                  <option value="local">{t('workspace.local')}</option>
-                </select>
-                <span className="oh-dsh-workspace-chevron">⌄</span>
+                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="environment" /></span>
+                <span className="oh-dsh-workspace-fact-copy">
+                  <small>{t('workspace.execution-environment')}</small>
+                  <select aria-label={t('workspace.execution-environment')} value="local" onChange={() => {}}>
+                    <option value="local">{t('workspace.local')}</option>
+                  </select>
+                </span>
+                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
               </label>
               <label className="oh-dsh-workspace-fact">
-                <span className="oh-dsh-workspace-fact-icon">⑂</span>
-                <select
-                  value={snapshot?.branch ?? ''}
-                  disabled={snapshot?.kind !== 'repository' || busy}
-                  aria-label={t('workspace.current-branch')}
-                  onChange={event => { void mutate({ action: 'checkout', branch: event.currentTarget.value }) }}
-                >
-                  {(snapshot?.branches ?? []).map(branch => <option key={branch} value={branch}>{branch}</option>)}
-                </select>
-                <span className="oh-dsh-workspace-chevron">⌄</span>
+                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="branch" /></span>
+                <span className="oh-dsh-workspace-fact-copy">
+                  <small>{t('workspace.current-branch')}</small>
+                  <select
+                    value={snapshot?.branch ?? ''}
+                    disabled={snapshot?.kind !== 'repository' || busy}
+                    aria-label={t('workspace.current-branch')}
+                    onChange={event => { void mutate({ action: 'checkout', branch: event.currentTarget.value }) }}
+                  >
+                    {(snapshot?.branches ?? []).map(branch => <option key={branch} value={branch}>{branch}</option>)}
+                  </select>
+                </span>
+                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
               </label>
               {snapshot?.kind === 'repository' && (
                 <div className="oh-dsh-new-branch">
@@ -1128,9 +1382,12 @@ function WorkspacePanel({
                 onClick={() => { setCommitOpen(open => !open) }}
                 aria-expanded={commitOpen}
               >
-                <span className="oh-dsh-workspace-fact-icon">—◯—</span>
-                <span>{t('workspace.commit-or-push')}</span>
-                <span className="oh-dsh-workspace-chevron">{commitOpen ? '⌃' : '⌄'}</span>
+                <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="commit" /></span>
+                <span className="oh-dsh-workspace-fact-copy">
+                  <small>{t('workspace.git-actions')}</small>
+                  <strong>{t('workspace.commit-or-push')}</strong>
+                </span>
+                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
               </button>
               {commitOpen && snapshot?.kind === 'repository' && (
                 <div className="oh-dsh-commit-box">
@@ -1160,10 +1417,10 @@ function WorkspacePanel({
             </section>
 
             <section className="oh-dsh-workspace-directory">
-              <span>{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
+              <span><WorkspaceIcon name="environment" />{snapshot?.name ?? cwd.split(/[\\/]/).filter(Boolean).pop()}</span>
               <small title={cwd}>{cwd}</small>
               {window.dshDesktop?.chooseWorkspace !== undefined && (
-                <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}>+</button>
+                <button type="button" onClick={() => { void chooseWorkspace() }} aria-label={t('workspace.add')}><WorkspaceIcon name="add" /></button>
               )}
             </section>
 
@@ -1171,7 +1428,7 @@ function WorkspacePanel({
               <h3>{t('workspace.background-processes')}</h3>
               {processes.map(process => (
                 <div key={process.callId} className="oh-dsh-process-row">
-                  <span>›_</span>
+                  <span><WorkspaceIcon name="process" /></span>
                   <code title={processTitle(process)}>{processTitle(process)}</code>
                 </div>
               ))}
@@ -1198,7 +1455,13 @@ function WorkspaceToolsSurface(props: {
   const t = useTranslate(props.locale, props.t)
   const panelState = useSyncExternalStore(props.service.subscribe, props.service.getSnapshot)
   const sessionList = useSyncExternalStore(props.sessions.list.subscribe, props.sessions.list.getSnapshot)
-  const cwd = sessionList.current === undefined ? undefined : sessionList.byId[sessionList.current]?.cwd
+  const sessionId = sessionList.current
+  const cwd = sessionId === undefined ? undefined : sessionList.byId[sessionId]?.cwd
+  const reviewSummary = useWorkspaceDiffSummary(
+    sessionId,
+    cwd,
+    panelState.open && panelState.view !== 'review',
+  )
   return (
     <>
       <DesktopPanelToolbar
@@ -1213,6 +1476,8 @@ function WorkspaceToolsSurface(props: {
         width={panelState.width}
         maximized={panelState.maximized}
         sidebar={props.sidebar}
+        reviewSummary={reviewSummary.summary}
+        reviewSummaryLoading={reviewSummary.loading}
         t={t}
         onClose={() => { props.service.setOpen(false) }}
         onResize={width => { props.service.setWidth(width) }}

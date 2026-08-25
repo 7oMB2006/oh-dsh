@@ -213,6 +213,7 @@ export function workspaceChangesFromBetterSidebar(
     oldPath: null,
     status: statusFromCode(entry.xy),
     staged: entry.xy[0] !== ' ' && entry.xy[0] !== '?',
+    unstaged: entry.xy === '??' || (entry.xy[1] !== ' ' && entry.xy[1] !== '?'),
   })).sort((left, right) => left.path.localeCompare(right.path))
 }
 

@@ -81,6 +81,7 @@ export type WorkspaceMessage =
   | 'workspace.clean'
   | 'workspace.not-git'
   | 'workspace.execution-environment'
+  | 'workspace.git-actions'
   | 'workspace.local'
   | 'workspace.current-branch'
   | 'workspace.new-branch'
@@ -191,6 +192,7 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'workspace.clean': 'Working tree clean',
     'workspace.not-git': 'This directory is not a Git repository.',
     'workspace.execution-environment': 'Execution environment',
+    'workspace.git-actions': 'Git actions',
     'workspace.local': 'Local',
     'workspace.current-branch': 'Current branch',
     'workspace.new-branch': 'New branch',
@@ -300,6 +302,7 @@ export const WORKSPACE_MESSAGES: LocaleMessages<WorkspaceMessage> = {
     'workspace.clean': '工作树已清理',
     'workspace.not-git': '此目录不是 Git 仓库。',
     'workspace.execution-environment': '执行环境',
+    'workspace.git-actions': 'Git 操作',
     'workspace.local': '本地',
     'workspace.current-branch': '当前分支',
     'workspace.new-branch': '新分支',

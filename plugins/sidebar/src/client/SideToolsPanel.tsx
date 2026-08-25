@@ -35,6 +35,8 @@ interface SideToolsPanelProps {
   onClose(): void
   onResize(width: number): void
   open: boolean
+  reviewSummary: { additions: number; deletions: number } | null
+  reviewSummaryLoading: boolean
   sidebar: DesktopSidebar
   t: Translate<WorkspaceMessage>
   width: number
@@ -84,6 +86,7 @@ function DescriptorIcon({ descriptor }: {
 function ToolRow(props: {
   descriptor: DesktopSidebarTabDescriptor
   disabled?: boolean
+  summary?: ReactNode
   onClick(): void
 }): JSX.Element {
   return (
@@ -95,6 +98,7 @@ function ToolRow(props: {
     >
       <DescriptorIcon descriptor={props.descriptor} />
       <span>{descriptorTitle(props.descriptor)}</span>
+      {props.summary}
       {props.descriptor.shortcut !== undefined && (
         <kbd>{props.descriptor.shortcut}</kbd>
       )}
@@ -131,6 +135,20 @@ function SideMenu(props: SideToolsPanelProps): JSX.Element {
           descriptor={descriptor}
           disabled={(descriptor.requiresWorkspace === true && props.cwd === undefined)
             || descriptor.available?.() === false}
+          summary={descriptor.id === 'review' && (props.reviewSummaryLoading || props.reviewSummary !== null)
+            ? (
+              <span className="oh-dsh-side-tool-summary" aria-label="diff summary" style={{ fontSize: '16px', fontWeight: 700, lineHeight: 1 }}>
+                {props.reviewSummaryLoading
+                  ? <span className="oh-dsh-change-stats-loading">…</span>
+                  : (
+                    <>
+                      <span className="oh-dsh-change-stat-add">+{props.reviewSummary?.additions}</span>
+                      <span className="oh-dsh-change-stat-delete">-{props.reviewSummary?.deletions}</span>
+                    </>
+                  )}
+              </span>
+            )
+            : undefined}
           onClick={() => { void open(descriptor) }}
         />
       ))}

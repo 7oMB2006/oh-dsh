@@ -48,9 +48,9 @@ test('Better Sidebar status maps into the Oh-DSH workspace model', () => {
     { path: 'renamed.ts', xy: 'R ' },
     { path: 'loose.txt', xy: '??' },
   ]), [
-    { path: 'loose.txt', oldPath: null, status: 'untracked', staged: false },
-    { path: 'renamed.ts', oldPath: null, status: 'renamed', staged: true },
-    { path: 'staged.ts', oldPath: null, status: 'modified', staged: true },
+    { path: 'loose.txt', oldPath: null, status: 'untracked', staged: false, unstaged: true },
+    { path: 'renamed.ts', oldPath: null, status: 'renamed', staged: true, unstaged: false },
+    { path: 'staged.ts', oldPath: null, status: 'modified', staged: true, unstaged: false },
   ])
 })
 
@@ -77,4 +77,12 @@ test('workspace files adapt Better Sidebar responses to the Oh-DSH UI', () => {
   })
   assert.equal(preview.kind, 'file')
   if (preview.kind === 'file') assert.match(preview.content ?? '', /ready = true/)
+})
+
+test('Better Sidebar status preserves both staged and unstaged sides', () => {
+  assert.deepEqual(workspaceChangesFromBetterSidebar([
+    { path: 'mixed.ts', xy: 'MM' },
+  ]), [
+    { path: 'mixed.ts', oldPath: null, status: 'modified', staged: true, unstaged: true },
+  ])
 })

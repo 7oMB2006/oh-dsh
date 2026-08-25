@@ -54,7 +54,7 @@
 
 .oh-dsh-side-tool-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   min-height: 48px;
@@ -76,6 +76,7 @@
 .oh-dsh-side-tool-row svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .oh-dsh-side-tool-row > span { font-size: 14px; }
 .oh-dsh-side-tool-row kbd { padding: 2px 7px; border: 0; border-radius: 999px; background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%)); color: var(--dsw-alias-label-tertiary, #8c959f); font: 11px system-ui; }
+.oh-dsh-side-tool-summary { display: inline-flex; gap: 5px; white-space: nowrap; font-family: var(--ds-font-family-code, ui-monospace, monospace); font-size: 15px !important; font-weight: 700 !important; line-height: 1 !important; }
 
 .oh-dsh-browser-view,
 .oh-dsh-files-view {
