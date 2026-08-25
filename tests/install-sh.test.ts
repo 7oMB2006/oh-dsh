@@ -282,7 +282,7 @@ test('shell PATH profiles quote apostrophes in launcher paths', { skip: skipOnWi
       env: { ...process.env, ...env, PATH: '/usr/bin:/bin' },
     })
     assert.equal(sourced.status, 0, sourced.stderr)
-    assert.equal(sourced.stdout.trim(), join(bin, 'ohdsh'))
+    assert.equal(sourced.stdout.trim(), realpathSync(join(bin, 'ohdsh')))
   } finally {
     await github.stop()
   }
