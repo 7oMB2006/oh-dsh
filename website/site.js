@@ -429,9 +429,13 @@ function cachedDownloadCount() {
         const cached = JSON.parse(
             window.localStorage.getItem(downloadsCacheKey),
         );
+        // A negative age means the device clock moved back after the write;
+        // honoring it would pin the badge to a stale total past the TTL.
+        const age = cached ? Date.now() - cached.at : Number.NaN;
         if (
             cached &&
-            Date.now() - cached.at < downloadsCacheTtl &&
+            age >= 0 &&
+            age < downloadsCacheTtl &&
             Number.isFinite(cached.count)
         ) {
             return cached.count;

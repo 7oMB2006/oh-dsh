@@ -21,10 +21,13 @@ server component to aggregate it.
   already uses, so no new infrastructure or token exists to leak.
 - The aggregate is cached in `localStorage` (`oh-dsh-site-downloads`) with a
   30-minute TTL; a visit inside the TTL renders from the cache without a
-  network request. Corrupt or blocked storage falls through to a live fetch.
+  network request. Corrupt or blocked storage falls through to a live fetch,
+  and a cache entry whose timestamp lies in the future — a device clock moved
+  back after the write — is rejected so the badge cannot freeze on a stale
+  total.
 - The number counts up over 700 ms when it first appears;
-  `prefers-reduced-motion` and non-positive totals render the final value
-  immediately. Any fetch failure keeps the pill's count hidden — the page
+  `prefers-reduced-motion` renders the final value immediately. Any fetch
+  failure or non-positive aggregate keeps the pill's count hidden — the page
   never shows a wrong or zero total.
 - Mobile widths hide both counts, matching the existing star-count rule.
 
