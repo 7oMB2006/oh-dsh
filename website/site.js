@@ -2,10 +2,15 @@ const repositoryUrl = "https://github.com/hust-open-atom-club/oh-dsh";
 const latestReleaseUrl = `${repositoryUrl}/releases/latest`;
 const releaseApiUrl =
     "https://api.github.com/repos/hust-open-atom-club/oh-dsh/releases/latest";
+const releasesApiUrl =
+    "https://api.github.com/repos/hust-open-atom-club/oh-dsh/releases?per_page=100";
+const downloadsCacheKey = "oh-dsh-site-downloads";
+const downloadsCacheTtl = 30 * 60 * 1000;
 
 const translations = {
     "zh-CN": {
         star: "星标",
+        downloads: "下载",
         pageTitle: "Oh-DSH｜一套 Runtime，三种开发体验",
         sloganRuntime: "一套 DSH runtime，",
         sloganSurfaces: "Desktop、Web 与 TUI",
@@ -36,6 +41,7 @@ const translations = {
     },
     en: {
         star: "Star",
+        downloads: "Downloads",
         pageTitle: "Oh-DSH — One Runtime, Three Interfaces",
         sloganRuntime: "One DSH runtime.",
         sloganSurfaces: "Desktop · Web · TUI",
@@ -72,6 +78,7 @@ const elements = {
     dialog: document.querySelector("[data-download-dialog]"),
     dialogClose: document.querySelector("[data-dialog-close]"),
     directDownload: document.querySelector("[data-direct-download]"),
+    downloadCount: document.querySelector("[data-download-count]"),
     downloadTrigger: document.querySelector("[data-download-trigger]"),
     installCaption: document.querySelector("[data-install-caption]"),
     installCommand: document.querySelector("[data-install-command]"),
@@ -417,7 +424,102 @@ elements.starDownload.addEventListener("click", () => {
     window.open(repositoryUrl, "_blank", "noopener,noreferrer");
 });
 
+function cachedDownloadCount() {
+    try {
+        const cached = JSON.parse(
+            window.localStorage.getItem(downloadsCacheKey),
+        );
+        // A negative age means the device clock moved back after the write;
+        // honoring it would pin the badge to a stale total past the TTL.
+        const age = cached ? Date.now() - cached.at : Number.NaN;
+        if (
+            cached &&
+            age >= 0 &&
+            age < downloadsCacheTtl &&
+            Number.isFinite(cached.count)
+        ) {
+            return cached.count;
+        }
+    } catch {
+        // Corrupt or blocked storage falls through to a live request.
+    }
+    return null;
+}
+
+function storeDownloadCount(count) {
+    try {
+        window.localStorage.setItem(
+            downloadsCacheKey,
+            JSON.stringify({ at: Date.now(), count }),
+        );
+    } catch {
+        // The badge still updates this visit when persistent storage is blocked.
+    }
+}
+
+function totalDownloads(releases) {
+    return releases.reduce(
+        (total, release) =>
+            (release.assets ?? []).reduce(
+                (sum, asset) => sum + (asset.download_count ?? 0),
+                0,
+            ) + total,
+        0,
+    );
+}
+
+function animateDownloadCount(target) {
+    const format = new Intl.NumberFormat();
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reducedMotion.matches || target <= 0) {
+        elements.downloadCount.textContent = format.format(target);
+        elements.downloadCount.hidden = false;
+        return;
+    }
+
+    const startedAt = performance.now();
+    const duration = 700;
+    function frame(now) {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        const eased = 1 - (1 - progress) ** 3;
+        elements.downloadCount.textContent = format.format(
+            Math.round(target * eased),
+        );
+        if (progress < 1) requestAnimationFrame(frame);
+    }
+    elements.downloadCount.hidden = false;
+    requestAnimationFrame(frame);
+}
+
+function showDownloadCount(count) {
+    if (typeof count !== "number" || !Number.isFinite(count) || count <= 0) {
+        return;
+    }
+    animateDownloadCount(count);
+}
+
+function loadDownloadCount() {
+    const cached = cachedDownloadCount();
+    if (cached !== null) {
+        showDownloadCount(cached);
+        return;
+    }
+    fetch(releasesApiUrl)
+        .then((response) => (response.ok ? response.json() : Promise.reject()))
+        .then((releases) => {
+            if (!Array.isArray(releases)) return;
+            const count = totalDownloads(releases);
+            storeDownloadCount(count);
+            showDownloadCount(count);
+        })
+        .catch(() => {
+            elements.downloadCount.hidden = true;
+        });
+}
+
 if (typeof fetch === "function") {
+    loadDownloadCount();
+
     fetch("https://api.github.com/repos/hust-open-atom-club/oh-dsh")
         .then((response) => (response.ok ? response.json() : Promise.reject()))
         .then((repository) => {

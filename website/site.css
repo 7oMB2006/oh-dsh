@@ -177,7 +177,8 @@ a:focus-visible {
     color: var(--text);
 }
 
-.github-star {
+.github-star,
+.github-downloads {
     display: inline-flex;
     gap: 7px;
     align-items: center;
@@ -194,12 +195,14 @@ a:focus-visible {
         border-color 160ms ease;
 }
 
-.github-star:hover {
+.github-star:hover,
+.github-downloads:hover {
     background: rgba(16, 43, 64, 0.82);
     border-color: rgba(151, 196, 255, 0.24);
 }
 
-.github-star svg {
+.github-star svg,
+.github-downloads svg {
     width: 16px;
     height: 16px;
     fill: none;
@@ -209,7 +212,8 @@ a:focus-visible {
     stroke-width: 1.7;
 }
 
-.star-count {
+.star-count,
+.download-count {
     padding-left: 7px;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
@@ -677,11 +681,13 @@ html:lang(zh-CN) .hero-title-surfaces {
 }
 
 @media (max-width: 600px) {
-    .github-star {
+    .github-star,
+    .github-downloads {
         padding: 0 10px;
     }
 
-    .star-count {
+    .star-count,
+    .download-count {
         display: none;
     }
 
