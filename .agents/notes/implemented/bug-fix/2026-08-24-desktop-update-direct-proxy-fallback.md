@@ -13,8 +13,9 @@ rules Chromium resolves for github.com onto the `electron-updater` partition
 session. When the OS proxy points at a local client that has stopped, every
 update check and download fails forever: Chromium on macOS and Windows ignores
 `HTTPS_PROXY`/`NO_PROXY` overrides, and the pinned rules lose Chromium's
-dynamic proxy fallback. The earlier message-level mitigation (actionable error
-text plus the Release-page link) could not make an update actually succeed.
+dynamic proxy fallback. The earlier message-level mitigation
+([update failure recovery](2026-08-21-desktop-update-failure-recovery.md))
+could not make an update actually succeed.
 
 ## Decision
 
@@ -24,6 +25,8 @@ text plus the Release-page link) could not make an update actually succeed.
   `ERR_TUNNEL_CONNECTION_FAILED`, `ERR_PROXY_AUTH_UNSUPPORTED`).
 - Once the bypass engages it holds for the session: `syncUpdaterProxy` keeps
   the updater session direct instead of re-copying the broken OS proxy rules.
+- Switching the updater session to direct also closes its pooled connections,
+  so the retry cannot reuse sockets opened through the dead proxy.
 - While a retry is possible, the updater `error` event for a proxy failure is
   not published, so the window never flashes a dead-end error before the
   retry lands.

@@ -436,7 +436,11 @@ async function syncUpdaterProxy(): Promise<void> {
 
 async function bypassUpdaterProxy(): Promise<void> {
   updaterProxyBypassed = true
-  await updaterSession().setProxy({ mode: 'direct' })
+  const target = updaterSession()
+  await target.setProxy({ mode: 'direct' })
+  // Sockets pooled through the dead proxy survive the proxy change and would
+  // keep failing; close them so the retry goes direct.
+  await target.closeAllConnections()
 }
 
 async function getUpdateManager(): Promise<DesktopUpdateManager> {

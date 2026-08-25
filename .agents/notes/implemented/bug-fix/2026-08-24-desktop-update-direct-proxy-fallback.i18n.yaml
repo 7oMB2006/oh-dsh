@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-24-desktop-update-direct-proxy-fallback.md
-2026-08-24-desktop-update-direct-proxy-fallback.md: b7186607d3818621f80db829d8dda7e0a5452466
-2026-08-24-desktop-update-direct-proxy-fallback.zh.md: 94d78d34bcfdb8beaf0daa63e80d8a5ccffe37c5
+2026-08-24-desktop-update-direct-proxy-fallback.md: 0b8eaca7f0ef1e9b39466971dc180b476cee2746
+2026-08-24-desktop-update-direct-proxy-fallback.zh.md: cfa3bbf232d56aca0d7671dfd8027fe83c408a63

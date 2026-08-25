@@ -11,8 +11,8 @@ Issue #113 反馈 Desktop 更新完全不可用（"软件更新无效"）：更�
 github.com 解析出的系统代理规则复制到 `electron-updater` 分区 session。当系统代理
 指向一个已停止的本地客户端时，所有更新检查与下载都会永久失败：macOS 和 Windows
 上的 Chromium 忽略 `HTTPS_PROXY`/`NO_PROXY` 环境变量覆盖，而固定下来的代理规则也
-失去了 Chromium 的动态回退能力。此前仅改进文案的措施（可操作的错误提示加 Release
-页面链接）无法让更新真正成功。
+失去了 Chromium 的动态回退能力。此前仅改进文案的措施（[更新失败恢复](2026-08-21-desktop-update-failure-recovery.md)）
+无法让更新真正成功。
 
 ## Decision
 
@@ -21,6 +21,8 @@ github.com 解析出的系统代理规则复制到 `electron-updater` 分区 ses
   `ERR_PROXY_AUTH_UNSUPPORTED`）时，绕过代理直连重试一次。
 - 一旦触发直连，本会话内保持直连：`syncUpdaterProxy` 不再重新复制失效的系统代理
   规则。
+- 将更新器 session 切为直连时会同时关闭其已池化的连接，避免重试复用经由失效
+  代理建立的 socket。
 - 在仍可能重试时，不为代理类失败发布 updater 的 `error` 事件，避免窗口在重试落地
   前闪现死胡同错误。
 - `PROXY_AUTH_REQUIRED` 保留"登录代理后重试"的提示：需要认证的代理通常守护着直连
