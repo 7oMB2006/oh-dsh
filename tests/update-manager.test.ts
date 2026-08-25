@@ -200,3 +200,112 @@ test('manager explains Chromium proxy connection failures and offers a manual fa
   await manager.openRelease()
   assert.deepEqual(opened, ['https://github.com/hust-open-atom-club/oh-dsh/releases'])
 })
+
+test('manager retries a check once without the configured proxy', async () => {
+  const updater = new FakeUpdater()
+  const attempts: number[] = []
+  let calls = 0
+  updater.checkForUpdates = async () => {
+    calls += 1
+    attempts.push(calls)
+    if (calls === 1) {
+      const error = new Error('net::ERR_PROXY_CONNECTION_FAILED')
+      updater.emit('error', error)
+      throw error
+    }
+    updater.emit('checking-for-update')
+    updater.emit('update-available', updateInfo('1.2.0'))
+    return { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  }
+  let bypassCalls = 0
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    bypassProxy: async () => { bypassCalls += 1 },
+  })
+  const states: string[] = []
+  manager.subscribe(state => { states.push(state.status) })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'available')
+  assert.deepEqual(attempts, [1, 2])
+  assert.equal(bypassCalls, 1)
+  assert.deepEqual(states, ['idle', 'checking', 'available'])
+})
+
+test('manager retries a download once without the configured proxy', async () => {
+  const updater = new FakeUpdater()
+  updater.result = { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  let bypassCalls = 0
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    bypassProxy: async () => { bypassCalls += 1 },
+  })
+  await manager.check()
+  let calls = 0
+  updater.downloadUpdate = async () => {
+    calls += 1
+    if (calls === 1) {
+      const error = new Error('net::ERR_TUNNEL_CONNECTION_FAILED')
+      updater.emit('error', error)
+      throw error
+    }
+    updater.emit('download-progress', { percent: 50, transferred: 50, total: 100, bytesPerSecond: 10 })
+    updater.emit('update-downloaded', { downloadedFile: '/tmp/Oh-DSH-Desktop-update.zip' })
+    return ['/tmp/Oh-DSH-Desktop-update.zip']
+  }
+
+  const state = await manager.download()
+  assert.equal(state.status, 'downloaded')
+  assert.equal(calls, 2)
+  assert.equal(bypassCalls, 1)
+  assert.equal(manager.getState().status, 'downloaded')
+})
+
+test('manager keeps the proxy bypassed for later operations', async () => {
+  const updater = new FakeUpdater()
+  let calls = 0
+  updater.checkForUpdates = async () => {
+    calls += 1
+    if (calls === 1) throw new Error('net::ERR_PROXY_CONNECTION_FAILED')
+    updater.emit('update-available', updateInfo('1.2.0'))
+    return { isUpdateAvailable: true, updateInfo: updateInfo('1.2.0') }
+  }
+  let bypassCalls = 0
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    bypassProxy: async () => { bypassCalls += 1 },
+  })
+
+  assert.equal((await manager.check()).status, 'available')
+  updater.checkForUpdates = async () => { throw new Error('net::ERR_PROXY_CONNECTION_FAILED') }
+  const state = await manager.check()
+  assert.equal(state.status, 'error')
+  if (state.status === 'error') assert.equal(state.code, 'ERR_PROXY_CONNECTION_FAILED')
+  assert.equal(bypassCalls, 1)
+})
+
+test('manager does not bypass the proxy for unrelated failures', async () => {
+  const updater = new FakeUpdater()
+  updater.checkForUpdates = async () => { throw Object.assign(new Error('404 Not Found'), { code: 'HTTP_404' }) }
+  let bypassCalls = 0
+  const manager = new DesktopUpdateManager({
+    currentVersion: '1.1.0',
+    platform: 'darwin',
+    arch: 'arm64',
+    updater,
+    bypassProxy: async () => { bypassCalls += 1 },
+  })
+
+  const state = await manager.check()
+  assert.equal(state.status, 'error')
+  assert.equal(bypassCalls, 0)
+})

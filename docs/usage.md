@@ -197,7 +197,9 @@ The updater checks only stable GitHub Releases from
   download, or install on the next application quit.
 - `.deb` downloads and opens the system package installer. It never runs
   `sudo`, `apt`, or `dpkg` around the system permission boundary.
-- The updater uses the system proxy configuration. Offline, proxy-auth, 404,
+- The updater uses the system proxy configuration. When the configured proxy
+  cannot be reached, the updater retries once without any proxy and keeps the
+  direct connection for the rest of the session. Offline, proxy-auth, 404,
   insufficient-space, verification, cancellation, and retry states are shown
   in the update window. A verification failure never replaces the current app.
 - An update replaces only the application. DSH data, workspace settings,
