@@ -227,6 +227,8 @@ html[data-oh-dsh-desktop-sidebar-open='true'] #oh-dsh-sidebar-root {
   font: inherit;
 }
 
+.oh-dsh-review-history-toggle { grid-template-columns: 26px minmax(0, 1fr) auto auto; }
+
 .oh-dsh-workspace-section-toggle:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgb(0 0 0 / 6%));
 }

@@ -852,6 +852,7 @@ function WorkspacePanel({
   const [commitOpen, setCommitOpen] = useState(false)
   const [commitMessage, setCommitMessage] = useState('')
   const [newBranch, setNewBranch] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<BetterSidebarGitLogEntry[]>([])
   const [selectedCommit, setSelectedCommit] = useState<GitReviewCommit | null>(null)
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -949,6 +950,7 @@ function WorkspacePanel({
     setChangesOpen(false)
     setChangeStats({})
 
+    setHistoryOpen(false)
     setHistory([])
     setSelectedCommit(null)
     setCommentTarget(null)
@@ -1178,11 +1180,20 @@ function WorkspacePanel({
 
             {snapshot?.kind === 'repository' && (
               <section className="oh-dsh-review-history">
-                <div className="oh-dsh-workspace-section-title">
+                <button
+                  type="button"
+                  className="oh-dsh-workspace-section-toggle oh-dsh-review-history-toggle"
+                  aria-expanded={historyOpen}
+                  onClick={() => { setHistoryOpen(value => !value) }}
+                >
                   <span className="oh-dsh-workspace-section-icon"><WorkspaceIcon name="history" /></span>
                   <strong>{t('workspace.review-history')}</strong>
                   <span className="oh-dsh-workspace-count">{history.length}</span>
-                </div>
+                  <span className={`oh-dsh-workspace-section-chevron${historyOpen ? ' is-open' : ''}`}>
+                    <WorkspaceIcon name="chevron" />
+                  </span>
+                </button>
+                {historyOpen && <>
                 <div className="oh-dsh-review-commit-list">
                   {history.map(entry => (
                     <button
@@ -1331,6 +1342,7 @@ function WorkspacePanel({
                     )}
                   </div>
                 )}
+                </>}
               </section>
             )}
 
