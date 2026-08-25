@@ -8,7 +8,8 @@
 - 只需要浏览器交互：安装 **Oh-DSH Web**，不携带 Electron。
 - 纯终端交互：安装 **Oh-DSH TUI**，不携带 Electron 或浏览器 UI。
 
-完整版已经包含三种形态，因此安装一次后可以使用 `desktop`、`web` 和 `tui`。
+Release 提供完整版、Web-only 与 TUI-only 三种形态；命令行安装器默认先安装
+TUI，其他 surface 可以按需指定。
 
 ## 使用 install.sh 安装
 
@@ -19,7 +20,7 @@
 ```sh
 curl -fsSL \
   https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
-  | bash -s -- --surface tui
+  | bash
 ```
 
 Windows 使用对应的 `install.ps1`，安装相同的 surface（desktop 通过 NSIS
@@ -37,12 +38,12 @@ Surface 矩阵与默认位置：
 
 | Surface | macOS (arm64/x64) | Linux (x64) | Windows (x64) |
 | --- | --- | --- | --- |
-| desktop（默认） | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services | AppImage 安装到 `~/.local/bin/oh-dsh-desktop` | 静默运行 NSIS 安装器（用户级） |
+| desktop | `Oh-DSH Desktop.app` 安装到 `/Applications` 并刷新 Launch Services，同时在 `~/.local/bin` 注册 `ohdsh desktop` | AppImage 安装到 `~/.local/bin/oh-dsh-desktop`，同时在 `~/.local/bin` 注册 `ohdsh desktop` | 静默运行 NSIS 安装器（用户级），同时注册 `ohdsh desktop` |
 | web | 载荷在 `~/.local/share/oh-dsh/web`，并在 `~/.local/bin` 创建调度式 `ohdsh` 启动器 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\web`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd`（自动加入用户 PATH） |
-| tui | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建调度式 `ohdsh` 启动器 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\tui`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd` |
+| tui（默认） | 载荷在 `~/.local/share/oh-dsh/tui`，并在 `~/.local/bin` 创建调度式 `ohdsh` 启动器 | 同左 | 载荷在 `%LOCALAPPDATA%\oh-dsh\tui`，并在 `%LOCALAPPDATA%\oh-dsh\bin` 创建 `ohdsh.cmd`（自动加入用户 PATH） |
 
 只有 desktop 会创建桌面应用入口；web 和 tui 不会注册 Launch Services，
-也不会生成 `.app` 包。
+也不会生成 `.app` 包；desktop 安装也会注册统一的 `ohdsh` dispatcher。
 
 web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可以并行安装：
 共享的 `ohdsh` 启动器记录每个 surface 的载荷位置，把 `ohdsh web` 与
@@ -52,10 +53,10 @@ web 与 tui 的载荷各自只携带自己 surface 的依赖，因此两者可�
 
 | 选项 | 默认值 | 说明 |
 | --- | --- | --- |
-| `--surface` | `desktop` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
+| `--surface` | `tui` | `desktop`、`web` 或 `tui`，每个 surface 只安装自己的文件与启动器 |
 | `--version` | 最新稳定版 | 固定 Release 标签，如 `v0.1.8`。预发布不会被自动选中，只有在显式固定时才会安装 |
 | `--dest` | 见上表 | 目标目录 |
-| `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器目录（web/tui） |
+| `--bin-dir` | `~/.local/bin` | `ohdsh` 启动器目录 |
 | `--repo` | `hust-open-atom-club/oh-dsh` | 从其他 fork 安装 |
 | `--force` | 关闭 | 已安装相同版本时强制重装 |
 | `--uninstall` | 关闭 | 卸载对应 surface |

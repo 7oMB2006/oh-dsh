@@ -16,13 +16,15 @@ installed the latest stable release for any surface.
 ## Decision
 
 - Ship one POSIX `sh` installer at the repository root covering all three
-  surfaces through `--surface desktop|web|tui` (default `desktop`). Each
-  surface installs only its own files: an `.app` under `/Applications` with
+  surfaces through `--surface desktop|web|tui` (default `tui`). The CLI-first
+  default and shared Desktop routing are detailed in the
+  [CLI-first installer note](2026-08-25-cli-first-install-and-lean-packages.md).
+  Each surface installs only its own files: an `.app` under `/Applications` with
   a Launch Services refresh and stale-bundle retirement for macOS desktop,
   an AppImage under `~/.local/bin` for Linux desktop, and a payload plus a
-  generated dispatching `ohdsh` launcher for web/tui (see the launcher
-  bullet below). Only the desktop surface ever registers an application
-  entry.
+  generated dispatching `ohdsh` launcher for command-line access; its records
+  also accept Desktop executables (see the launcher bullet below). Only the
+  desktop surface ever registers an application entry.
 - Verify every download against the `digest` (sha256) field the GitHub REST
   API already publishes for every asset. This covers every existing release
   without changing the release workflow, and fails closed when a digest is
@@ -34,13 +36,14 @@ installed the latest stable release for any surface.
   aside. Marker files (payload `.oh-dsh-install.env`,
   `<OH_DSH_HOME>/installer/desktop.env`) make same-version re-runs a no-op
   unless `--force` is passed, and `--uninstall` reverses an install.
-- web/tui installs place a dispatching `ohdsh` launcher in the bin
-  directory rather than a symlink: the web and tui payloads each carry only
-  their own surface's dependencies, so one shared symlink would make the
-  second install break the first surface. The launcher records each
-  surface's destination in `launcher.env` under the installer data home and
-  routes `ohdsh web`/`ohdsh tui` to the payload that provides the surface;
-  uninstalling one surface refreshes the launcher for the remaining one.
+- Web and TUI installs place a dispatching `ohdsh` launcher in the bin
+  directory rather than a symlink: their payloads each carry only their own
+  surface's dependencies, so one shared symlink would make the second install
+  break the first surface. Desktop installs record the native executable in
+  the same launcher records, so the dispatcher serves every installed
+  surface and routes `ohdsh web`, `ohdsh tui`, and `ohdsh desktop` to their
+  owners; uninstalling one surface refreshes the launcher for the remaining
+  ones.
 - Markers are inert `KEY=value` text: values are charset-validated on
   write and parsed line-by-line on read (never sourced), destinations are
   recorded so desktop idempotency is keyed by the requested location, and
@@ -90,8 +93,8 @@ sha512, while the API digest covers all surfaces uniformly.
 
 **An interactive surface selector as the default.** Rejected:
 `curl | bash` is non-interactive by nature; an explicit, documented
-`--surface` with `desktop` as the flagship default keeps the one-liner
-deterministic.
+`--surface` with `tui` as the command-line default keeps the one-liner
+deterministic while leaving Desktop and Web explicit.
 
 **A Windows PowerShell counterpart.** Rejected initially to keep the first
 installer Unix-only while the NSIS `.exe` covered Windows desktop; reversed

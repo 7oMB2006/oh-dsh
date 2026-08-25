@@ -10,7 +10,7 @@
 # Usage:
 #   curl -fsSL \
 #     https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
-#     | bash -s -- --surface tui
+#     | bash
 #   sh install.sh --surface web --version v0.1.8
 #   sh install.sh --uninstall --surface desktop
 #
@@ -36,7 +36,7 @@ Usage:
   sh install.sh [options]
 
 Options:
-  -s, --surface NAME    Surface to install: desktop (default), web, or tui.
+  -s, --surface NAME    Surface to install: tui (default), desktop, or web.
                         Each surface installs only its own files and launcher.
   -v, --version TAG     Release tag to install (for example v0.1.8).
                         Default: the latest stable Release. Prereleases are
@@ -71,9 +71,8 @@ Uninstall:
   sh install.sh --uninstall [--surface NAME] [--dest DIR] [--bin-dir DIR]
 
 Files:
-  web/tui installs a payload plus an `ohdsh` symlink in --bin-dir; desktop on
-  macOS installs "Oh-DSH Desktop.app" and refreshes Launch Services; desktop
-  on Linux installs an executable named oh-dsh-desktop.
+  web/tui installs a payload plus an `ohdsh` dispatcher in --bin-dir; desktop
+  installs its native app and registers the same dispatcher when possible.
 EOF
 }
 
@@ -90,7 +89,7 @@ log() {
 # Options
 # ---------------------------------------------------------------------------
 
-surface=${OH_DSH_SURFACE:-desktop}
+surface=${OH_DSH_SURFACE:-tui}
 version_arg=${OH_DSH_VERSION:-}
 dest_arg=${OH_DSH_INSTALL_DIR:-}
 bin_dir_arg=${OH_DSH_BIN_DIR:-}
@@ -428,6 +427,7 @@ same_version_installed() {
       else
         [ -x "$dest/oh-dsh-desktop" ] || return 1
       fi
+      launcher_current || return 1
       ;;
     web|tui)
       [ -x "$dest/bin/ohdsh" ] || return 1
@@ -494,10 +494,19 @@ write_launcher_env() {
   tmp="$launcher_env.tmp.$$"
   {
     [ -f "$launcher_env" ] \
-      && sed -e "/^$key=/d" -e "/^${surface_key}_REPO=/d" -e '/^BIN_DIR=/d' "$launcher_env"
+      && sed -e "/^$key=/d" -e "/^${surface_key}_REPO=/d" \
+        -e "/^${surface_key}_OS=/d" -e "/^${surface_key}_EXE=/d" \
+        -e '/^BIN_DIR=/d' "$launcher_env"
     printf '%s=%s\n' "$key" "$dest"
     printf 'BIN_DIR=%s\n' "$bin_dir"
     printf '%s_REPO=%s\n' "$surface_key" "$repo"
+    printf '%s_OS=%s\n' "$surface_key" "$os"
+    if [ "$surface" = desktop ]; then
+      case "$os" in
+        darwin) printf 'DESKTOP_EXE=%s/Oh-DSH Desktop.app/Contents/MacOS/Oh-DSH Desktop\n' "$dest" ;;
+        linux) printf 'DESKTOP_EXE=%s/oh-dsh-desktop\n' "$dest" ;;
+      esac
+    fi
   } > "$tmp"
   mv -f "$tmp" "$launcher_env"
   if [ -n "$relocated_previous" ] && [ "$relocated_previous" != "$dest" ] \
@@ -520,8 +529,13 @@ remove_launcher_env_key() {
   # $1: key. BIN_DIR stays while another surface still needs the launcher.
   [ -f "$launcher_env" ] || return 1
   tmp="$launcher_env.tmp.$$"
-  sed -e "/^$1=/d" -e "/^${1%_DEST}_REPO=/d" "$launcher_env" > "$tmp"
-  if grep -Eq '^(WEB|TUI)_DEST=' "$tmp"; then
+  if [ "$1" = DESKTOP_DEST ]; then
+    sed -e "/^$1=/d" -e '/^DESKTOP_EXE=/d' -e "/^${1%_DEST}_REPO=/d" \
+      -e "/^${1%_DEST}_OS=/d" "$launcher_env" > "$tmp"
+  else
+    sed -e "/^$1=/d" -e "/^${1%_DEST}_REPO=/d" -e "/^${1%_DEST}_OS=/d" "$launcher_env" > "$tmp"
+  fi
+  if grep -Eq '^(DESKTOP|WEB|TUI)_DEST=' "$tmp"; then
     mv -f "$tmp" "$launcher_env"
     return 0
   fi
@@ -539,6 +553,7 @@ ensure_dispatcher_target_available() {
     for candidate_root in \
       "$(marker_field "$launcher_env" WEB_DEST)" \
       "$(marker_field "$launcher_env" TUI_DEST)" \
+      "$(marker_field "$launcher_env" DESKTOP_DEST)" \
       "$data_home/web" \
       "$data_home/tui"; do
       [ -n "$candidate_root" ] || continue
@@ -581,38 +596,112 @@ fi
 
 web_dest=''
 tui_dest=''
+desktop_dest=''
+desktop_exec=''
 if [ -f "\$ENV_FILE" ]; then
   web_dest=\$(sed -n 's/^WEB_DEST=//p' "\$ENV_FILE" | head -n 1)
   tui_dest=\$(sed -n 's/^TUI_DEST=//p' "\$ENV_FILE" | head -n 1)
+  desktop_dest=\$(sed -n 's/^DESKTOP_DEST=//p' "\$ENV_FILE" | head -n 1)
+  desktop_exec=\$(sed -n 's/^DESKTOP_EXE=//p' "\$ENV_FILE" | head -n 1)
 fi
 
 surface=\${1:-}
-root=''
 case "\$surface" in
-  web) root=\$web_dest ;;
-  tui) root=\$tui_dest ;;
+  web)
+    if [ -z "\$web_dest" ] || [ ! -x "\$web_dest/bin/ohdsh" ]; then
+      printf 'Oh-DSH web is not installed. Re-run the install script with --surface web.\\n' >&2
+      exit 2
+    fi
+    exec "\$web_dest/bin/ohdsh" "\$@"
+    ;;
+  tui)
+    if [ -z "\$tui_dest" ] || [ ! -x "\$tui_dest/bin/ohdsh" ]; then
+      printf 'Oh-DSH tui is not installed. Re-run the install script with --surface tui.\\n' >&2
+      exit 2
+    fi
+    exec "\$tui_dest/bin/ohdsh" "\$@"
+    ;;
+  desktop|gui)
+    if [ -z "\$desktop_exec" ] || [ ! -x "\$desktop_exec" ]; then
+      printf 'Oh-DSH desktop is not installed. Re-run the install script with --surface desktop.\\n' >&2
+      exit 2
+    fi
+    shift
+    exec "\$desktop_exec" "\$@"
+    ;;
   *)
-    # desktop, gui, help, and update work from any installed payload.
-    if [ -n "\$tui_dest" ]; then root=\$tui_dest; else root=\$web_dest; fi
+    if [ -n "\$tui_dest" ] && [ -x "\$tui_dest/bin/ohdsh" ]; then
+      exec "\$tui_dest/bin/ohdsh" "\$@"
+    elif [ -n "\$web_dest" ] && [ -x "\$web_dest/bin/ohdsh" ]; then
+      exec "\$web_dest/bin/ohdsh" "\$@"
+    else
+      if [ -n "\$desktop_exec" ] && [ -x "\$desktop_exec" ]; then
+        exec "\$desktop_exec" "\$@"
+      fi
+    fi
+    printf 'Oh-DSH is not installed. Re-run the install script from the repository README.\\n' >&2
+    exit 2
     ;;
 esac
-
-if [ -z "\$root" ] || [ ! -x "\$root/bin/ohdsh" ]; then
-  case "\$surface" in
-    web|tui)
-      printf 'Oh-DSH %s is not installed. Re-run the install script with --surface %s.\\n' "\$surface" "\$surface" >&2
-      ;;
-    *)
-      printf 'Oh-DSH is not installed. Re-run the install script from the repository README.\\n' >&2
-      ;;
-  esac
-  exit 2
-fi
-
-exec "\$root/bin/ohdsh" "\$@"
 EOF
   chmod 0755 "$tmp"
   mv -f "$tmp" "$target"
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+ensure_launcher_profile() {
+  profile=$1
+  marker='# Oh-DSH launcher path'
+  end_marker='# End Oh-DSH launcher path'
+  mkdir -p "$(dirname "$profile")"
+  tmp="$profile.ohdsh.$$"
+  if [ -f "$profile" ]; then
+    # Replace only the installer-owned stanza; preserve other shell setup.
+    awk -v marker="$marker" -v end_marker="$end_marker" '
+      $0 == marker { in_block=1; skip_end=0; next }
+      in_block {
+        if ($0 == end_marker) { in_block=0; next }
+        if ($0 == "esac") { in_block=0; skip_end=1; next }
+        next
+      }
+      skip_end && $0 == end_marker { skip_end=0; next }
+      { skip_end=0; print }
+    ' "$profile" > "$tmp"
+  else
+    : > "$tmp"
+  fi
+  quoted_bin=$(shell_quote "$bin_dir")
+  {
+    if [ -s "$tmp" ]; then printf '\n'; fi
+    printf '%s\n' "$marker"
+    printf 'case ":${PATH:-}:" in\n'
+    printf '  *:%s:*) ;;\n' "$quoted_bin"
+    printf "  *) PATH=%s:\${PATH:-}; export PATH ;;\n" "$quoted_bin"
+    printf 'esac\n'
+    printf '%s\n' "$end_marker"
+  } >> "$tmp"
+  mv -f "$tmp" "$profile"
+  log "Added $bin_dir to PATH for new shells via $profile"
+}
+
+ensure_launcher_path() {
+  shell_name=$(basename "${SHELL:-}")
+  case "$shell_name" in
+    bash)
+      ensure_launcher_profile "$HOME/.bash_profile"
+      ensure_launcher_profile "$HOME/.bashrc"
+      ;;
+    zsh)
+      ensure_launcher_profile "${ZDOTDIR:-$HOME}/.zprofile"
+      ensure_launcher_profile "${ZDOTDIR:-$HOME}/.zshrc"
+      ;;
+    *)
+      ensure_launcher_profile "$HOME/.profile"
+      ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------
@@ -643,6 +732,9 @@ remove_desktop_mac() {
     rm -f "$desktop_marker"
     log "Removed $desktop_marker"
   fi
+  if [ "$removed" = 1 ]; then
+    remove_desktop_dispatcher
+  fi
   [ "$removed" = 1 ] || log "No Oh-DSH Desktop app found under $dest; nothing to remove"
 }
 
@@ -659,8 +751,21 @@ remove_desktop_linux() {
       rm -f "$desktop_marker"
       log "Removed $desktop_marker"
     fi
+    remove_desktop_dispatcher
   else
     log "No oh-dsh-desktop AppImage found under $dest; nothing to remove"
+  fi
+}
+
+remove_desktop_dispatcher() {
+  link="$bin_dir/ohdsh"
+  if remove_launcher_env_key DESKTOP_DEST; then
+    install_dispatcher "$link"
+    log "Launcher $link now serves the remaining installed surfaces"
+  elif [ ! -f "$launcher_env" ] && [ -f "$link" ] && [ ! -L "$link" ] \
+    && grep -q 'Oh-DSH launcher installed by install.sh' "$link" 2>/dev/null; then
+    rm -f "$link"
+    log "Removed launcher $link"
   fi
 }
 
@@ -879,6 +984,7 @@ install_payload_surface() {
 
   log "Installed Oh-DSH $surface $version to $dest"
   log "Launcher: $bin_dir/ohdsh"
+  ensure_launcher_path
   case ":${PATH:-}:" in
     *":$bin_dir:"*) ;;
     *)
@@ -893,6 +999,8 @@ install_payload_surface() {
 # ---------------------------------------------------------------------------
 
 install_desktop_linux() {
+  mkdir -p "$bin_dir"
+  ensure_dispatcher_target_available "$bin_dir/ohdsh"
   mkdir -p "$dest"
   if [ ! -w "$dest" ]; then
     die "$dest is not writable; pass --dest DIR or rerun with sufficient privileges"
@@ -927,6 +1035,9 @@ install_desktop_linux() {
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
+  write_launcher_env
+  install_dispatcher "$bin_dir/ohdsh"
+  ensure_launcher_path
   retire_relocated_desktop_dest
   # Deletions happen only once the marker is committed.
   rm -f "$previous"
@@ -938,6 +1049,8 @@ install_desktop_linux() {
   fi
 
   log "Installed Oh-DSH Desktop $version to $image"
+  log "Launcher: $bin_dir/ohdsh"
+  printf '    start with: %s desktop\n' "$bin_dir/ohdsh"
   case ":${PATH:-}:" in
     *":$dest:"*) ;;
     *)
@@ -1028,6 +1141,8 @@ quit_running_app() {
 
 
 install_desktop_mac() {
+  mkdir -p "$bin_dir"
+  ensure_dispatcher_target_available "$bin_dir/ohdsh"
   extract_dir="$workdir/extract"
   mkdir -p "$extract_dir"
   if command -v ditto >/dev/null 2>&1; then
@@ -1150,9 +1265,14 @@ install_desktop_mac() {
 
   mkdir -p "$record_home"
   write_marker "$desktop_marker"
+  write_launcher_env
+  install_dispatcher "$bin_dir/ohdsh"
+  ensure_launcher_path
   retire_relocated_desktop_dest
 
   log "Installed $app_dest"
+  log "Launcher: $bin_dir/ohdsh"
+  printf '    start with: %s desktop\n' "$bin_dir/ohdsh"
   if [ "$had_previous" = 1 ]; then
     rm -rf "$backup"
     log "Removed the previous app bundle"

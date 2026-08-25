@@ -72,6 +72,63 @@ Git review, browser, files, sessions, and plugin state.
 
 ## Download and install
 
+### Preferred: command-line installation
+
+Use the repository's root-level `install.sh` on Linux and macOS to install the
+latest stable release. It installs TUI by default and registers `ohdsh` under
+`~/.local/bin`; open a new terminal and run:
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash
+```
+
+Choose Web or Desktop explicitly when needed:
+
+```sh
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface web
+
+curl -fsSL \
+  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
+  | bash -s -- --surface desktop
+```
+
+On Windows, use the root-level `install.ps1`; it also installs TUI by default:
+
+```powershell
+irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
+```
+
+After installation, use the unified command for any installed surface:
+
+```sh
+# Terminal UI
+ohdsh tui
+
+# Web UI
+ohdsh web
+
+# Desktop application
+ohdsh desktop
+```
+
+`ohdsh` starts only surfaces that have been installed; the direct
+`oh-dsh-desktop` entry point remains available. On Linux/macOS, open a new
+terminal if the current shell has not loaded the new PATH; on Windows, use a
+new terminal.
+
+The installers verify the published SHA-256 digest before touching the
+previous installation, so a failed download, checksum mismatch, or interrupted
+extraction keeps the old install usable. Re-running the command upgrades in
+place, and `--uninstall` removes a surface. Options, environment overrides,
+and the surface matrix are documented in the
+[installation guide](./docs/usage.md#install-with-installsh).
+
+### Manual installation from a GitHub Release
+
 Choose a distribution from the
 [latest GitHub Release](https://github.com/hust-open-atom-club/oh-dsh/releases/latest):
 
@@ -85,55 +142,8 @@ Choose a distribution from the
 - **Windows:** run the installer, or extract and launch the portable package.
 - **Linux:** run the AppImage, or install the deb with `apt`.
 
-macOS and Linux can also install the latest stable release with the
-repository's root-level `install.sh`; Windows uses `install.ps1`:
-
-```sh
-curl -fsSL \
-  https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.sh \
-  | bash -s -- --surface desktop
-```
-
-```powershell
-irm https://raw.githubusercontent.com/hust-open-atom-club/oh-dsh/main/install.ps1 | iex
-```
-
-`--surface` accepts `desktop` (default), `web`, or `tui`; each surface
-installs only its own files and launcher. The installers verify the
-published SHA-256 digest before touching the previous installation, so a
-failed download, checksum mismatch, or interrupted extraction keeps the old
-install usable, and a successful upgrade deletes the previous installation
-instead of accumulating copies. Re-running the command upgrades in place,
-and `--uninstall` removes a surface. Every surface also checks for a newer
-stable release once per launch: TUI and Web print a notice and upgrade
-through `ohdsh update`, while the desktop notifies through its update
-window. Options, environment overrides, and the surface matrix are
-documented in the
-[installation guide](./docs/usage.md#install-with-installsh).
-
-Web-only and TUI-only packages are ready after extraction:
-
-```sh
-# Web UI, listening on http://127.0.0.1:3080 by default
-./bin/ohdsh web
-
-# Terminal UI
-./bin/ohdsh tui
-```
-
-On Windows, use `bin\ohdsh.cmd web` or `bin\ohdsh.cmd tui`.
-
-### Install the unified command
-
-The macOS full distribution contains a launcher that can be added to `PATH`:
-
-```sh
-sudo ln -sf \
-  "/Applications/Oh-DSH Desktop.app/Contents/Resources/bin/ohdsh" \
-  /usr/local/bin/ohdsh
-```
-
-Run `./bin/ohdsh` from Web-only and TUI-only packages, or add it to `PATH`.
+The installer is the recommended entry point; Release assets are useful when
+you need to choose a package manually or distribute it offline.
 
 ## Usage
 
