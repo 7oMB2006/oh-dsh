@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-collapsible-workspace-change-summary.md
-2026-08-24-collapsible-workspace-change-summary.md: 56cab18517d020efcc25a0f62eb8280d39c74972
-2026-08-24-collapsible-workspace-change-summary.zh.md: 9ccd3cbe9c2ea9eed3176ac756dbb66c63719d81
+2026-08-24-collapsible-workspace-change-summary.md: 532803c6a7a102b5a7fad4f510f800e40e361d8f
+2026-08-24-collapsible-workspace-change-summary.zh.md: 127625581922b53c63dde1e49ded4a89e9488b73
