@@ -350,6 +350,12 @@ function Find-DesktopExecutable {
     return ''
 }
 
+function Test-DesktopDispatcher {
+    $shimPath = Join-Path (Get-BinDir) 'ohdsh.cmd'
+    if (-not (Test-Path -LiteralPath $shimPath)) { return $false }
+    return (Get-Content -LiteralPath $shimPath -Raw) -like '*DESKTOP_EXE*'
+}
+
 function Remove-SurfaceInstall {
     if ($Surface -eq 'desktop') {
         $candidates = @(
@@ -562,11 +568,9 @@ if (-not $Force) {
                         if ($hasApp) { break }
                     }
                     $artifactsOk = $hasApp
-                    if ($artifactsOk) {
-                        $shimPath = Join-Path (Get-BinDir) 'ohdsh.cmd'
-                        $artifactsOk = (Test-Path -LiteralPath $shimPath) `
-                            -and ((Get-Content -LiteralPath $shimPath -Raw) -like '*DESKTOP_EXE*')
-                    }
+                }
+                if ($artifactsOk) {
+                    $artifactsOk = Test-DesktopDispatcher
                 }
             }
         } else {
