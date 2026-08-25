@@ -228,4 +228,7 @@ test('workspace review uses one SVG icon language', async () => {
   assert.match(sourceText, /<WorkspaceIcon name="chevron" \/>/)
   assert.match(sourceText, /<WorkspaceIcon name="branch" \/>/)
   assert.match(sourceText, /<WorkspaceIcon name="commit" \/>/)
+  assert.match(sourceText, /function WorkspaceDropdown\(/)
+  assert.match(sourceText, /role="listbox"/)
+  assert.doesNotMatch(sourceText, /<select/)
 })

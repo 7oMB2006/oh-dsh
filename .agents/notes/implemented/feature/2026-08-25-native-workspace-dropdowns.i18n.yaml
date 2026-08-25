@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-native-workspace-dropdowns.md
+2026-08-25-native-workspace-dropdowns.md: b56d10a4bd810ee416b7a738c6f843b1e773cc10
+2026-08-25-native-workspace-dropdowns.zh.md: d97440a86aa633bcd06935927356ca70c472b5ed

@@ -706,6 +706,7 @@ type WorkspaceIconName =
   | 'branch'
   | 'changes'
   | 'chevron'
+  | 'check'
   | 'close'
   | 'commit'
   | 'environment'
@@ -729,6 +730,7 @@ function WorkspaceIcon({ name }: { name: WorkspaceIconName }): JSX.Element {
     return <svg {...common}><rect x="3.5" y="3" width="10.5" height="14" rx="2" /><path d="M7 7h3M7 10h3M7 13h3M13.5 6.5h3v7" /></svg>
   }
   if (name === 'chevron') return <svg {...common}><path d="m6.5 8 3.5 4 3.5-4" /></svg>
+  if (name === 'check') return <svg {...common}><path d="m4.5 10 3.5 3.5 7.5-7" /></svg>
   if (name === 'close') return <svg {...common}><path d="m5 5 10 10M15 5 5 15" /></svg>
   if (name === 'commit') {
     return <svg {...common}><circle cx="5" cy="10" r="2" /><circle cx="15" cy="5" r="2" /><circle cx="15" cy="15" r="2" /><path d="M7 10h4a4 4 0 0 0 4-4V7M11 10a4 4 0 0 1 4 4v-1" /></svg>
@@ -743,6 +745,122 @@ function WorkspaceIcon({ name }: { name: WorkspaceIconName }): JSX.Element {
   return <svg {...common}><path d="M16 7.5A6 6 0 1 0 16.5 12" /><path d="M16 4.5v3.5h-3.5" /></svg>
 }
 
+interface WorkspaceDropdownOption {
+  label: string
+  value: string
+}
+
+function WorkspaceDropdown({
+  ariaLabel,
+  disabled = false,
+  onChange,
+  options,
+  value,
+}: {
+  ariaLabel: string
+  disabled?: boolean
+  onChange: (value: string) => void
+  options: readonly WorkspaceDropdownOption[]
+  value: string
+}): JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const selectedIndex = Math.max(0, options.findIndex(option => option.value === value))
+  const [activeIndex, setActiveIndex] = useState(selectedIndex)
+  const selected = options.find(option => option.value === value)
+
+  useEffect(() => {
+    if (open) setActiveIndex(selectedIndex)
+  }, [open, selectedIndex])
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent): void => {
+      if (rootRef.current?.contains(event.target as Node) !== true) setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+        triggerRef.current?.focus()
+        return
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setActiveIndex(index => Math.min(options.length - 1, index + 1))
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setActiveIndex(index => Math.max(0, index - 1))
+        return
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        const option = options[activeIndex]
+        if (option === undefined) return
+        onChange(option.value)
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [activeIndex, onChange, open, options])
+
+  return (
+    <div ref={rootRef} className="oh-dsh-workspace-dropdown">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="oh-dsh-workspace-dropdown-trigger"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={ariaLabel}
+        disabled={disabled || options.length === 0}
+        onClick={() => { setOpen(value => !value) }}
+      >
+        <span className="oh-dsh-workspace-dropdown-label">
+          {(selected?.label ?? value) || '—'}
+        </span>
+        <span className={`oh-dsh-workspace-dropdown-chevron${open ? ' is-open' : ''}`}>
+          <WorkspaceIcon name="chevron" />
+        </span>
+      </button>
+      {open && (
+        <div className="oh-dsh-workspace-dropdown-menu" role="listbox" aria-label={ariaLabel}>
+          {options.map((option, index) => {
+            const selectedOption = option.value === value
+            return (
+              <button
+                type="button"
+                key={option.value}
+                role="option"
+                aria-selected={selectedOption}
+                data-active={index === activeIndex || undefined}
+                className="oh-dsh-workspace-dropdown-option"
+                onMouseEnter={() => { setActiveIndex(index) }}
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                  triggerRef.current?.focus()
+                }}
+              >
+                <span>{option.label}</span>
+                {selectedOption && <WorkspaceIcon name="check" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 function DesktopPanelToolbar({
   service,
   panels,
@@ -1348,31 +1466,31 @@ function WorkspacePanel({
 
             <section className="oh-dsh-workspace-facts">
 
-              <label className="oh-dsh-workspace-fact">
+              <div className="oh-dsh-workspace-fact">
                 <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="environment" /></span>
                 <span className="oh-dsh-workspace-fact-copy">
                   <small>{t('workspace.execution-environment')}</small>
-                  <select aria-label={t('workspace.execution-environment')} value="local" onChange={() => {}}>
-                    <option value="local">{t('workspace.local')}</option>
-                  </select>
+                  <WorkspaceDropdown
+                    ariaLabel={t('workspace.execution-environment')}
+                    options={[{ value: 'local', label: t('workspace.local') }]}
+                    value="local"
+                    onChange={() => {}}
+                  />
                 </span>
-                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
-              </label>
-              <label className="oh-dsh-workspace-fact">
+              </div>
+              <div className="oh-dsh-workspace-fact">
                 <span className="oh-dsh-workspace-fact-icon"><WorkspaceIcon name="branch" /></span>
                 <span className="oh-dsh-workspace-fact-copy">
                   <small>{t('workspace.current-branch')}</small>
-                  <select
+                  <WorkspaceDropdown
+                    ariaLabel={t('workspace.current-branch')}
+                    options={(snapshot?.branches ?? []).map(branch => ({ value: branch, label: branch }))}
                     value={snapshot?.branch ?? ''}
                     disabled={snapshot?.kind !== 'repository' || busy}
-                    aria-label={t('workspace.current-branch')}
-                    onChange={event => { void mutate({ action: 'checkout', branch: event.currentTarget.value }) }}
-                  >
-                    {(snapshot?.branches ?? []).map(branch => <option key={branch} value={branch}>{branch}</option>)}
-                  </select>
+                    onChange={branch => { void mutate({ action: 'checkout', branch }) }}
+                  />
                 </span>
-                <span className="oh-dsh-workspace-chevron"><WorkspaceIcon name="chevron" /></span>
-              </label>
+              </div>
               {snapshot?.kind === 'repository' && (
                 <div className="oh-dsh-new-branch">
                   <input
