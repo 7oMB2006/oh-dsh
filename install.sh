@@ -648,29 +648,60 @@ EOF
   mv -f "$tmp" "$target"
 }
 
-ensure_launcher_path() {
-  case ":${PATH:-}:" in
-    *":$bin_dir:"*) return 0 ;;
-  esac
-  profile="$HOME/.profile"
-  shell_name=$(basename "${SHELL:-}")
-  if [ "$shell_name" = zsh ]; then
-    profile="${ZDOTDIR:-$HOME}/.zprofile"
-  elif [ "$shell_name" = bash ] && [ -f "$HOME/.bash_profile" ]; then
-    profile="$HOME/.bash_profile"
-  fi
-  escaped_bin=$(printf '%s' "$bin_dir" | sed "s/'/'\\''/g")
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+ensure_launcher_profile() {
+  profile=$1
   marker='# Oh-DSH launcher path'
-  if [ ! -f "$profile" ] || ! grep -Fqx "$marker" "$profile" 2>/dev/null; then
-    {
-      printf '\n%s\n' "$marker"
-      printf 'case ":${PATH:-}:" in\n'
-      printf '  *:\"%s\":*) ;;\n' "$escaped_bin"
-      printf "  *) PATH='%s':\${PATH:-}; export PATH ;;\n" "$escaped_bin"
-      printf 'esac\n'
-    } >> "$profile"
-    log "Added $bin_dir to PATH for new shells via $profile"
+  end_marker='# End Oh-DSH launcher path'
+  mkdir -p "$(dirname "$profile")"
+  tmp="$profile.ohdsh.$$"
+  if [ -f "$profile" ]; then
+    # Replace only the installer-owned stanza; preserve other shell setup.
+    awk -v marker="$marker" -v end_marker="$end_marker" '
+      $0 == marker { in_block=1; skip_end=0; next }
+      in_block {
+        if ($0 == end_marker) { in_block=0; next }
+        if ($0 == "esac") { in_block=0; skip_end=1; next }
+        next
+      }
+      skip_end && $0 == end_marker { skip_end=0; next }
+      { skip_end=0; print }
+    ' "$profile" > "$tmp"
+  else
+    : > "$tmp"
   fi
+  quoted_bin=$(shell_quote "$bin_dir")
+  {
+    if [ -s "$tmp" ]; then printf '\n'; fi
+    printf '%s\n' "$marker"
+    printf 'case ":${PATH:-}:" in\n'
+    printf '  *:%s:*) ;;\n' "$quoted_bin"
+    printf "  *) PATH=%s:\${PATH:-}; export PATH ;;\n" "$quoted_bin"
+    printf 'esac\n'
+    printf '%s\n' "$end_marker"
+  } >> "$tmp"
+  mv -f "$tmp" "$profile"
+  log "Added $bin_dir to PATH for new shells via $profile"
+}
+
+ensure_launcher_path() {
+  shell_name=$(basename "${SHELL:-}")
+  case "$shell_name" in
+    bash)
+      ensure_launcher_profile "$HOME/.bash_profile"
+      ensure_launcher_profile "$HOME/.bashrc"
+      ;;
+    zsh)
+      ensure_launcher_profile "${ZDOTDIR:-$HOME}/.zprofile"
+      ensure_launcher_profile "${ZDOTDIR:-$HOME}/.zshrc"
+      ;;
+    *)
+      ensure_launcher_profile "$HOME/.profile"
+      ;;
+  esac
 }
 
 # ---------------------------------------------------------------------------

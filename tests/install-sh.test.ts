@@ -206,12 +206,13 @@ test('default Unix installation provides the TUI dispatcher', { skip: skipOnWind
   await github.start()
   try {
     github.publish('v0.1.8', [await makeSurfaceArchive('tui', '0.1.8', 'linux', 'x64', 'default-tui')])
-    const { home, env } = await makeSandbox(github)
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/bash' })
     const result = await runInstaller(['--os', 'linux', '--arch', 'x64'], env)
     assert.equal(result.status, 0, result.stderr)
     const launcher = join(home, '.local', 'bin', 'ohdsh')
     assert.ok(await exists(launcher))
-    assert.match(await readFile(join(home, '.profile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.match(await readFile(join(home, '.bash_profile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.match(await readFile(join(home, '.bashrc'), 'utf8'), /Oh-DSH launcher path/)
     const launched = runLauncher(launcher, ['tui'], env)
     assert.equal(launched.status, 0, launched.stderr)
     assert.match(launched.stdout, /default-tui/)
@@ -220,7 +221,7 @@ test('default Unix installation provides the TUI dispatcher', { skip: skipOnWind
   }
 })
 
-test('zsh installations create .zprofile for new shells', { skip: skipOnWindows }, async () => {
+test('zsh installations register login and interactive profiles', { skip: skipOnWindows }, async () => {
   const github = new MockGitHub()
   await github.start()
   try {
@@ -229,7 +230,59 @@ test('zsh installations create .zprofile for new shells', { skip: skipOnWindows 
     const result = await runInstaller(['--os', 'linux', '--arch', 'x64'], env)
     assert.equal(result.status, 0, result.stderr)
     assert.match(await readFile(join(home, '.zprofile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.match(await readFile(join(home, '.zshrc'), 'utf8'), /Oh-DSH launcher path/)
     assert.equal(await exists(join(home, '.profile')), false)
+  } finally {
+    await github.stop()
+  }
+})
+
+test('shell PATH profiles follow a relocated launcher directory', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'relocated-path')])
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/bash' })
+    const payload = join(home, 'payload')
+    const binA = join(home, 'bin-a')
+    const binB = join(home, 'bin-b')
+    const common = ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--dest', payload]
+    assert.equal((await runInstaller([...common, '--bin-dir', binA], env)).status, 0)
+    assert.equal((await runInstaller([...common, '--bin-dir', binB], env)).status, 0)
+
+    for (const profile of ['.bash_profile', '.bashrc']) {
+      const contents = await readFile(join(home, profile), 'utf8')
+      assert.ok(contents.includes(binB), `${profile} must contain the current bin directory`)
+      assert.ok(!contents.includes(binA), `${profile} must remove the retired bin directory`)
+    }
+  } finally {
+    await github.stop()
+  }
+})
+
+test('shell PATH profiles quote apostrophes in launcher paths', { skip: skipOnWindows }, async () => {
+  const github = new MockGitHub()
+  await github.start()
+  try {
+    github.publish('v0.1.8', [await makeSurfaceArchive('web', '0.1.8', 'linux', 'x64', 'quoted-path')])
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/bash' })
+    const bin = join(home, "bin'a")
+    const profile = join(home, '.bashrc')
+    const result = await runInstaller(
+      ['--surface', 'web', '--os', 'linux', '--arch', 'x64', '--bin-dir', bin],
+      env,
+    )
+    assert.equal(result.status, 0, result.stderr)
+    const contents = await readFile(profile, 'utf8')
+    const quotedBin = bin.replaceAll("'", "'\\''")
+    assert.ok(contents.includes(quotedBin))
+    run('sh', ['-n', profile])
+    const sourced = spawnSync('sh', ['-c', '. "$1"; command -v ohdsh', 'test', profile], {
+      encoding: 'utf8',
+      env: { ...process.env, ...env, PATH: '/usr/bin:/bin' },
+    })
+    assert.equal(sourced.status, 0, sourced.stderr)
+    assert.equal(sourced.stdout.trim(), join(bin, 'ohdsh'))
   } finally {
     await github.stop()
   }
@@ -240,7 +293,7 @@ test('desktop install registers the unified launcher', { skip: skipOnWindows }, 
   await github.start()
   try {
     github.publish('v0.1.8', [await makeMacDesktopZip('0.1.8', 'arm64')])
-    const { home, env } = await makeSandbox(github)
+    const { home, env } = await makeSandbox(github, { SHELL: '/bin/bash' })
     const plutil = await makePlutilSpy(home)
     env.OH_DSH_PLUTIL = plutil.bin
     const apps = join(home, 'Applications')
@@ -253,7 +306,8 @@ test('desktop install registers the unified launcher', { skip: skipOnWindows }, 
     const launched = runLauncher(launcher, ['desktop'], env)
     assert.equal(launched.status, 0, launched.stderr)
     assert.match(launched.stdout, /desktop-0\.1\.8/)
-    assert.match(await readFile(join(home, '.profile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.match(await readFile(join(home, '.bash_profile'), 'utf8'), /Oh-DSH launcher path/)
+    assert.match(await readFile(join(home, '.bashrc'), 'utf8'), /Oh-DSH launcher path/)
   } finally {
     await github.stop()
   }
